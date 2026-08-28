@@ -1,0 +1,237 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { AlertTriangle, CheckCircle2, ChevronDown, Wrench, ListChecks } from "lucide-react";
+import type { ParseOutput } from "@/lib/mcq/parser";
+
+interface DetectCardProps {
+  parsed: ParseOutput | null;
+  selected: Set<number>;
+  onToggle: (id: number) => void;
+  onSelectAll: () => void;
+  onSelectNone: () => void;
+  onSelectRange: (fromPos: number, toPos: number) => void;
+  onAutoFix: () => void;
+  allowBroken: boolean;
+  onAllowBrokenChange: (v: boolean) => void;
+  fixing: boolean;
+}
+
+const PAGE = 100;
+
+export function DetectCard({
+  parsed,
+  selected,
+  onToggle,
+  onSelectAll,
+  onSelectNone,
+  onSelectRange,
+  onAutoFix,
+  allowBroken,
+  onAllowBrokenChange,
+  fixing,
+}: DetectCardProps) {
+  const [visible, setVisible] = useState(PAGE);
+  const [rangeFrom, setRangeFrom] = useState("");
+  const [rangeTo, setRangeTo] = useState("");
+
+  const stats = useMemo(() => {
+    if (!parsed) return null;
+    const withOptions = parsed.questions.filter((q) => q.options.length >= 2).length;
+    return { total: parsed.questions.length, withOptions };
+  }, [parsed]);
+
+  if (!parsed || !stats) return null;
+
+  const serial = parsed.serial;
+  const questions = parsed.questions;
+  const shown = questions.slice(0, visible);
+
+  const scriptLabel =
+    parsed.numberScript === "bn" ? "বাংলা সংখ্যা (১,২,৩)" : parsed.numberScript === "en" ? "English সংখ্যা (1,2,3)" : parsed.numberScript === "mixed" ? "বাংলা + English মিক্স" : "—";
+
+  const applyRange = () => {
+    const f = parseInt(rangeFrom, 10);
+    const t = parseInt(rangeTo, 10);
+    if (!isNaN(f) && !isNaN(t) && f >= 1 && t >= f && t <= questions.length) {
+      onSelectRange(f - 1, t - 1);
+    }
+  };
+
+  return (
+    <Card id="step-detect">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">২</span>
+          <CardTitle className="text-lg md:text-xl">ডিটেকশন রেজাল্ট ও প্রশ্ন সিলেকশন</CardTitle>
+        </div>
+        <CardDescription>কোন কোন প্রশ্ন শাফল হবে সেগুলো টিক দিয়ে সিলেক্ট করুন।</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {/* স্ট্যাটস */}
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
+            <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{stats.total}</div>
+            <div className="text-xs text-muted-foreground">মোট প্রশ্ন ডিটেক্ট</div>
+          </div>
+          <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
+            <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{stats.withOptions}</div>
+            <div className="text-xs text-muted-foreground">অপশনসহ প্রশ্ন</div>
+          </div>
+          <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
+            <div className="mt-1 text-sm font-semibold">{scriptLabel}</div>
+            <div className="text-xs text-muted-foreground">নম্বরের ধরন</div>
+          </div>
+          <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
+            <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">
+              {selected.size}
+            </div>
+            <div className="text-xs text-muted-foreground">সিলেক্টেড</div>
+          </div>
+        </div>
+
+        {/* সিরিয়াল স্ট্যাটাস */}
+        {serial && (
+          <div
+            className={`rounded-xl border p-4 ${
+              serial.status === "ok"
+                ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30"
+                : "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30"
+            }`}
+          >
+            <div className="flex flex-wrap items-center gap-3">
+              {serial.status === "ok" ? (
+                <CheckCircle2 className="h-6 w-6 shrink-0 text-emerald-600" />
+              ) : (
+                <AlertTriangle className="h-6 w-6 shrink-0 text-amber-600" />
+              )}
+              <div className="min-w-0 flex-1">
+                {serial.status === "ok" ? (
+                  <>
+                    <div className="font-semibold text-emerald-800 dark:text-emerald-300">
+                      ✅ সিরিয়াল ঠিক আছে — শাফল করার জন্য রেডি!
+                    </div>
+                    <div className="mt-0.5 text-sm text-emerald-700/80 dark:text-emerald-400/80">
+                      প্রশ্ন নম্বর {serial.startAt} থেকে {questions[questions.length - 1].originalNumber} পর্যন্ত পরপর সাজানো।
+                      {!serial.startsAtOne && " (নোট: নম্বর ১ থেকে শুরু হয়নি, কিন্তু ক্রম ঠিক আছে)"}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="font-semibold text-amber-800 dark:text-amber-300">
+                      ⚠️ সিরিয়ালে {Math.min(serial.issues.length, 30)} টি জায়গায় সমস্যা পাওয়া গেছে
+                    </div>
+                    <div className="mt-1 text-sm text-amber-700/90 dark:text-amber-400/90">
+                      {serial.issues.slice(0, 3).map((is, i) => (
+                        <div key={i}>
+                          প্রশ্ন #{is.index + 1}: নম্বর {is.expected} হওয়ার কথা, কিন্তু পাওয়া গেছে {is.found}
+                        </div>
+                      ))}
+                      {serial.issues.length > 3 && <div>...আরও {serial.issues.length - 3} টি</div>}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {serial.status === "broken" && (
+              <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-amber-200 pt-3 dark:border-amber-800">
+                <Button size="sm" className="gap-2 bg-amber-600 hover:bg-amber-700" onClick={onAutoFix} disabled={fixing}>
+                  <Wrench className="h-4 w-4" />
+                  {fixing ? "ঠিক করা হচ্ছে..." : "🔧 অটো নম্বরিং ঠিক করুন"}
+                </Button>
+                <div className="flex items-center gap-2">
+                  <Switch id="allow-broken" checked={allowBroken} onCheckedChange={onAllowBrokenChange} />
+                  <Label htmlFor="allow-broken" className="text-sm cursor-pointer">
+                    যেভাবে আছে তেভাবে চালান
+                  </Label>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* সিলেকশন টুলবার */}
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-muted/40 p-3">
+          <ListChecks className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
+          <Button size="sm" variant="outline" onClick={onSelectAll}>
+            সব সিলেক্ট
+          </Button>
+          <Button size="sm" variant="outline" onClick={onSelectNone}>
+            সব বাদ
+          </Button>
+          <div className="flex items-center gap-1.5">
+            <Input
+              value={rangeFrom}
+              onChange={(e) => setRangeFrom(e.target.value)}
+              className="h-8 w-16 text-center"
+              placeholder="থেকে"
+              inputMode="numeric"
+            />
+            <span className="text-sm text-muted-foreground">—</span>
+            <Input
+              value={rangeTo}
+              onChange={(e) => setRangeTo(e.target.value)}
+              className="h-8 w-16 text-center"
+              placeholder="পর্যন্ত"
+              inputMode="numeric"
+            />
+            <Button size="sm" variant="outline" onClick={applyRange}>
+              রেঞ্জ সিলেক্ট
+            </Button>
+          </div>
+          <span className="text-xs text-muted-foreground">(পজিশন নম্বর, যেমন ১ থেকে ৫০)</span>
+        </div>
+
+        {/* প্রশ্ন লিস্ট */}
+        <div className="max-h-[420px] space-y-1 overflow-y-auto rounded-xl border p-3 mcq-scroll">
+          {shown.map((q, pos) => (
+            <label
+              key={q.id}
+              className="flex cursor-pointer items-start gap-2.5 rounded-lg px-2 py-1.5 transition hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+            >
+              <Checkbox
+                checked={selected.has(q.id)}
+                onCheckedChange={() => onToggle(q.id)}
+                className="mt-0.5"
+              />
+              <span className="min-w-0 flex-1 text-sm leading-snug">
+                <span className="mr-1.5 inline-block min-w-[2.2rem] text-right font-semibold text-emerald-700 dark:text-emerald-400">
+                  {q.originalNumber}.
+                </span>
+                <span className="text-foreground/90">{q.lines[0].replace(/^[\s০-৯0-9.।):–\-—]+/, "")}</span>
+                {q.options.length > 0 && (
+                  <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-[10px]">
+                    {q.options.length} অপশন
+                  </Badge>
+                )}
+                {q.lines.length > 1 + q.options.length && (
+                  <span className="ml-2 text-xs text-muted-foreground">(+{q.lines.length - 1 - q.options.length} লাইন)</span>
+                )}
+              </span>
+              <span className="sr-only">প্রশ্ন পজিশন {pos + 1}</span>
+            </label>
+          ))}
+          {visible < questions.length && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full gap-1 text-emerald-700 dark:text-emerald-400"
+              onClick={() => setVisible((v) => v + PAGE)}
+            >
+              <ChevronDown className="h-4 w-4" />
+              আরও দেখুন (বাকি {questions.length - visible} টি)
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
