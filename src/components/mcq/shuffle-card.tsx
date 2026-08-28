@@ -38,9 +38,11 @@ export function ShuffleCard({
   onShuffle,
   shuffling,
 }: ShuffleCardProps) {
+  const isOriginal = distribution === "original";
   const perSet = setCount > 0 ? Math.floor(selectedCount / setCount) : 0;
   const remainder = setCount > 0 ? selectedCount % setCount : 0;
-  const countInvalid = setCount < 2 || setCount > 50 || setCount > selectedCount;
+  const countInvalid =
+    setCount < 2 || setCount > 50 || (isOriginal ? false : setCount > selectedCount);
 
   return (
     <Card id="step-shuffle" className={enabled ? "border-emerald-300 dark:border-emerald-700" : ""}>
@@ -50,7 +52,7 @@ export function ShuffleCard({
           <CardTitle className="text-lg md:text-xl">শাফল সেটিংস ও শুরু</CardTitle>
         </div>
         <CardDescription>
-          কতটা সেট চান লিখে দিন (২–৫০, সাধারণত ৩–১০)। ২০, ১০০, ১০০০ — যত প্রশ্ন সিলেক্ট করবেন, সবগুলো সেটে ভাগ হয়ে যাবে।
+          কতটা সেট চান লিখে দিন (২–৫০, সাধারণত ৩–১০)। Original Shuffle-এ প্রতি সেটে সবগুলো প্রশ্ন থাকে, বাকি স্টাইলে প্রশ্ন ভাগ হয়ে যায়।
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -86,10 +88,15 @@ export function ShuffleCard({
             </div>
             {countInvalid && (
               <p className="text-xs text-red-600 dark:text-red-400">
-                ২ থেকে ৫০ এর মধ্যে দিন — সিলেক্টেড প্রশ্নের সংখ্যার চেয়ে বেশি হতে পারবে না।
+                ২ থেকে ৫০ এর মধ্যে দিন{!isOriginal && " — সিলেক্টেড প্রশ্নের সংখ্যার চেয়ে বেশি হতে পারবে না"}।
               </p>
             )}
-            {enabled && !countInvalid && (
+            {enabled && !countInvalid && isOriginal && (
+              <p className="text-xs text-muted-foreground">
+                প্রতি সেটে <span className="font-semibold text-emerald-700 dark:text-emerald-400">সবগুলো {selectedCount}</span> টি প্রশ্ন — কিন্তু প্রতি সেটের সিরিয়াল ক্রম আলাদা (যেমন: A: ১,২,৩,৪… / B: ৪,১,২,৫,৩…)
+              </p>
+            )}
+            {enabled && !countInvalid && !isOriginal && (
               <p className="text-xs text-muted-foreground">
                 প্রতি সেটে ≈ <span className="font-semibold text-emerald-700 dark:text-emerald-400">{perSet}</span> টি প্রশ্ন
                 {remainder > 0 && ` (প্রথম ${remainder} টি সেটে ১টা করে বেশি)`}
@@ -101,6 +108,15 @@ export function ShuffleCard({
           <div className="space-y-2">
             <Label className="font-medium">ভাগ করার স্টাইল</Label>
             <RadioGroup value={distribution} onValueChange={(v) => onDistributionChange(v as Distribution)} className="gap-2">
+              <div className="flex items-start gap-2">
+                <RadioGroupItem value="original" id="dist-original" className="mt-0.5" />
+                <Label htmlFor="dist-original" className="cursor-pointer text-sm leading-snug">
+                  <span className="font-medium">⭐ Original Shuffle — সব সেটে সব প্রশ্ন</span>
+                  <span className="block text-xs text-muted-foreground">
+                    ১০০ প্রশ্ন × ৫ সেট = প্রতি সেটেই ১০০টা প্রশ্ন, কিন্তু সিরিয়াল ক্রম সেটভেদে আলাদা — সেট A: ১,২,৩,৪… সেট B: ৪,১,২,৫,৩… এক সেটের ক্রম আরেক সেটের সাথে মিলবে না। প্রশ্ন-অপশন হুবহু অপরিবর্তিত।
+                  </span>
+                </Label>
+              </div>
               <div className="flex items-start gap-2">
                 <RadioGroupItem value="interleaved" id="dist-inter" className="mt-0.5" />
                 <Label htmlFor="dist-inter" className="cursor-pointer text-sm leading-snug">
@@ -118,7 +134,7 @@ export function ShuffleCard({
               <div className="flex items-start gap-2">
                 <RadioGroupItem value="random" id="dist-random" className="mt-0.5" />
                 <Label htmlFor="dist-random" className="cursor-pointer text-sm leading-snug">
-                  <span className="font-medium">একদম এলোমেলো</span>
+                  <span className="font-medium">একদম এলোমেলো ভাগ</span>
                   <span className="block text-xs text-muted-foreground">পুরো পুল আগে শাফল হয়ে তারপর সেটে ভাগ হবে</span>
                 </Label>
               </div>
@@ -126,16 +142,18 @@ export function ShuffleCard({
           </div>
         </div>
 
-        {/* সেটের ভেতরে শাফল */}
-        <div className="flex items-center justify-between rounded-xl border bg-muted/40 p-3">
-          <div>
-            <Label htmlFor="shuffle-within" className="cursor-pointer font-medium">
-              সেটের ভেতরেও প্রশ্ন এলোমেলো
-            </Label>
-            <p className="text-xs text-muted-foreground">বন্ধ রাখলে সেটের ভেতরে প্রশ্নগুলো অরিজিনাল সিরিয়ালেই থাকবে</p>
+        {/* সেটের ভেতরে শাফল — Original Shuffle-এ দরকার নেই (ক্রম ইতিমধ্যেই সেটপ্রতি আলাদা) */}
+        {!isOriginal && (
+          <div className="flex items-center justify-between rounded-xl border bg-muted/40 p-3">
+            <div>
+              <Label htmlFor="shuffle-within" className="cursor-pointer font-medium">
+                সেটের ভেতরেও প্রশ্ন এলোমেলো
+              </Label>
+              <p className="text-xs text-muted-foreground">বন্ধ রাখলে সেটের ভেতরে প্রশ্নগুলো অরিজিনাল সিরিয়ালেই থাকবে</p>
+            </div>
+            <Switch id="shuffle-within" checked={shuffleWithin} onCheckedChange={onShuffleWithinChange} />
           </div>
-          <Switch id="shuffle-within" checked={shuffleWithin} onCheckedChange={onShuffleWithinChange} />
-        </div>
+        )}
 
         {/* বড় বাটন */}
         <div className="flex flex-col items-stretch gap-2">
@@ -151,6 +169,10 @@ export function ShuffleCard({
           {lockReason ? (
             <p className="flex items-center justify-center gap-1.5 text-center text-sm text-amber-700 dark:text-amber-400">
               <Lock className="h-3.5 w-3.5" /> {lockReason}
+            </p>
+          ) : isOriginal ? (
+            <p className="text-center text-sm text-emerald-700 dark:text-emerald-400">
+              রেডি! ক্লিক করলেই {setCount} টি সেট — প্রতিটিতে সব {selectedCount} টি প্রশ্ন, সিরিয়াল ক্রম আলাদা, প্রতিটি সেট আলাদা পেজে।
             </p>
           ) : (
             <p className="text-center text-sm text-emerald-700 dark:text-emerald-400">

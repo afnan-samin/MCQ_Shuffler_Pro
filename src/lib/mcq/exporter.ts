@@ -7,6 +7,7 @@
 import { AlignmentType, Document, Packer, Paragraph, TextRun } from "docx";
 import type { McqQuestion } from "./parser";
 import { getSetName, setToText, type NameStyle } from "./set-engine";
+import { splitLineSegments, type Enc } from "./encoding";
 
 export type FontMode = "auto" | "legacy" | "unicode" | "english";
 
@@ -14,8 +15,10 @@ export interface ExportOptions {
   fontMode: FontMode;
   /** Bijoy/ANSI লিগ্যাসি ফন্ট (যেমন SutonnyMJ) */
   legacyFont: string;
-  /** Unicode বাংলা ফন্ট (যেমন Nirmala UI, SolaimanLipi) */
+  /** Unicode বাংলা ফন্ট (যেমন Nirmala UI, Kalpurush) */
   unicodeFont: string;
+  /** English ফন্ট (auto মোডে English শব্দে বসবে) */
+  englishFont: string;
   /** ফন্ট সাইজ (pt) */
   fontSize: number;
   nameStyle: NameStyle;
@@ -28,6 +31,7 @@ export const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
   fontMode: "auto",
   legacyFont: "SutonnyMJ",
   unicodeFont: "Nirmala UI",
+  englishFont: "Times New Roman",
   fontSize: 12,
   nameStyle: "letter",
   includeHeader: true,
@@ -47,12 +51,40 @@ function fontForLine(line: string, opts: ExportOptions): string {
     case "unicode":
       return opts.unicodeFont;
     case "english":
-      return "Times New Roman";
+      return opts.englishFont;
     default: {
       // auto: Unicode বাংলা হলে Unicode ফন্ট, নাহলে লিগ্যাসি (Bijoy/English)
       return isBanglaUnicode(line) ? opts.unicodeFont : opts.legacyFont;
     }
   }
+}
+
+/**
+ * লাইন → ফন্ট-রান তালিকা। auto মোডে শব্দ ধরে ধরে ফন্ট বসে:
+ * Bijoy শব্দ → legacyFont (SutonnyMJ), Unicode বাংলা → unicodeFont,
+ * English → englishFont। অন্য মোডে পুরো লাইন এক ফন্টে।
+ */
+export interface LineRun {
+  text: string;
+  font: string;
+  enc: Enc;
+}
+
+export function runsForLine(line: string, opts: ExportOptions): LineRun[] {
+  if (opts.fontMode !== "auto") {
+    return [{ text: line, font: fontForLine(line, opts), enc: "neutral" }];
+  }
+  const base = fontForLine(line, opts);
+  const segs = splitLineSegments(line);
+  if (segs.length === 0) return [{ text: line, font: base, enc: "neutral" }];
+  if (segs.length === 1) return [{ text: line, font: base, enc: segs[0].enc }];
+  return segs.map((s) => {
+    let font = base;
+    if (s.enc === "bijoy") font = opts.legacyFont;
+    else if (s.enc === "unicode") font = opts.unicodeFont;
+    else if (s.enc === "english") font = opts.englishFont;
+    return { text: s.text, font, enc: s.enc };
+  });
 }
 
 function fontObj(name: string) {
@@ -99,31 +131,34 @@ function buildDocxParagraphs(sets: McqQuestion[][], opts: ExportOptions): Paragr
         new Paragraph({
           alignment: AlignmentType.CENTER,
           spacing: { after: 60 },
-          children: [
-            new TextRun({
-              text: h,
-              size: halfPoints,
-              bold: isBanglaUnicode(h) === false && /^[A-Z0-9 ]+$/.test(h),
-              font: fontObj(fontForLine(h, opts)),
-            }),
-          ],
+          children: runsForLine(h, opts).map(
+            (r) =>
+              new TextRun({
+                text: r.text,
+                size: halfPoints,
+                bold: isBanglaUnicode(h) === false && /^[A-Z0-9 ]+$/.test(h),
+                font: fontObj(r.font),
+              })
+          ),
         })
       );
     }
 
-    // প্রশ্নগুলো
+    // প্রশ্নগুলো — সিরিয়ালসহ প্রতিটি লাইন প্লেইন টেক্সট রানে (কোনো বুলেট/
+    // অটো নম্বরিং নেই), শব্দ ধরে ধরে সঠিক ফন্ট বসে
     for (const q of questions) {
       for (const line of q.lines) {
         paras.push(
           new Paragraph({
             spacing: { after: 40 },
-            children: [
-              new TextRun({
-                text: line,
-                size: halfPoints,
-                font: fontObj(fontForLine(line, opts)),
-              }),
-            ],
+            children: runsForLine(line, opts).map(
+              (r) =>
+                new TextRun({
+                  text: r.text,
+                  size: halfPoints,
+                  font: fontObj(r.font),
+                })
+            ),
           })
         );
       }
@@ -189,8 +224,10 @@ function buildSetsHtml(sets: McqQuestion[][], opts: ExportOptions, forPrint: boo
           (q) =>
             q.lines
               .map((line) => {
-                const f = fontForLine(line, opts);
-                return `<p class="line" style="font-family:'${f}'">${escapeHtml(line)}</p>`;
+                const spans = runsForLine(line, opts)
+                  .map((r) => `<span style="font-family:'${r.font}'">${escapeHtml(r.text)}</span>`)
+                  .join("");
+                return `<p class="line">${spans}</p>`;
               })
               .join("\n") + `<p class="gap">&nbsp;</p>`
         )

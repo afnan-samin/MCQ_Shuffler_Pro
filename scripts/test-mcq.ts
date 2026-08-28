@@ -1,6 +1,8 @@
 // পার্সার + সেট ইঞ্জিন কুইক টেস্ট
 import { parseMcq, autoFixNumbering } from "../src/lib/mcq/parser";
 import { buildSets, getSetName } from "../src/lib/mcq/set-engine";
+import { classifyWord, analyzeText, splitLineSegments } from "../src/lib/mcq/encoding";
+import { runsForLine, DEFAULT_EXPORT_OPTIONS } from "../src/lib/mcq/exporter";
 import { SAMPLE_MCQ } from "../src/lib/mcq/sample";
 
 let pass = 0, fail = 0;
@@ -92,6 +94,60 @@ const dt = performance.now() - t0;
 check("২০০০ প্রশ্ন ডিটেক্ট", p2000.questions.length === 2000, `got ${p2000.questions.length}`);
 check("৪০০০ অপশন ডিটেক্ট", p2000.questions.every(q => q.options.length === 2));
 console.log(`  ⏱ পার্স টাইম: ${dt.toFixed(1)}ms ${dt < 500 ? "(দ্রুত ✓)" : "(স্লো!)"}`);
+
+console.log("— টেস্ট ১১: Original Shuffle (প্রতি সেটে সব প্রশ্ন, ক্রম আলাদা) —");
+const oSets = buildSets(pool, { setCount: 3, distribution: "original", shuffleWithin: true });
+check("৩টি সেট", oSets.length === 3);
+check("প্রতি সেটে সবগুলো ১২ প্রশ্ন", oSets.every(s => s.length === 12), oSets.map(s => s.length).join(","));
+check("প্রতি সেটে সব প্রশ্ন থাকে (id সেট সমান)", oSets.every(s => new Set(s.map(q => q.id)).size === 12));
+check("কোনো সেট অরিজিনাল ক্রমে নেই", oSets.every(s => s.some((q, i) => q.id !== i)));
+const oKeys = oSets.map(s => s.map(q => q.id).join(","));
+check("সেটগুলোর ক্রম পরস্পর আলাদা", new Set(oKeys).size === 3);
+const bigOrig = buildSets(bigPool, { setCount: 5, distribution: "original", shuffleWithin: true });
+check("১০০০ প্রশ্ন × ৫ সেট: প্রতিটিতে ১০০০", bigOrig.every(s => s.length === 1000));
+check("১০০০ প্রশ্ন: ক্রমগুলো আলাদা", new Set(bigOrig.map(s => s.map(q => q.id).join(","))).size === 5);
+
+console.log("— টেস্ট ১২: এনকোডিং ডিটেক্টর (শব্দ ধরে) —");
+check("ইউনিকোড বাংলা", classifyWord("বাংলাদেশ", null) === "unicode");
+check("English কমন শব্দ", classifyWord("capital", null) === "english");
+check("ASCII সংখ্যা = neutral", classifyWord("1971", null) === "neutral");
+check("বাংলা সংখ্যা = unicode", classifyWord("১৯৭১", null) === "unicode");
+check("Bijoy strong মার্কার (†)", classifyWord("Av‡i", null) === "bijoy");
+check("Bijoy strong মার্কার (µ)", classifyWord("Pµ", null) === "bijoy");
+check("Bijoy ASCII + bijoy কনটেক্সট", classifyWord("evsjv", "bijoy") === "bijoy");
+check("ASCII + কনটেক্সট নেই = english", classifyWord("evsjv", null) === "english");
+
+const encBn = analyzeText("১. বাংলাদেশের রাজধানী কোনটি?");
+check("ইউনিকোড ডক: dominant=unicode", encBn.dominant === "unicode");
+check("ইউনিকোড ডক: সব শব্দ unicode", encBn.unicode === encBn.total, JSON.stringify(encBn));
+
+const encBijoy = analyzeText("1. evsjv Av‡i Pµ? wKQz");
+check("Bijoy ডক: dominant=bijoy", encBijoy.dominant === "bijoy");
+check("Bijoy ডক: bijoy শব্দ ধরা পড়েছে", encBijoy.bijoy === 4, JSON.stringify(encBijoy));
+
+const encMix = analyzeText("১. বাংলা প্রশ্ন?\n2. evsjv Av‡i?\n3. What is capital?");
+check("মিক্সড নমুনা: তিন ধরনই আছে", encMix.bijoy > 0 && encMix.unicode > 0 && encMix.english > 0, JSON.stringify(encMix));
+
+console.log("— টেস্ট ১৩: এক্সপোর্ট ফন্ট-রান (শব্দ ধরে) —");
+const bijoyLine = "1. evsjv Av‡i Pµ?";
+const bijoyRuns = runsForLine(bijoyLine, DEFAULT_EXPORT_OPTIONS);
+check("Bijoy লাইন → SutonnyMJ ফন্ট", bijoyRuns.every(r => r.font === "SutonnyMJ"), JSON.stringify(bijoyRuns));
+check("Bijoy লাইন: টেক্সট অক্ষত", bijoyRuns.map(r => r.text).join("") === bijoyLine);
+
+const mixLine = "১. বাংলা question কোনটি?";
+const mixRuns = runsForLine(mixLine, DEFAULT_EXPORT_OPTIONS);
+check("মিক্সড লাইন: টেক্সট অক্ষত", mixRuns.map(r => r.text).join("") === mixLine);
+check("মিক্সড লাইন: English শব্দে Times", mixRuns.some(r => r.enc === "english" && r.font === "Times New Roman"), JSON.stringify(mixRuns));
+check("মিক্সড লাইন: বাংলায় Unicode ফন্ট", mixRuns.some(r => r.enc === "unicode" && r.font === "Nirmala UI"));
+const segs = splitLineSegments(mixLine);
+check("splitLineSegments: ১+ সেগমেন্ট", segs.length >= 2 && segs.map(s => s.text).join("") === mixLine);
+
+console.log("— টেস্ট ১৪: প্লেইন টেক্সট সিরিয়াল (কোনো বুলেট নেই) —");
+const p14 = parseMcq("১. প্রশ্ন?\nক) উত্তর\n2. প্রশ্ন দুই?\na) X");
+check("২টি প্রশ্ন", p14.questions.length === 2, `got ${p14.questions.length}`);
+check("লাইনে নম্বর টেক্সট থাকে (প্লেইন)", p14.questions[0].lines[0] === "১. প্রশ্ন?", p14.questions[0].lines[0]);
+check("rawPrefix সাধারণ টেক্সট", p14.questions[0].rawPrefix.trim() === "১.", JSON.stringify(p14.questions[0].rawPrefix));
+check("সেট টেক্সটে বুলেট চিহ্ন যোগ হয় না", !"•‣◦·-–".split("").some(b => getSetName(0, "letter").startsWith(b)));
 
 console.log(`\n==== রেজাল্ট: ${pass} পাস, ${fail} ফেল ====`);
 process.exit(fail ? 1 : 0);

@@ -3,10 +3,32 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ---------- ফন্ট এমবেড ---------- */
+
+/* Kalpurush — পুরো ওয়েবসাইটের মূল ফন্ট (ইউনিকোড বাংলা + English) */
+@font-face {
+  font-family: "Kalpurush";
+  src: url("/fonts/kalpurush.woff2") format("woff2"),
+    url("/fonts/kalpurush.ttf") format("truetype");
+  font-display: swap;
+  font-weight: 100 900;
+  font-style: normal;
+}
+
+/* SutonnyMJ — Bijoy (ANSI লিগ্যাসি) লেখা ওয়েবে দেখানোর জন্য।
+   আগে ইউজারের PC-তে ইনস্টল করা SutonnyMJ ব্যবহার হয়, না থাকলে এই ওয়েব-ফন্ট। */
+@font-face {
+  font-family: "SutonnyMJ Web";
+  src: url("/fonts/SutonnyMJ.woff") format("woff");
+  font-display: swap;
+  font-weight: 100 900;
+  font-style: normal;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-bengali), var(--font-geist-sans), "Noto Sans Bengali", sans-serif;
+  --font-sans: "Kalpurush", var(--font-bengali), var(--font-geist-sans), "Noto Sans Bengali", sans-serif;
   --font-mono: var(--font-geist-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -118,6 +140,8 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* পুরো ওয়েবসাইটের ফন্ট = Kalpurush (ব্যবহারকারীর অনুরোধ) */
+    font-family: "Kalpurush", var(--font-bengali), var(--font-geist-sans), "Noto Sans Bengali", sans-serif;
   }
 }
 
@@ -146,3 +170,48 @@ input[type="number"] {
   -moz-appearance: textfield;
   appearance: textfield;
 }
+
+/* ---------- এনকোডিং ডিটেক্টর — শব্দ-ধরে রঙ ও ফন্ট ---------- */
+
+/* Bijoy লেখার ফন্ট স্ট্যাক: PC-তে ইনস্টল করা ফন্ট আগে, তারপর ওয়েব-ফন্ট */
+.tokfont-bijoy,
+.tok-bijoy {
+  font-family: "SutonnyMJ", "SutonnyMJ Web", "SutonnyMJ Bold", "SutonnyOMJ", "Bijoy", sans-serif;
+}
+
+.tok {
+  border-radius: 3px;
+  padding: 0 1.5px;
+}
+
+/* Bijoy শব্দ — সোনালি রঙ */
+.tok-bijoy {
+  background: color-mix(in oklab, #f59e0b 16%, transparent);
+  color: #b45309;
+}
+.dark .tok-bijoy {
+  color: #fcd34d;
+}
+
+/* ইউনিকোড বাংলা শব্দ — সবুজ রঙ */
+.tok-unicode {
+  background: color-mix(in oklab, #10b981 14%, transparent);
+  color: #047857;
+  border-radius: 3px;
+  padding: 0 1.5px;
+}
+.dark .tok-unicode {
+  color: #6ee7b7;
+}
+
+/* English শব্দ — নীল রঙ */
+.tok-english {
+  background: color-mix(in oklab, #6366f1 13%, transparent);
+  color: #4338ca;
+  border-radius: 3px;
+  padding: 0 1.5px;
+}
+.dark .tok-english {
+  color: #a5b4fc;
+}
+

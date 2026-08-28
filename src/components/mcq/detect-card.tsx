@@ -8,8 +8,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { AlertTriangle, CheckCircle2, ChevronDown, Wrench, ListChecks } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, Wrench, ListChecks, ScanText } from "lucide-react";
 import type { ParseOutput } from "@/lib/mcq/parser";
+import { lineDominantOf, type Enc, type EncodingStats } from "@/lib/mcq/encoding";
+import { TokText } from "@/components/mcq/tok-text";
 
 interface DetectCardProps {
   parsed: ParseOutput | null;
@@ -22,9 +24,14 @@ interface DetectCardProps {
   allowBroken: boolean;
   onAllowBrokenChange: (v: boolean) => void;
   fixing: boolean;
+  /** শব্দ-ধরে এনকোডিং ডিটেক্টরের ফলাফল */
+  encStats: EncodingStats | null;
+  /** ডকুমেন্টের প্রধান লেখার ধরন */
+  dominant: Enc | null;
 }
 
 const PAGE = 100;
+const DETECT_PREVIEW_LINES = 30;
 
 export function DetectCard({
   parsed,
@@ -37,6 +44,8 @@ export function DetectCard({
   allowBroken,
   onAllowBrokenChange,
   fixing,
+  encStats,
+  dominant,
 }: DetectCardProps) {
   const [visible, setVisible] = useState(PAGE);
   const [rangeFrom, setRangeFrom] = useState("");
@@ -46,6 +55,20 @@ export function DetectCard({
     if (!parsed) return null;
     const withOptions = parsed.questions.filter((q) => q.options.length >= 2).length;
     return { total: parsed.questions.length, withOptions };
+  }, [parsed]);
+
+  // ডিটেক্টর প্রিভিউ — প্রথম কয়েকটি লাইন শব্দ-ধরে রঙসহ
+  const previewLines = useMemo(() => {
+    if (!parsed) return [] as { text: string; kind: "preamble" | "q" | "o" }[];
+    const out: { text: string; kind: "preamble" | "q" | "o" }[] = [];
+    for (const p of parsed.preamble.slice(0, 4)) out.push({ text: p, kind: "preamble" });
+    for (const q of parsed.questions) {
+      for (let i = 0; i < q.lines.length; i++) {
+        out.push({ text: q.lines[i], kind: i === 0 ? "q" : "o" });
+      }
+      if (out.length >= DETECT_PREVIEW_LINES) break;
+    }
+    return out.slice(0, DETECT_PREVIEW_LINES);
   }, [parsed]);
 
   if (!parsed || !stats) return null;
@@ -96,6 +119,65 @@ export function DetectCard({
             <div className="text-xs text-muted-foreground">সিলেক্টেড</div>
           </div>
         </div>
+
+        {/* শব্দ-ধরে এনকোডিং ডিটেক্টর */}
+        {encStats && encStats.total > 0 && (
+          <div className="rounded-xl border border-sky-200 bg-sky-50/50 p-4 dark:border-sky-900 dark:bg-sky-950/20">
+            <div className="flex flex-wrap items-center gap-2">
+              <ScanText className="h-5 w-5 text-sky-700 dark:text-sky-400" />
+              <span className="font-semibold text-sky-900 dark:text-sky-200">শব্দ ধরে ধরে ডিটেক্টর</span>
+              <span className="text-xs text-sky-700/80 dark:text-sky-400/80">
+                — প্রতিটি শব্দ চেক করা হয়েছে: কোনটা Bijoy, কোনটা ইউনিকোড, কোনটা English
+              </span>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+              <div className="rounded-lg border bg-white p-2 text-center dark:bg-background">
+                <div className="text-lg font-bold">{encStats.total}</div>
+                <div className="text-[11px] text-muted-foreground">মোট শব্দ চেক</div>
+              </div>
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-center dark:border-amber-900 dark:bg-amber-950/30">
+                <div className="text-lg font-bold text-amber-800 dark:text-amber-300">
+                  {encStats.bijoy} <span className="text-xs font-medium">({Math.round((encStats.bijoy / encStats.total) * 100)}%)</span>
+                </div>
+                <div className="text-[11px] text-amber-700 dark:text-amber-400">Bijoy টাইপ (SutonnyMJ)</div>
+              </div>
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-center dark:border-emerald-900 dark:bg-emerald-950/30">
+                <div className="text-lg font-bold text-emerald-800 dark:text-emerald-300">
+                  {encStats.unicode} <span className="text-xs font-medium">({Math.round((encStats.unicode / encStats.total) * 100)}%)</span>
+                </div>
+                <div className="text-[11px] text-emerald-700 dark:text-emerald-400">ইউনিকোড বাংলা (অভ্র)</div>
+              </div>
+              <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-2 text-center dark:border-indigo-900 dark:bg-indigo-950/30">
+                <div className="text-lg font-bold text-indigo-800 dark:text-indigo-300">
+                  {encStats.english} <span className="text-xs font-medium">({Math.round((encStats.english / encStats.total) * 100)}%)</span>
+                </div>
+                <div className="text-[11px] text-indigo-700 dark:text-indigo-400">English</div>
+              </div>
+            </div>
+
+            {/* প্রিভিউ — শব্দ ধরে রঙ ও ফন্ট */}
+            <div className="mt-3 space-y-1 rounded-lg border bg-white p-3 text-[13px] leading-relaxed dark:bg-background">
+              {previewLines.map((ln, i) => (
+                <div key={i} className={ln.kind === "preamble" ? "font-medium text-muted-foreground" : ""}>
+                  <TokText line={ln.text} dominant={lineDominantOf(ln.text) ?? dominant} />
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <span className="tok tok-bijoy px-1">Avi evsjv</span> = Bijoy → SutonnyMJ ফন্টে দেখানো হচ্ছে
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="tok tok-unicode px-1">বাংলা</span> = ইউনিকোড
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="tok tok-english px-1">English</span> = English
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* সিরিয়াল স্ট্যাটাস */}
         {serial && (
@@ -190,7 +272,7 @@ export function DetectCard({
           <span className="text-xs text-muted-foreground">(পজিশন নম্বর, যেমন ১ থেকে ৫০)</span>
         </div>
 
-        {/* প্রশ্ন লিস্ট */}
+        {/* প্রশ্ন লিস্ট — Bijoy শব্দ SutonnyMJ ফন্টে */}
         <div className="max-h-[420px] space-y-1 overflow-y-auto rounded-xl border p-3 mcq-scroll">
           {shown.map((q, pos) => (
             <label
@@ -206,7 +288,13 @@ export function DetectCard({
                 <span className="mr-1.5 inline-block min-w-[2.2rem] text-right font-semibold text-emerald-700 dark:text-emerald-400">
                   {q.originalNumber}.
                 </span>
-                <span className="text-foreground/90">{q.lines[0].replace(/^[\s০-৯0-9.।):–\-—]+/, "")}</span>
+                <span className="text-foreground/90">
+                  <TokText
+                    line={q.lines[0].replace(/^[\s০-৯0-9.।):–\-—]+/, "")}
+                    dominant={lineDominantOf(q.lines[0]) ?? dominant}
+                    colored={false}
+                  />
+                </span>
                 {q.options.length > 0 && (
                   <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-[10px]">
                     {q.options.length} অপশন

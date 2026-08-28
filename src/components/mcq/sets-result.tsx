@@ -24,6 +24,8 @@ import {
 import type { McqQuestion } from "@/lib/mcq/parser";
 import { getSetName, type NameStyle } from "@/lib/mcq/set-engine";
 import type { ExportOptions, FontMode } from "@/lib/mcq/exporter";
+import { lineDominantOf, type Enc } from "@/lib/mcq/encoding";
+import { TokText } from "@/components/mcq/tok-text";
 
 interface SetsResultProps {
   sets: McqQuestion[][];
@@ -39,10 +41,13 @@ interface SetsResultProps {
   onCopyAll: () => void;
   busy: string | null;
   copiedSet: number | null;
+  /** ডকুমেন্টের প্রধান লেখার ধরন (প্রিভিউতে সঠিক ফন্টের জন্য) */
+  dominant: Enc | null;
 }
 
 const LEGACY_FONT_SUGGESTIONS = ["SutonnyMJ", "SutonnyOMJ", "SutonnyEMJ", "BijoyClassic", "SushreeMJ", "ShiblyMJ"];
-const UNICODE_FONT_SUGGESTIONS = ["Nirmala UI", "SolaimanLipi", "Kalpurush", "Nikosh", "Shonar Bangla"];
+const UNICODE_FONT_SUGGESTIONS = ["Nirmala UI", "Kalpurush", "SolaimanLipi", "Nikosh", "Shonar Bangla"];
+const ENGLISH_FONT_SUGGESTIONS = ["Times New Roman", "Arial", "Calibri", "Cambria", "Georgia"];
 
 export function SetsResult({
   sets,
@@ -58,6 +63,7 @@ export function SetsResult({
   onCopyAll,
   busy,
   copiedSet,
+  dominant,
 }: SetsResultProps) {
   const [showSettings, setShowSettings] = useState(false);
   const totalQ = sets.reduce((a, s) => a + s.length, 0);
@@ -88,7 +94,7 @@ export function SetsResult({
 
         {showSettings && (
           <div className="space-y-4 rounded-xl border bg-muted/30 p-4">
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <div className="space-y-1.5">
                 <Label className="text-sm">ফন্ট মোড</Label>
                 <Select value={exportOpts.fontMode} onValueChange={(v) => patch({ fontMode: v as FontMode })}>
@@ -96,19 +102,19 @@ export function SetsResult({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="auto">অটো (মিক্সড ফাইলের জন্য)</SelectItem>
+                    <SelectItem value="auto">অটো — শব্দ ধরে ধরে ফন্ট</SelectItem>
                     <SelectItem value="legacy">Bijoy / লিগ্যাসি ফন্ট</SelectItem>
                     <SelectItem value="unicode">Unicode বাংলা</SelectItem>
-                    <SelectItem value="english">English (Times)</SelectItem>
+                    <SelectItem value="english">English</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-[11px] leading-snug text-muted-foreground">
-                  অটো মোডে বাংলা Unicode লাইনে {exportOpts.unicodeFont}, বাকিতে {exportOpts.legacyFont} বসবে
+                  অটো মোডে শব্দ ধরে ধরে ফন্ট বসে: Bijoy→{exportOpts.legacyFont}, ইউনিকোড→{exportOpts.unicodeFont}, English→{exportOpts.englishFont}
                 </p>
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-sm">Bijoy ফন্টের নাম (Word-এ বসবে)</Label>
+                <Label className="text-sm">Bijoy ফন্ট (Word-এ বসবে)</Label>
                 <Input
                   list="legacy-fonts"
                   value={exportOpts.legacyFont}
@@ -133,6 +139,21 @@ export function SetsResult({
                 />
                 <datalist id="unicode-fonts">
                   {UNICODE_FONT_SUGGESTIONS.map((f) => (
+                    <option key={f} value={f} />
+                  ))}
+                </datalist>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-sm">English ফন্ট</Label>
+                <Input
+                  list="english-fonts"
+                  value={exportOpts.englishFont}
+                  onChange={(e) => patch({ englishFont: e.target.value })}
+                  className="h-9"
+                />
+                <datalist id="english-fonts">
+                  {ENGLISH_FONT_SUGGESTIONS.map((f) => (
                     <option key={f} value={f} />
                   ))}
                 </datalist>
@@ -255,12 +276,22 @@ export function SetsResult({
                     <span className="min-w-[2rem] shrink-0 text-right font-semibold text-emerald-700 dark:text-emerald-400">
                       {q.originalNumber}.
                     </span>
-                    <span className="text-foreground/90">{q.lines[0].replace(/^[\s০-৯0-9.।):–\-—]+/, "")}</span>
+                    <span className="text-foreground/90">
+                      <TokText
+                        line={q.lines[0].replace(/^[\s০-৯0-9.।):–\-—]+/, "")}
+                        dominant={lineDominantOf(q.lines[0]) ?? dominant}
+                        colored={false}
+                      />
+                    </span>
                   </div>
                 ))}
               </div>
             </div>
           ))}
+        </div>
+
+        <div className="rounded-lg border bg-muted/30 px-3 py-2 text-center text-xs text-muted-foreground">
+          ✍️ সিরিয়ালগুলো <span className="font-medium text-foreground/80">প্লেইন টেক্সটে</span> বসে — কোনো বুলেট বা Word-এর অটো নম্বরিং নেই। প্রতিটি সেট আলাদা পেজে/সেগমেন্টে ভাগ হয়ে যায়।
         </div>
 
         <div className="flex items-center justify-center gap-1.5 pt-2 text-xs text-muted-foreground">

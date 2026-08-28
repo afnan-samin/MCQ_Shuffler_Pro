@@ -10,8 +10,10 @@ import {
   autoFixNumbering,
   parseMcq,
   type ParseOutput,
+  type McqQuestion,
 } from "@/lib/mcq/parser";
 import { buildSets, shuffled, type Distribution } from "@/lib/mcq/set-engine";
+import { analyzeText, type Enc, type EncodingStats } from "@/lib/mcq/encoding";
 import {
   allSetsClipboardText,
   copyToClipboard,
@@ -91,6 +93,27 @@ export default function Home() {
     }
   };
 
+  /** টেক্সট সেট করে সাথে সাথে ডিটেক্ট চালায় (আপলোড/নমুনার পরে) */
+  const loadAndDetect = (t: string) => {
+    setRawText(t);
+    setSets(null);
+    if (!t.trim()) {
+      setParsed(null);
+      setSelected(new Set());
+      return;
+    }
+    setDetecting(true);
+    try {
+      const result = parseMcq(t);
+      setParsed(result);
+      setSelected(new Set(result.questions.map((q) => q.id)));
+      setAllowBroken(false);
+      announceDetect(result);
+    } finally {
+      setDetecting(false);
+    }
+  };
+
   const handleDetect = () => {
     if (!rawText.trim()) return;
     setDetecting(true);
@@ -100,33 +123,18 @@ export default function Home() {
       setParsed(result);
       setSelected(new Set(result.questions.map((q) => q.id)));
       setAllowBroken(false);
-      if (result.questions.length === 0) {
-        toast({
-          title: "কোনো প্রশ্ন পাওয়া যায়নি",
-          description: "প্রশ্নগুলো নম্বর দিয়ে শুরু আছে কিনা দেখুন (যেমন: ১. অথবা 1.)",
-        });
-      } else if (result.serial?.status === "ok") {
-        toast({
-          title: `✅ ${result.questions.length} টি প্রশ্ন ডিটেক্ট হয়েছে`,
-          description: "সিরিয়াল ঠিক আছে — শাফল বাটন এখন চালু!",
-        });
-      } else if (result.serial) {
-        toast({
-          title: `⚠️ ${result.questions.length} টি প্রশ্ন পাওয়া গেছে, কিন্তু সিরিয়ালে সমস্যা আছে`,
-          description: "'অটো নম্বরিং ঠিক করুন' চাপলে এক ক্লিকে ঠিক হয়ে যাবে।",
-        });
-      }
+      announceDetect(result);
     } finally {
       setDetecting(false);
     }
   };
 
   const handleSample = () => {
-    setRawText(SAMPLE_MCQ);
-    setParsed(null);
-    setSelected(new Set());
-    setSets(null);
-    toast({ title: "নমুনা প্রশ্ন লোড হয়েছে", description: "এখন 'প্রশ্ন ডিটেক্ট করুন' চাপুন।" });
+    loadAndDetect(SAMPLE_MCQ);
+  };
+
+  const handleFileLoaded = (t: string) => {
+    loadAndDetect(t);
   };
 
   const handleAutoFix = () => {
@@ -156,6 +164,33 @@ export default function Home() {
       return next;
     });
   };
+
+  // ডিটেকশন ফলাফল অনুযায়ী টোস্ট
+  const announceDetect = (result: ParseOutput) => {
+    if (result.questions.length === 0) {
+      toast({
+        title: "কোনো প্রশ্ন পাওয়া যায়নি",
+        description: "প্রশ্নগুলো নম্বর দিয়ে শুরু আছে কিনা দেখুন (যেমন: ১. অথবা 1.)",
+      });
+    } else if (result.serial?.status === "ok") {
+      toast({
+        title: `✅ ${result.questions.length} টি প্রশ্ন ডিটেক্ট হয়েছে`,
+        description: "সিরিয়াল ঠিক আছে — শাফল বাটন এখন চালু!",
+      });
+    } else if (result.serial) {
+      toast({
+        title: `⚠️ ${result.questions.length} টি প্রশ্ন পাওয়া গেছে, কিন্তু সিরিয়ালে সমস্যা আছে`,
+        description: "'অটো নম্বরিং ঠিক করুন' চাপলে এক ক্লিকে ঠিক হয়ে যাবে।",
+      });
+    }
+  };
+
+  // শব্দ-ধরে এনকোডিং ডিটেক্টর (ডিটেক্ট হলেই চলে)
+  const encData = useMemo(() => {
+    if (!parsed) return { stats: null as EncodingStats | null, dominant: null as Enc | null };
+    const s = analyzeText(rawText);
+    return { stats: s, dominant: s.dominant };
+  }, [parsed, rawText]);
 
   const selectAll = () => {
     if (!parsed) return;
@@ -189,15 +224,24 @@ export default function Home() {
     setShuffling(true);
     try {
       const pool = parsed.questions.filter((q) => selected.has(q.id));
-      const result = buildSets(pool, { setCount, distribution, shuffleWithin });
+      const isOriginal = distribution === "original";
+      const result = buildSets(pool, {
+        setCount,
+        distribution,
+        shuffleWithin: isOriginal ? true : shuffleWithin,
+      });
       setSets(result);
-      setSortedFlags(result.map((_, i) => distribution === "chunk" && !shuffleWithin));
+      setSortedFlags(result.map(() => false));
       setTimeout(() => {
         resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 80);
       toast({
-        title: `🔀 ${setCount} টি সেট তৈরি হয়েছে!`,
-        description: `${pool.length} টি প্রশ্ন ভাগ হয়েছে। এখন Word ফাইল ডাউনলোড করতে পারেন।`,
+        title: isOriginal
+          ? `🔀 ${setCount} টি সেট তৈরি — প্রতিটিতে সব ${pool.length} টি প্রশ্ন!`
+          : `🔀 ${setCount} টি সেট তৈরি হয়েছে!`,
+        description: isOriginal
+          ? "প্রতি সেটের সিরিয়াল ক্রম আলাদা — এক সেটের ক্রম আরেক সেটের সাথে মিলবে না।"
+          : `${pool.length} টি প্রশ্ন ভাগ হয়েছে। এখন Word ফাইল ডাউনলোড করতে পারেন।`,
       });
     } finally {
       setShuffling(false);
@@ -292,7 +336,7 @@ export default function Home() {
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-bold tracking-tight md:text-2xl">MCQ Shuffler Pro</h1>
             <p className="text-xs text-muted-foreground md:text-sm">
-              MCQ শাফল • সেট তৈরি • সিরিয়াল ডিটেক্ট — Bijoy ও English ফন্ট সাপোর্ট
+              শাফল • সেট তৈরি • শব্দ-ধরে Bijoy/ইউনিকোড/English ডিটেক্টর — Bijoy ও English ফন্ট সাপোর্ট
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -313,6 +357,7 @@ export default function Home() {
           onTextChange={handleTextChange}
           onDetect={handleDetect}
           onSample={handleSample}
+          onFileLoaded={handleFileLoaded}
           detecting={detecting}
           detected={parsed !== null && parsed.questions.length > 0}
         />
@@ -328,6 +373,8 @@ export default function Home() {
           allowBroken={allowBroken}
           onAllowBrokenChange={setAllowBroken}
           fixing={fixing}
+          encStats={encData.stats}
+          dominant={encData.dominant}
         />
 
         <ShuffleCard
@@ -360,6 +407,7 @@ export default function Home() {
               onCopyAll={handleCopyAll}
               busy={busy}
               copiedSet={copiedSet}
+              dominant={encData.dominant}
             />
           )}
         </div>

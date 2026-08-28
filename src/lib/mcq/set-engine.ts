@@ -4,7 +4,7 @@
 
 import type { McqQuestion } from "./parser";
 
-export type Distribution = "interleaved" | "chunk" | "random";
+export type Distribution = "interleaved" | "chunk" | "random" | "original";
 
 export type NameStyle = "letter" | "bangla" | "number" | "setn";
 
@@ -28,6 +28,10 @@ export interface BuildSetsOptions {
 /**
  * নির্বাচিত প্রশ্নগুলোকে setCount সংখ্যক সেটে ভাগ করে।
  *
+ * - original (Original Shuffle): প্রতি সেটে সবগুলো প্রশ্ন থাকে — ভাগ হয় না।
+ *   শুধু প্রশ্নের ক্রম (সিরিয়াল অর্ডার) সেটভেদে আলাদা হয় — যেমন
+ *   সেট A: ১,২,৩,৪... সেট B: ৪,১,২,৫,৩... এক সেটের ক্রম আরেক সেটের সাথে
+ *   কোনোভাবেই মিলবে না। অরিজিনাল প্রশ্ন ও অপশন হুবহু অপরিবর্তিত থাকে।
  * - interleaved: পরপর ভাগ (q1→সেটA, q2→সেটB, q3→সেটC, q4→সেটA ...)
  *   প্রতি সেটে সমান মানের মিশ্রণ থাকে — পরীক্ষার জন্য আদর্শ।
  * - chunk: ধারাবাহিক ব্লক (সেটA = 1-25, সেটB = 26-50 ...)
@@ -37,6 +41,24 @@ export interface BuildSetsOptions {
 export function buildSets(pool: McqQuestion[], opts: BuildSetsOptions): McqQuestion[][] {
   const k = Math.max(1, Math.min(opts.setCount, pool.length));
   const sets: McqQuestion[][] = Array.from({ length: k }, () => []);
+
+  if (opts.distribution === "original") {
+    // প্রতি সেটে সবগুলো প্রশ্ন — শুধু ক্রম সেটপ্রতি আলাদা হবে।
+    // অরিজিনাল ক্রম ও আগের সেটগুলোর ক্রমের সাথে কোনো সেট মিলবে না।
+    const keyOf = (arr: McqQuestion[]) => arr.map((q) => q.id).join(",");
+    const seen = new Set<string>([keyOf(pool)]);
+    for (let s = 0; s < k; s++) {
+      let arr = shuffled(pool);
+      let tries = 0;
+      while (tries < 16 && seen.has(keyOf(arr))) {
+        arr = shuffled(pool);
+        tries++;
+      }
+      seen.add(keyOf(arr));
+      sets[s] = arr;
+    }
+    return sets;
+  }
 
   if (opts.distribution === "chunk") {
     const base = Math.floor(pool.length / k);
@@ -57,6 +79,11 @@ export function buildSets(pool: McqQuestion[], opts: BuildSetsOptions): McqQuest
   }
 
   return sets;
+}
+
+/** Original Shuffle মোডে সেট সংখ্যা প্রশ্ন সংখ্যার দ্বারা সীমাবদ্ধ না (প্রতি সেটে সবগুলো প্রশ্ন) */
+export function isSetCountLimitedByPool(distribution: Distribution): boolean {
+  return distribution !== "original";
 }
 
 // ---------- সেটের নাম ----------

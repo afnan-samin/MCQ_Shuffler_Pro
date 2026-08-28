@@ -21,8 +21,8 @@ const notoBengali = Noto_Sans_Bengali({
 export const metadata: Metadata = {
   title: "MCQ Shuffler Pro — MCQ শাফল ও সেট তৈরির ফ্রি টুল",
   description:
-    "MCQ প্রশ্ন শাফল করুন, একাধিক সেটে ভাগ করুন, সিরিয়াল ডিটেক্ট ও অটো-ফিক্স করুন। Bijoy ও Unicode বাংলা ফন্ট সাপোর্ট, Word (.docx) এক্সপোর্ট — প্রতি সেট আলাদা পেজে। একদম ফ্রি।",
-  keywords: ["MCQ shuffle", "MCQ set maker", "Bijoy font", "বাংলা MCQ", "exam set generator", "question shuffle", "Word export"],
+    "MCQ প্রশ্ন শাফল করুন, একাধিক সেটে ভাগ বা প্রতি সেটে সব প্রশ্ন (Original Shuffle) করুন। শব্দ ধরে ধরে Bijoy/ইউনিকোড/English ডিটেক্টর, সিরিয়াল ডিটেক্ট ও অটো-ফিক্স। Kalpurush + Bijoy (SutonnyMJ) ফন্ট সাপোর্ট, Word (.docx) এক্সপোর্ট — প্রতি সেট আলাদা পেজে, প্লেইন টেক্সট সিরিয়াল। একদম ফ্রি।",
+  keywords: ["MCQ shuffle", "MCQ set maker", "Original Shuffle", "Bijoy font", "SutonnyMJ", "Kalpurush", "বাংলা MCQ", "exam set generator", "question shuffle", "Word export"],
   icons: {
     icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
   },

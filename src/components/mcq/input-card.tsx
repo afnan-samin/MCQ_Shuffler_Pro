@@ -13,11 +13,13 @@ interface InputCardProps {
   onTextChange: (t: string) => void;
   onDetect: () => void;
   onSample: () => void;
+  /** ফাইল আপলোড সফল হলে — অটো-ডিটেক্টসহ */
+  onFileLoaded?: (t: string) => void;
   detecting: boolean;
   detected: boolean;
 }
 
-export function InputCard({ rawText, onTextChange, onDetect, onSample, detecting, detected }: InputCardProps) {
+export function InputCard({ rawText, onTextChange, onDetect, onSample, onFileLoaded, detecting, detected }: InputCardProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -34,6 +36,9 @@ export function InputCard({ rawText, onTextChange, onDetect, onSample, detecting
       const data = await res.json();
       if (!res.ok) {
         setUploadError(data.error || "ফাইল পড়া যায়নি");
+      } else if (onFileLoaded) {
+        // আপলোডের পরেই ডিটেক্টর অটো চলবে (প্রশ্ন + শব্দ-ধরে এনকোডিং)
+        onFileLoaded(data.text);
       } else {
         onTextChange(data.text);
       }
@@ -98,7 +103,9 @@ a) Beijing  b) Tokyo  c) Seoul  d) Bangkok`}
               <span className="text-sm font-medium">
                 {uploading ? "ফাইল পড়া হচ্ছে..." : "ফাইল সিলেক্ট করতে ক্লিক করুন"}
               </span>
-              <span className="text-xs text-muted-foreground">সাপোর্টেড: .docx, .txt (সর্বোচ্চ ২০০০ প্রশ্ন)</span>
+              <span className="text-xs text-muted-foreground">
+                সাপোর্টেড: .docx, .txt (সর্বোচ্চ ২০০০ প্রশ্ন) — আপলোডের পরেই ডিটেক্টর অটো চলবে
+              </span>
             </button>
             <input
               ref={fileRef}
