@@ -1,0 +1,1535 @@
+<!DOCTYPE html>
+<html lang="bn" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="Professional Bangla Unicode to Bijoy and Bijoy to Unicode text and DOCX conversion. Free, offline, private." />
+<meta name="theme-color" content="#6c63ff" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#8b80ff" media="(prefers-color-scheme: dark)" />
+<title>LipiLab — Bangla Unicode ↔ Bijoy Converter</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Crect width='36' height='36' rx='9' fill='%236c63ff'/%3E%3Ctext x='18' y='26' text-anchor='middle' font-family='sans-serif' font-size='20' font-weight='700' fill='white'%3E%E0%A6%B2%3C/text%3E%3C/svg%3E" />
+
+<!-- JSZip: needed for both blank-DOCX generation and DOCX template round-trip patching -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<!-- UI + Bangla web fonts (CDN only — no local asset files) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+/* ==========================================================================
+   LipiLab — Design Tokens
+   Palette derives from the approved frontend.html theme-color meta values
+   (#6c63ff light / #8b80ff dark) and its logo gradient (#6c63ff → #a855f7).
+   ========================================================================== */
+:root{
+  --accent:#6c63ff;
+  --accent-2:#a855f7;
+  --accent-soft:#ece9ff;
+  --accent-contrast:#ffffff;
+
+  --bg:#f5f4fb;
+  --bg-orb-1:#6c63ff;
+  --bg-orb-2:#a855f7;
+  --bg-orb-3:#63b3ff;
+
+  --surface:#ffffff;
+  --surface-alt:#f3f1fb;
+  --surface-raised:#ffffff;
+  --border:#e3e0f3;
+  --border-strong:#cfc9ea;
+
+  --text:#1e1b2e;
+  --text-secondary:#655f82;
+  --text-faint:#948fb0;
+
+  --success:#16a34a;
+  --warning:#d97706;
+  --warning-soft:#fef3e2;
+  --danger:#dc2626;
+  --danger-soft:#fde8e8;
+
+  --shadow-sm:0 1px 2px rgba(30,27,46,.06);
+  --shadow-md:0 8px 24px rgba(30,27,46,.08);
+  --shadow-lg:0 20px 48px rgba(30,27,46,.14);
+
+  --radius-sm:8px;
+  --radius-md:14px;
+  --radius-lg:22px;
+  --radius-pill:999px;
+
+  --font-display:'Sora',system-ui,sans-serif;
+  --font-body:'Manrope',system-ui,sans-serif;
+  --font-bangla:'Noto Sans Bengali','Hind Siliguri',system-ui,sans-serif;
+  --font-mono:ui-monospace,'SF Mono','Cascadia Code',Consolas,monospace;
+  --font-bijoy:'SutonnyMJ','Noto Sans Bengali',serif;
+
+  --ease:cubic-bezier(.22,1,.36,1);
+  --dur-fast:.15s;
+  --dur-med:.28s;
+}
+
+[data-theme="dark"]{
+  --accent:#8b80ff;
+  --accent-2:#c084fc;
+  --accent-soft:#2a2450;
+  --accent-contrast:#ffffff;
+
+  --bg:#100e1c;
+  --bg-orb-1:#6c63ff;
+  --bg-orb-2:#a855f7;
+  --bg-orb-3:#3b82f6;
+
+  --surface:#1b1830;
+  --surface-alt:#221e3c;
+  --surface-raised:#211d3a;
+  --border:#322c56;
+  --border-strong:#453d78;
+
+  --text:#f2f0fb;
+  --text-secondary:#aba4cf;
+  --text-faint:#726b98;
+
+  --success:#4ade80;
+  --warning:#fbbf24;
+  --warning-soft:#3a2f14;
+  --danger:#f87171;
+  --danger-soft:#3a1a1a;
+
+  --shadow-sm:0 1px 2px rgba(0,0,0,.3);
+  --shadow-md:0 8px 24px rgba(0,0,0,.35);
+  --shadow-lg:0 24px 56px rgba(0,0,0,.5);
+}
+
+@font-face{
+  font-family:'SutonnyMJ';
+  src:url('https://bangla.plus/fonts/bangla/sutonnymj.woff2') format('woff2');
+  font-display:swap;
+}
+
+*,*::before,*::after{ box-sizing:border-box; }
+html{ color-scheme:light; }
+html[data-theme="dark"]{ color-scheme:dark; }
+body{
+  margin:0;
+  min-height:100vh;
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--font-body);
+  font-size:15px;
+  line-height:1.5;
+  transition:background-color var(--dur-med) var(--ease), color var(--dur-med) var(--ease);
+  overflow-x:hidden;
+}
+h1,h2,h3{ margin:0; font-family:var(--font-display); }
+button{ font-family:inherit; }
+::selection{ background:var(--accent-soft); color:var(--accent); }
+
+.visually-hidden{
+  position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+}
+
+:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:4px; }
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; scroll-behavior:auto !important; }
+}
+
+/* ---- Background layer ---- */
+.bg-layer{ position:fixed; inset:0; overflow:hidden; z-index:0; pointer-events:none; }
+.bg-orb{ position:absolute; border-radius:50%; filter:blur(70px); opacity:.35; animation:orbFloat 22s ease-in-out infinite; }
+[data-theme="dark"] .bg-orb{ opacity:.28; }
+.bg-orb--1{ width:420px; height:420px; top:-120px; left:-100px; background:var(--bg-orb-1); animation-delay:0s; }
+.bg-orb--2{ width:360px; height:360px; top:20%; right:-140px; background:var(--bg-orb-2); animation-delay:-7s; }
+.bg-orb--3{ width:300px; height:300px; bottom:-100px; left:35%; background:var(--bg-orb-3); animation-delay:-14s; }
+@keyframes orbFloat{
+  0%,100%{ transform:translate(0,0) scale(1); }
+  50%{ transform:translate(30px,-40px) scale(1.08); }
+}
+
+/* ---- Shell / layout ---- */
+.app-shell{ position:relative; z-index:1; max-width:1180px; margin:0 auto; padding:28px 24px 40px; display:flex; flex-direction:column; gap:18px; min-height:100vh; }
+
+.app-header{ display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.app-header__brand{ display:flex; align-items:center; gap:12px; }
+.app-logo{ display:block; border-radius:9px; box-shadow:var(--shadow-sm); }
+.app-brand-text{ display:flex; flex-direction:column; line-height:1.15; }
+.app-brand-name{ font-family:var(--font-display); font-weight:800; font-size:22px; letter-spacing:-.02em; }
+.app-brand-tagline{ font-size:12.5px; color:var(--text-secondary); font-weight:500; }
+.app-header__actions{ display:flex; align-items:center; gap:8px; }
+
+.icon-btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:40px; height:40px; border-radius:var(--radius-md);
+  background:var(--surface); border:1px solid var(--border); color:var(--text-secondary);
+  cursor:pointer; transition:background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+  box-shadow:var(--shadow-sm);
+}
+.icon-btn:hover{ color:var(--accent); border-color:var(--accent); transform:translateY(-1px); }
+.icon-btn:active{ transform:translateY(0) scale(.96); }
+.icon-btn--sm{ width:32px; height:32px; border-radius:var(--radius-sm); }
+.icon-btn--danger:hover{ color:var(--danger); border-color:var(--danger); }
+.icon{ display:block; }
+.icon-btn .icon--moon{ display:none; }
+[data-theme="dark"] .icon-btn .icon--sun{ display:none; }
+[data-theme="dark"] .icon-btn .icon--moon{ display:block; }
+
+/* ---- Toolbar ---- */
+.app-toolbar{
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg);
+  padding:10px 14px; box-shadow:var(--shadow-sm);
+}
+.direction-selector{ border:0; margin:0; padding:0; display:flex; gap:2px; background:var(--surface-alt); border-radius:var(--radius-pill); padding:4px; position:relative; }
+.direction-selector__option{ position:relative; z-index:1; }
+.direction-selector__label{
+  display:flex; align-items:center; padding:8px 16px; border-radius:var(--radius-pill);
+  font-size:13.5px; font-weight:600; color:var(--text-secondary); cursor:pointer; white-space:nowrap;
+  transition:color var(--dur-fast) var(--ease);
+}
+.direction-selector__input:checked + .direction-selector__label{ color:var(--accent-contrast); }
+.direction-selector__input:focus-visible + .direction-selector__label{ outline:2px solid var(--accent); outline-offset:2px; }
+.direction-selector__option{ display:grid; }
+.direction-selector__option::before{ content:""; }
+.direction-selector{ --thumb-x:0px; --thumb-w:0px; }
+.direction-selector::after{
+  content:""; position:absolute; top:4px; bottom:4px; left:4px;
+  width:var(--thumb-w); transform:translateX(var(--thumb-x));
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));
+  border-radius:var(--radius-pill); transition:transform var(--dur-med) var(--ease), width var(--dur-med) var(--ease);
+  z-index:0; box-shadow:0 4px 12px rgba(108,99,255,.35);
+}
+
+.live-toggle{ display:flex; align-items:center; }
+.live-toggle__btn{ display:flex; align-items:center; gap:8px; background:none; border:0; cursor:pointer; padding:6px 4px; color:var(--text-secondary); font-weight:600; font-size:13.5px; }
+.live-toggle__track{ width:34px; height:20px; border-radius:var(--radius-pill); background:var(--border-strong); display:inline-block; position:relative; transition:background var(--dur-fast) var(--ease); }
+.live-toggle__thumb{ position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:var(--shadow-sm); transition:transform var(--dur-fast) var(--ease); }
+.live-toggle__btn[aria-checked="true"] .live-toggle__track{ background:linear-gradient(135deg,var(--accent),var(--accent-2)); }
+.live-toggle__btn[aria-checked="true"] .live-toggle__thumb{ transform:translateX(14px); }
+.live-toggle__btn[aria-checked="true"] .live-toggle__text{ color:var(--accent); }
+
+.btn{
+  display:inline-flex; align-items:center; gap:8px; border:0; cursor:pointer;
+  border-radius:var(--radius-pill); padding:10px 18px; font-weight:700; font-size:14px;
+  transition:transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
+}
+.btn:active{ transform:scale(.97); }
+.btn--convert{
+  margin-left:auto; background:linear-gradient(135deg,var(--accent),var(--accent-2)); color:#fff;
+  box-shadow:0 6px 18px rgba(108,99,255,.35);
+}
+.btn--convert:hover{ box-shadow:0 8px 22px rgba(108,99,255,.48); transform:translateY(-1px); }
+.btn--convert:disabled{ opacity:.55; cursor:not-allowed; transform:none; box-shadow:none; }
+.btn__icon{ display:block; }
+.btn__kbd{ font-family:var(--font-mono); font-size:10.5px; font-weight:600; opacity:.85; background:rgba(255,255,255,.18); padding:2px 6px; border-radius:6px; }
+
+/* ---- Panels ---- */
+.app-panels{ display:grid; grid-template-columns:1fr auto 1fr; gap:14px; align-items:stretch; }
+.panel{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-md); display:flex; flex-direction:column; overflow:hidden;
+  min-width:0;
+}
+.panel__header{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:14px 16px 10px; flex-wrap:wrap; }
+.panel__title{ font-size:14.5px; font-weight:700; letter-spacing:.01em; }
+.panel__header-actions{ display:flex; gap:6px; flex-wrap:wrap; }
+.panel__header-actions .icon-btn--sm{
+  width:auto; padding:0 10px; gap:6px; font-size:12.5px; font-weight:600; color:var(--text-secondary);
+}
+.panel__header-actions label.icon-btn--sm{ box-shadow:var(--shadow-sm); }
+.panel__body{ padding:0 16px; flex:1; display:flex; }
+.panel__textarea{
+  width:100%; min-height:260px; resize:vertical; border:1px solid var(--border); border-radius:var(--radius-md);
+  padding:14px; font-size:var(--ta-font-size,16px); line-height:1.75; background:var(--surface-alt); color:var(--text);
+  font-family:var(--font-bangla); transition:border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+}
+.panel__textarea:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+.panel__textarea--bijoy{ font-family:var(--font-bijoy); }
+.panel__textarea--output{ background:var(--surface-alt); }
+.panel__textarea--locked{ opacity:.75; cursor:not-allowed; }
+.panel__textarea::placeholder{ color:var(--text-faint); }
+.panel__footer{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 16px 16px; flex-wrap:wrap; }
+.panel__stats{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-secondary); }
+.stat__value{ font-weight:700; color:var(--text); }
+.stat__separator{ opacity:.5; }
+.panel__font-size{ display:flex; gap:4px; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius-sm); padding:3px; }
+.font-size-btn{
+  border:0; background:none; cursor:pointer; color:var(--text-secondary); border-radius:6px; padding:4px 9px; font-weight:700;
+  transition:background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.font-size-btn[data-size="small"]{ font-size:11px; }
+.font-size-btn[data-size="medium"]{ font-size:13px; }
+.font-size-btn[data-size="large"]{ font-size:15px; }
+.font-size-btn--active{ background:var(--surface); color:var(--accent); box-shadow:var(--shadow-sm); }
+
+.panel-divider{ display:flex; align-items:center; justify-content:center; }
+.swap-btn{
+  width:38px; height:38px; border-radius:50%; background:var(--surface); border:1px solid var(--border);
+  color:var(--text-secondary); cursor:pointer; display:flex; align-items:center; justify-content:center;
+  box-shadow:var(--shadow-sm); transition:transform var(--dur-med) var(--ease), color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.swap-btn:hover{ color:var(--accent); border-color:var(--accent); transform:rotate(180deg); }
+
+/* ---- DOCX template banner ---- */
+.docx-banner{
+  display:none; align-items:center; gap:10px; margin:0 16px 12px; padding:10px 12px;
+  background:var(--accent-soft); border:1px solid var(--border-strong); border-radius:var(--radius-md); font-size:12.5px;
+}
+.docx-banner.show{ display:flex; }
+.docx-banner__icon{ color:var(--accent); flex-shrink:0; }
+.docx-banner__text{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); font-weight:600; }
+.docx-banner__clear{ border:0; background:none; cursor:pointer; color:var(--text-secondary); width:24px; height:24px; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.docx-banner__clear:hover{ color:var(--danger); background:var(--danger-soft); }
+
+/* ---- Status bar ---- */
+.app-statusbar{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-pill);
+  padding:9px 16px; font-size:12.5px; box-shadow:var(--shadow-sm); flex-wrap:wrap;
+}
+.encoding-badge{ display:flex; align-items:center; gap:7px; font-weight:700; color:var(--text-secondary); }
+.encoding-badge__dot{ width:8px; height:8px; border-radius:50%; background:var(--accent); }
+.encoding-badge--live .encoding-badge__dot{ animation:pulseDot 1.6s ease-in-out infinite; }
+@keyframes pulseDot{ 0%,100%{ opacity:1; transform:scale(1);} 50%{ opacity:.4; transform:scale(1.3);} }
+.statusbar__center{ display:flex; align-items:center; gap:8px; color:var(--text-secondary); font-weight:600; }
+.processing-spinner{ width:13px; height:13px; border-radius:50%; border:2px solid var(--border-strong); border-top-color:var(--accent); animation:spin .7s linear infinite; display:inline-block; }
+@keyframes spin{ to{ transform:rotate(360deg); } }
+.warning-badge{
+  display:flex; align-items:center; gap:6px; border:1px solid var(--warning); background:var(--warning-soft); color:var(--warning);
+  border-radius:var(--radius-pill); padding:5px 12px; font-weight:700; cursor:default;
+}
+
+/* ---- Footer ---- */
+.app-footer{ display:flex; align-items:center; justify-content:center; gap:8px; font-size:12px; color:var(--text-faint); padding:4px 0 0; }
+.app-footer__offline{ display:flex; align-items:center; gap:5px; color:var(--success); }
+.app-footer__offline.is-offline{ color:var(--danger); }
+
+/* ---- Shortcuts modal ---- */
+.shortcuts-panel{ position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; padding:20px; }
+.shortcuts-panel[hidden]{ display:none; }
+.shortcuts-panel__backdrop{ position:absolute; inset:0; background:rgba(15,12,26,.5); backdrop-filter:blur(3px); animation:fadeIn var(--dur-med) var(--ease); }
+.shortcuts-panel__content{
+  position:relative; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-lg); width:100%; max-width:420px; max-height:80vh; overflow:auto; padding:20px;
+  animation:popIn var(--dur-med) var(--ease);
+}
+@keyframes fadeIn{ from{ opacity:0; } to{ opacity:1; } }
+@keyframes popIn{ from{ opacity:0; transform:translateY(8px) scale(.97); } to{ opacity:1; transform:translateY(0) scale(1); } }
+.shortcuts-panel__header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+.shortcuts-panel__title{ font-size:16px; font-weight:800; }
+.shortcuts-list{ margin:0; }
+.shortcuts-list__item{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:9px 0; border-bottom:1px solid var(--border); }
+.shortcuts-list__item:last-child{ border-bottom:0; }
+.shortcuts-list__keys{ display:flex; align-items:center; gap:3px; margin:0; }
+.shortcuts-list__keys kbd{ font-family:var(--font-mono); font-size:11px; font-weight:600; background:var(--surface-alt); border:1px solid var(--border-strong); border-bottom-width:2px; border-radius:6px; padding:3px 7px; color:var(--text); }
+.shortcuts-list__keys span{ color:var(--text-faint); font-size:11px; }
+.shortcuts-list__desc{ margin:0; font-size:12.5px; color:var(--text-secondary); text-align:right; }
+
+/* ---- Toasts ---- */
+.toast-container{ position:fixed; bottom:22px; left:50%; transform:translateX(-50%); z-index:60; display:flex; flex-direction:column; gap:8px; align-items:center; }
+.toast{
+  background:var(--text); color:var(--bg); padding:10px 18px; border-radius:var(--radius-pill); font-size:13px; font-weight:600;
+  box-shadow:var(--shadow-lg); animation:toastIn var(--dur-med) var(--ease);
+}
+.toast.toast--out{ animation:toastOut var(--dur-fast) var(--ease) forwards; }
+@keyframes toastIn{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:translateY(0); } }
+@keyframes toastOut{ to{ opacity:0; transform:translateY(6px); } }
+
+/* ---- Responsive ---- */
+@media (max-width:860px){
+  .app-panels{ grid-template-columns:1fr; }
+  .panel-divider{ order:2; }
+  .swap-btn{ transform:rotate(90deg); margin:-4px auto; }
+  .swap-btn:hover{ transform:rotate(270deg); }
+  .panel--input{ order:1; }
+  .panel--output{ order:3; }
+}
+@media (max-width:640px){
+  .app-shell{ padding:18px 14px 28px; gap:14px; }
+  .app-brand-tagline{ display:none; }
+  .app-toolbar{ padding:10px; }
+  .btn--convert{ padding:10px 14px; }
+  .btn__kbd{ display:none; }
+  .direction-selector__label{ padding:8px 11px; font-size:12.5px; }
+  .panel__textarea{ min-height:200px; }
+  .panel__header{ padding:12px 12px 8px; }
+  .panel__body{ padding:0 12px; }
+  .panel__footer{ padding:10px 12px 14px; }
+  .shortcuts-list__desc{ text-align:left; }
+  .shortcuts-list__item{ flex-direction:column; align-items:flex-start; gap:4px; }
+}
+</style>
+</head>
+<body>
+
+<div class="bg-layer" aria-hidden="true">
+  <div class="bg-orb bg-orb--1"></div>
+  <div class="bg-orb bg-orb--2"></div>
+  <div class="bg-orb bg-orb--3"></div>
+</div>
+
+<div class="app-shell">
+
+  <header class="app-header" role="banner">
+    <div class="app-header__brand">
+      <svg class="app-logo" width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+        <rect width="36" height="36" rx="9" fill="url(#logo-grad)" />
+        <text x="50%" y="26" text-anchor="middle" font-family="'Noto Sans Bengali', serif" font-size="22" font-weight="700" fill="white">ল</text>
+        <defs>
+          <linearGradient id="logo-grad" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#6c63ff" />
+            <stop offset="100%" stop-color="#a855f7" />
+          </linearGradient>
+        </defs>
+      </svg>
+      <div class="app-brand-text">
+        <span class="app-brand-name">LipiLab</span>
+        <span class="app-brand-tagline">Professional Bangla Text Conversion Suite</span>
+      </div>
+    </div>
+
+    <nav class="app-header__actions" aria-label="Application controls">
+      <button class="icon-btn" id="theme-toggle-btn" type="button" aria-label="Switch to dark mode" title="Toggle theme (Ctrl+D)">
+        <svg class="icon icon--sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+        <svg class="icon icon--moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </button>
+      <button class="icon-btn" id="shortcuts-open-btn" type="button" aria-label="Keyboard shortcuts" aria-expanded="false" aria-controls="shortcuts-panel" title="Keyboard shortcuts (?)">
+        <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <rect x="2" y="4" width="20" height="16" rx="2"/>
+          <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <div class="app-toolbar" role="toolbar" aria-label="Conversion controls">
+    <fieldset class="direction-selector" id="direction-selector">
+      <legend class="visually-hidden">Conversion direction</legend>
+      <label class="direction-selector__option" for="dir-unicode-bijoy">
+        <input class="direction-selector__input visually-hidden" type="radio" id="dir-unicode-bijoy" name="conversion-direction" value="unicode-to-bijoy" checked />
+        <span class="direction-selector__label">Unicode → Bijoy</span>
+      </label>
+      <label class="direction-selector__option" for="dir-bijoy-unicode">
+        <input class="direction-selector__input visually-hidden" type="radio" id="dir-bijoy-unicode" name="conversion-direction" value="bijoy-to-unicode" />
+        <span class="direction-selector__label">Bijoy → Unicode</span>
+      </label>
+      <label class="direction-selector__option" for="dir-auto">
+        <input class="direction-selector__input visually-hidden" type="radio" id="dir-auto" name="conversion-direction" value="auto" />
+        <span class="direction-selector__label">Auto</span>
+      </label>
+    </fieldset>
+
+    <div class="live-toggle">
+      <button class="live-toggle__btn" id="live-mode-btn" type="button" role="switch" aria-checked="false" aria-label="Toggle live conversion mode" title="Live mode (Ctrl+L)">
+        <span class="live-toggle__track" aria-hidden="true"><span class="live-toggle__thumb"></span></span>
+        <span class="live-toggle__text">Live</span>
+      </button>
+    </div>
+
+    <button class="btn btn--convert" id="convert-btn" type="button" aria-label="Convert text" title="Convert (Ctrl+Enter)">
+      <svg class="btn__icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 3l14 9-14 9V3z"/></svg>
+      <span id="convert-btn-label">Convert</span>
+      <kbd class="btn__kbd" aria-hidden="true">Ctrl+↵</kbd>
+    </button>
+  </div>
+
+  <main class="app-panels" id="main-content" aria-label="Text conversion workspace">
+
+    <section class="panel panel--input" aria-labelledby="input-panel-title">
+      <div class="panel__header">
+        <h2 class="panel__title" id="input-panel-title">Input</h2>
+        <div class="panel__header-actions">
+          <button class="icon-btn icon-btn--sm" id="paste-btn" type="button" aria-label="Paste from clipboard" title="Paste">
+            <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
+            Paste
+          </button>
+          <label class="icon-btn icon-btn--sm" for="file-upload-input" title="Upload .txt or .docx file" tabindex="0" role="button" aria-label="Upload text or DOCX file">
+            <input type="file" id="file-upload-input" class="visually-hidden" accept=".txt,.docx" tabindex="-1" />
+            <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload
+          </label>
+          <button class="icon-btn icon-btn--sm icon-btn--danger" id="clear-btn" type="button" aria-label="Clear input" title="Clear (Ctrl+Shift+C)">
+            <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            Clear
+          </button>
+        </div>
+      </div>
+
+      <div class="docx-banner" id="docx-banner">
+        <svg class="docx-banner__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span class="docx-banner__text" id="docx-banner-text">টেমপ্লেট লোড হয়েছে</span>
+        <button class="docx-banner__clear" id="docx-banner-clear" type="button" aria-label="Remove DOCX template">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="panel__body">
+        <textarea class="panel__textarea" id="input-textarea" aria-labelledby="input-panel-title" aria-describedby="input-panel-stats"
+                  placeholder="ইউনিকোড বা বিজয় বাংলা লিখুন অথবা পেস্ট করুন..." spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none"></textarea>
+      </div>
+
+      <div class="panel__footer">
+        <div class="panel__stats" id="input-panel-stats" aria-live="polite" aria-atomic="true">
+          <span class="stat"><span class="stat__value" id="input-char-count">0</span> <span class="stat__label">chars</span></span>
+          <span class="stat__separator" aria-hidden="true">·</span>
+          <span class="stat"><span class="stat__value" id="input-word-count">0</span> <span class="stat__label">words</span></span>
+        </div>
+        <div class="panel__font-size" role="group" aria-label="Input font size">
+          <button class="font-size-btn" data-size="small" data-panel="input" type="button" aria-label="Small font">A</button>
+          <button class="font-size-btn font-size-btn--active" data-size="medium" data-panel="input" type="button" aria-label="Medium font" aria-pressed="true">A</button>
+          <button class="font-size-btn" data-size="large" data-panel="input" type="button" aria-label="Large font">A</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="panel-divider" role="separator">
+      <button class="swap-btn" id="swap-btn" type="button" aria-label="Swap input and output" title="Swap (Ctrl+Shift+S)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 16V4m0 0L3 8m4-4l4 4"/><path d="M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
+      </button>
+    </div>
+
+    <section class="panel panel--output" aria-labelledby="output-panel-title" data-encoding-out="unicode">
+      <div class="panel__header">
+        <h2 class="panel__title" id="output-panel-title">Output</h2>
+        <div class="panel__header-actions">
+          <button class="icon-btn icon-btn--sm" id="copy-btn" type="button" aria-label="Copy output" title="Copy output">
+            <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy
+          </button>
+          <button class="icon-btn icon-btn--sm" id="download-txt-btn" type="button" aria-label="Download as .txt" title="Download .txt (Ctrl+S)">
+            <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            .txt
+          </button>
+          <button class="icon-btn icon-btn--sm" id="download-docx-btn" type="button" aria-label="Download as .docx" title="Download .docx">
+            <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            .docx
+          </button>
+        </div>
+      </div>
+
+      <div class="panel__body">
+        <textarea class="panel__textarea panel__textarea--output" id="output-textarea" aria-labelledby="output-panel-title" aria-describedby="output-panel-stats"
+                  placeholder="রূপান্তরিত লেখা এখানে দেখা যাবে..." readonly spellcheck="false" aria-readonly="true"></textarea>
+      </div>
+
+      <div class="panel__footer">
+        <div class="panel__stats" id="output-panel-stats" aria-live="polite" aria-atomic="true">
+          <span class="stat"><span class="stat__value" id="output-char-count">0</span> <span class="stat__label">chars</span></span>
+          <span class="stat__separator" aria-hidden="true">·</span>
+          <span class="stat"><span class="stat__value" id="output-word-count">0</span> <span class="stat__label">words</span></span>
+        </div>
+        <div class="panel__font-size" role="group" aria-label="Output font size">
+          <button class="font-size-btn" data-size="small" data-panel="output" type="button" aria-label="Small font">A</button>
+          <button class="font-size-btn font-size-btn--active" data-size="medium" data-panel="output" type="button" aria-label="Medium font" aria-pressed="true">A</button>
+          <button class="font-size-btn" data-size="large" data-panel="output" type="button" aria-label="Large font">A</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="app-statusbar" role="status" aria-label="Conversion status">
+    <div class="statusbar__left">
+      <span class="encoding-badge" id="encoding-badge" data-encoding="auto" aria-label="Mode: Auto Detect">
+        <span class="encoding-badge__dot" aria-hidden="true"></span>
+        <span class="encoding-badge__text" id="encoding-badge-text">Auto Detect</span>
+      </span>
+    </div>
+    <div class="statusbar__center" id="processing-indicator" aria-live="polite" hidden>
+      <span class="processing-spinner" aria-hidden="true"></span>
+      <span class="processing-text" id="processing-text">Converting...</span>
+    </div>
+    <div class="statusbar__right">
+      <button class="warning-badge" id="warning-badge" type="button" aria-label="Conversion warnings" hidden>
+        <svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span id="warning-count">0</span> unmappable
+      </button>
+    </div>
+  </div>
+
+  <footer class="app-footer" role="contentinfo">
+    <span class="app-footer__version">LipiLab v1.0.0</span>
+    <span class="app-footer__separator" aria-hidden="true">·</span>
+    <span class="app-footer__offline" id="offline-indicator" aria-live="polite" aria-label="Network: Online">
+      <svg class="icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+      <span id="offline-indicator-text">Online</span>
+    </span>
+  </footer>
+
+</div>
+
+<div class="shortcuts-panel" id="shortcuts-panel" role="dialog" aria-modal="true" aria-labelledby="shortcuts-panel-title" hidden>
+  <div class="shortcuts-panel__backdrop" id="shortcuts-backdrop" aria-hidden="true"></div>
+  <div class="shortcuts-panel__content">
+    <div class="shortcuts-panel__header">
+      <h2 class="shortcuts-panel__title" id="shortcuts-panel-title">Keyboard Shortcuts</h2>
+      <button class="icon-btn icon-btn--sm" id="shortcuts-close-btn" type="button" aria-label="Close shortcuts panel" title="Close (Esc)">
+        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <dl class="shortcuts-list">
+      <div class="shortcuts-list__item"><dt class="shortcuts-list__keys"><kbd>Ctrl</kbd><span>+</span><kbd>Enter</kbd></dt><dd class="shortcuts-list__desc">Convert text</dd></div>
+      <div class="shortcuts-list__item"><dt class="shortcuts-list__keys"><kbd>Ctrl</kbd><span>+</span><kbd>L</kbd></dt><dd class="shortcuts-list__desc">Toggle live mode</dd></div>
+      <div class="shortcuts-list__item"><dt class="shortcuts-list__keys"><kbd>Ctrl</kbd><span>+</span><kbd>Shift</kbd><span>+</span><kbd>C</kbd></dt><dd class="shortcuts-list__desc">Clear input</dd></div>
+      <div class="shortcuts-list__item"><dt class="shortcuts-list__keys"><kbd>Ctrl</kbd><span>+</span><kbd>Shift</kbd><span>+</span><kbd>S</kbd></dt><dd class="shortcuts-list__desc">Swap panels</dd></div>
+      <div class="shortcuts-list__item"><dt class="shortcuts-list__keys"><kbd>Ctrl</kbd><span>+</span><kbd>C</kbd></dt><dd class="shortcuts-list__desc">Copy output (focused)</dd></div>
+      <div class="shortcuts-list__item"><dt class="shortcuts-list__keys"><kbd>Ctrl</kbd><span>+</span><kbd>S</kbd></dt><dd class="shortcuts-list__desc">Download .txt</dd></div>
+      <div class="shortcuts-list__item"><dt class="shortcuts-list__keys"><kbd>Ctrl</kbd><span>+</span><kbd>D</kbd></dt><dd class="shortcuts-list__desc">Toggle dark mode</dd></div>
+      <div class="shortcuts-list__item"><dt class="shortcuts-list__keys"><kbd>?</kbd></dt><dd class="shortcuts-list__desc">Open this panel</dd></div>
+      <div class="shortcuts-list__item"><dt class="shortcuts-list__keys"><kbd>Esc</kbd></dt><dd class="shortcuts-list__desc">Close panel</dd></div>
+    </dl>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container" role="status" aria-live="polite" aria-atomic="false"></div>
+
+<script>
+/* ============================================================
+   LipiLab — Bangla Unicode <-> Bijoy Converter (single-file)
+
+   Section map:
+     1. Conversion Engine  - byte-identical to the approved
+        index.html reference (maps, ReArrange*, ConvertToASCII/
+        ConvertToUnicode). Kept in its original terse style
+        intentionally: this is proven, tested logic and the
+        highest-risk place to introduce a silent bug by
+        "cleaning up" variable names, so it is reproduced as-is
+        rather than rewritten.
+     2. Text Separator (tokenizer)
+     3. DOM References
+     4. Application State
+     5. Utilities
+     6. Theme
+     7. Shortcuts Modal
+     8. Plain-text Conversion
+     9. DOCX - blank generation (no template)
+    10. DOCX - template round-trip (new: load, patch, download)
+    11. Event Wiring
+    12. Keyboard Shortcuts
+    13. Init
+   ============================================================ */
+(function () {
+'use strict';
+
+/* ------------------------------------------------------------
+   1. CONVERSION ENGINE
+------------------------------------------------------------ */
+var uni2bijoy_string_conversion_map = {
+    "।": "|", "‘": "Ô", "’": "Õ", "“": "Ò", "”": "Ó", "্র্য": "ª¨", "র‌্য": "i¨", "ক্ক": "°", "ক্ট": "±", "ক্ত": "³", "ক্ব": "K¡", "স্ক্র": "¯Œ", "ক্র": "µ", "ক্ল": "K¬", "ক্ষ্ন": "¶è", "ক্ষ্ণ": "¶è", "হ্ম": "þ", "ক্ষ্ম": "²", "ঙ্ক্ষ": "•¶", "ক্ষ": "¶", "ক্স": "·", "ক্ম": "´", "ঙ্গু": "½y", "গু": "¸", "গ্ধ": "»", "গ্ন": "Mœ", "গ্ম": "M¥", "গ্লু": "Møæ", "গ্ল": "Mø", "গ্রু": "Mªæ", "ঘ্ন": "Nœ", "ঙ্ক": "¼", "ঙ্খ": "•L", "ঙ্গ": "½", "ঙ্ঘ": "•N", "চ্চ": "”P", "চ্ছ": "”Q", "চ্ছ্ব": "”Q¡", "চ্ঞ": "”T", "জ্জ্ব": "¾¡", "জ্জ": "¾", "জ্ঝ": "À", "জ্ঞ": "Á", "জ্ব": "R¡", "ঞ্চ": "Â", "ঞ্ছ": "Ã", "ঞ্জ": "Ä", "ঞ্ঝ": "Å", "ট্ট": "Æ", "ট্ব": "U¡", "ট্ম": "U¥", "ড্ড": "Ç", "ণ্ট": "È", "ণ্ঠ": "É", "ন্স": "Ý", "ণ্ড": "Ð", "ন্তু": "š‘", "ণ্ব": "Y^", "ত্ত্ব": "Ë¡", "ন্ত্ব": "šÍ¡", "ত্ত": "Ë", "ত্থ": "Ì", "ত্ন": "Zœ", "ত্ম": "Z¥", "ত্ব": "Z¡", "ত্রু": "Îæ", "ত্রূ": "Îƒ", "থ্ব": "_¡", "দ্গ": "˜M", "দ্ঘ": "˜N", "দ্দ": "Ï", "দ্ধ": "×", "ন্দ্ব": "›Ø", "দ্ব": "Ø", "দ্ভ্র": "™£", "দ্ভ": "™¢", "দ্ম": "Ù", "দ্রু": "`ªæ", "শ্রু": "kÖæ", "প্রু": "cÖæ", "প্লু": "cøæ", "ধ্ব": "aŸ", "ধ্ম": "a¥", "ন্ট": "›U", "ন্ঠ": "Ú", "ন্ড": "Û", "ন্ত্র": "š¿", "ন্ত": "šÍ", "স্ত্র": "¯¿", "ত্র": "Î", "ন্থ": "š’", "ন্দ": "›`", "ন্ধ": "Ü", "ণ্ণ": "Yœ", "ণ্ন": "Yœ", "ন্ন": "bœ", "ন্ব": "š^", "ন্ম": "b¥", "প্ট": "Þ", "প্ত": "ß", "প্ন": "cœ", "প্প": "à", "প্ল": "cø", "প্স": "á", "ফ্ল": "d¬", "ব্জ": "â", "ব্দ": "ã", "ব্ধ": "ä", "ব্ব": "eŸ", "ব্ল": "eø", "ভ্র": "å", "ম্ন": "gœ", "ম্প": "¤ú", "ম্ফ": "ç", "ম্ব": "¤^", "ম্ভ": "¤¢", "ম্ভ্র": "¤£", "ম্ম": "¤§", "ম্ল": "¤ø", "ড়ু": "o–", "ঢ়ু": "p–", "রু": "iæ", "রূ": "iƒ", "ল্ক": "é", "ল্গ": "ê", "ল্প": "í", "ল্ট": "ë", "ল্ড": "ì", "ল্ফ": "î", "ল্ব": "j¦", "ল্ম": "j¥", "ল্ল": "jø", "শু": "ï", "শ্চ": "ð", "শ্ছ": "ñ", "শ্ন": "kœ", "শ্ব": "k¦", "শ্ম": "k¥", "শ্ল": "kø", "ষ্ক": "®‹", "ষ্ক্র": "®Œ", "ষ্ট": "ó", "ষ্ঠ": "ô", "ষ্ণ": "ò", "ষ্প": "®ú", "ষ্ফ": "õ", "ষ্ম": "®§", "স্ক": "¯‹", "স্ট": "÷", "স্খ": "ö", "স্তু": "¯‘", "স্ত": "¯Í", "স্থ": "¯’", "স্ন": "mœ", "স্প": "¯ú", "স্ফ": "ù", "স্ব": "¯^", "স্ম": "¯§", "স্ল": "¯ø", "হ্ব": "nŸ", "হু": "û", "হ্ণ": "nè", "হ্ন": "ý", "হ্ল": "n¬", "হৃ": "ü", "র্": "©", "্র": "ª", "্য": "¨", "্": "&", "আ": "Av", "অ": "A", "ই": "B", "ঈ": "C", "উ": "D", "ঊ": "E", "ঋ": "F", "এ": "G", "ঐ": "H", "ও": "I", "ঔ": "J", "ক": "K", "খ": "L", "গ": "M", "ঘ": "N", "ঙ": "O", "চ": "P", "ছ": "Q", "জ": "R", "ঝ": "S", "ঞ": "T", "ট": "U", "ঠ": "V", "ড": "W", "ঢ": "X", "ণ": "Y", "ত": "Z", "থ": "_", "দ": "`", "ধ": "a", "ন": "b", "প": "c", "ফ": "d", "ব": "e", "ভ": "f", "ম": "g", "য": "h", "র": "i", "ল": "j", "শ": "k", "ষ": "l", "স": "m", "হ": "n", "ড়": "o", "ঢ়": "p", "য়": "q", "ৎ": "r", "০": "0", "১": "1", "২": "2", "৩": "3", "৪": "4", "৫": "5", "৬": "6", "৭": "7", "৮": "8", "৯": "9", "া": "v", "ি": "w", "ী": "x", "ু": "y", "ূ": "~", "…": "...", "ৃ": "…", "ে": "‡", "ৈ": "‰", "ৗ": "Š", "ং": "s", "ঃ": "t", "ঁ": "u", "—": "Ñ", "॥": "\\"
+};
+
+var bijoyKarReplacements = {
+    "¨y": "y¨", "¨~": "~¨", vu: "uv", "¨u": "u¨", Ky: "Kz", "K~": "K‚", Py: "Pz", "P~": "P‚", Qy: "Qz", "Q~": "Q‚", Sy: "Sz", "S~": "S‚", Uy: "Uz", "U~": "U‚", Vy: "Vz", "V~": "V‚", Wy: "Wz", "W~": "W‚", Xy: "Xz", "X~": "X‚", Zy: "Zz", "Z~": "Z‚", dy: "dz", "d~": "d‚", fy: "fz", "f~": "f‚", "¶y": "¶z", "¶~": "¶‚", "Áy": "Áz", "Á~": "Á‚", "þy": "þz", "þ~": "þ‚", "¾y": "¾z", "¾~": "¾‚", "°y": "°z", "°~": "°‚", "¼y": "¼z", "¼~": "¼‚", "Üy": "Üz", "Ü~": "Ü‚", "×y": "×z", "×~": "x‚", "äy": "äz", "ä~": "ä‚", "§…": "§„", "¥…": "¥„", "c…": "c„", "N…": "N„", "g…": "g„", "e…": "e„", "k…": "k„", "L…": "L„", "M…": "M„", "m…": "m„", "l…": "l„", "R…": "R„", "_…": "_„", "`…": "`„", "a…": "a„", "b…": "b„", "j…": "j„", "h…": "h„", "Y…": "Y„", "j&¸": "êy", "'‡": "'†", '"‡': '"†', "{‡": "{†", "-‡": "-†", "'‰": "'ˆ", '"‰': '"ˆ', "{‰": "{ˆ", "-‰": "-ˆ", "©y": "©z", "©~": "©‚", "‹y": "‹z", "‹~": "‹‚", "÷y": "÷z", "÷~": "÷‚", "ùy": "ùz", "ù~": "ù‚"
+};
+
+var bijoyRoFolaReplacements = {
+    "&iæ": "ªæ", "&iƒ": "ªƒ", "Mª": "MÖ", "cª": "cÖ", "dª": "d«", "Nªæ": "Nªy", "Pªæ": "Pªy", "Qªæ": "Qªy", "Sªæ": "Sªy", "Uªæ": "Uªy", "Vªæ": "Vªy", "Wªæ": "Wªy", "Xªæ": "Xªy", "Yªæ": "Yªy", "bªæ": "bªy", "d«æ": "d«y", "hªæ": "hªy", "jªæ": "jªy", "lªæ": "lªy", "nªæ": "nªy", "åy": "åæ", "Nªƒ": "Nª~", "Pªƒ": "Pª~", "Qªƒ": "Qª~", "Sªƒ": "Sª~", "Uªƒ": "Uª~", "Vªƒ": "Vª~", "Wªƒ": "Wª~", "Xªƒ": "Xª~", "Yªƒ": "Yª~", "bªƒ": "bª~", "d«ƒ": "d«~", "hªƒ": "hª~", "jªƒ": "jª~", "lªƒ": "lª~", "nªƒ": "nª~", "å~": "åƒ", "”Q&e": "”Q¡", "kª": "kÖ", "mª": "mÖ", "g&å": "¤£"
+};
+
+var uni2bijoyPatterns = null;
+
+var bijoy_string_conversion_map = {
+    "i¨": "র‌্য", "ª¨": "্র্য", "°": "ক্ক", "±": "ক্ট", "³": "ক্ত", "K¡": "ক্ব", "¯Œ": "স্ক্র", "µ": "ক্র", "K¬": "ক্ল", "¶è": "ক্ষ্ণ", "þ": "হ্ম", "²": "ক্ষ্ম", "•¶": "ঙ্ক্ষ", "¶": "ক্ষ", "·": "ক্স", "´": "ক্ম", "¸": "গু", "»": "গ্ধ", "Mœ": "গ্ন", "M¥": "গ্ম", "MÖƒ": "গ্রূ", "Mø": "গ্ল", "Nœ": "ঘ্ন", "¼": "ঙ্ক", "•L": "ঙ্খ", "½": "ঙ্গ", "•N": "ঙ্ঘ", "”P": "চ্চ", "”Q": "চ্ছ", "¾": "জ্জ", "À": "জ্ঝ", "Á": "জ্ঞ", "Â": "ঞ্চ", "Ã": "ঞ্ছ", "Ä": "ঞ্জ", "Å": "ঞ্ঝ", "Æ": "ট্ট", "U¡": "ট্ব", "U¥": "ট্ম", "Ç": "ড্ড", "È": "ণ্ট", "É": "ণ্ঠ", "Ý": "ন্স", "Ð": "ণ্ড", "š‘": "ন্তু", "Y\\^": "ণ্ব", "Ë": "ত্ত", "Ì": "ত্থ", "Z¥": "ত্ম", "Z¡": "ত্ব", "Zœ": "ত্ন", "Î": "ত্র", "_¡": "থ্ব", "˜M": "দ্গ", "˜N": "দ্ঘ", "Ï": "দ্দ", "×": "দ্ধ", "˜¡": "দ্ব", "Ø": "দ্ব", "™£": "দ্ভ্র", "™¢": "দ্ভ", "Ù": "দ্ম", "`ªƒ": "দ্রূ", "aªƒ": "ধ্রূ", "aŸ": "ধ্ব", "a¥": "ধ্ম", "›U": "ন্ট", "Ú": "ন্ঠ", "Û": "ন্ড", "šÍ": "ন্ত", "š¿": "ন্ত্র", "š’": "ন্থ", "›`": "ন্দ", "Ü": "ন্ধ", "Yœ": "ণ্ণ", "bœ": "ন্ন", "š\\^": "ন্ব", "b¥": "ন্ম", "Þ": "প্ট", "ß": "প্ত", "cœ": "প্ন", "à": "প্প", "c¬": "প্ল", "á": "প্স", "d¬": "ফ্ল", "â": "ব্জ", "ã": "ব্দ", "ä": "ব্ধ", "eŸ": "ব্ব", "e­": "ব্ল", "å": "ভ্র", "gœ": "ম্ন", "¤ú": "ম্প", "ç": "ম্ফ", "¤\\^": "ম্ব", "¤¢": "ম্ভ", "¤£": "ম্ভ্র", "¤§": "ম্ম", "¤ø": "ম্ল", "iƒ": "রূ", "é": "ল্ক", "ê": "ল্গ", "ë": "ল্ট", "ì": "ল্ড", "í": "ল্প", "î": "ল্ফ", "jø": "ল্ল", "kÖƒ": "শ্রূ", "ï": "শু", "ð": "শ্চ", "ñ": "শ্ছ", "kœ": "শ্ন", "k¦": "শ্ব", "k¥": "শ্ম", "®‹": "ষ্ক", "®Œ": "ষ্ক্র", "ó": "ষ্ট", "ô": "ষ্ঠ", "ò": "ষ্ণ", "õ": "ষ্ফ", "®§": "ষ্ম", "¯‹": "স্ক", "÷": "স্ট", "ö": "স্খ", "¯Í": "স্ত", "¯‘": "স্তু", "¯¿": "স্ত্র", "¯’": "স্থ", "mœ": "স্ন", "¯ú": "স্প", "ù": "স্ফ", "¯\\^": "স্ব", "¯§": "স্ম", "û": "হু", "nŸ": "হ্ব", "nè": "হ্ণ", "ý": "হ্ন", "n¬": "হ্ল", "ü": "হৃ", "©": "র্", "Av": "আ", "A": "অ", "B": "ই", "C": "ঈ", "D": "উ", "E": "ঊ", "F": "ঋ", "G": "এ", "H": "ঐ", "I": "ও", "J": "ঔ", "K": "ক", "L": "খ", "M": "গ", "N": "ঘ", "O": "ঙ", "P": "চ", "Q": "ছ", "R": "জ", "S": "ঝ", "T": "ঞ", "U": "ট", "V": "ঠ", "W": "ড", "X": "ঢ", "Y": "ণ", "Z": "ত", "_": "থ", "`": "দ", "a": "ধ", "b": "ন", "c": "প", "d": "ফ", "e": "ব", "f": "ভ", "g": "ম", "h": "য", "i": "র", "j": "ল", "k": "শ", "l": "ষ", "m": "স", "n": "হ", "o": "ড়", "p": "ঢ়", "q": "য়", "r": "ৎ", "0": "০", "1": "১", "2": "২", "3": "৩", "4": "৪", "5": "৫", "6": "৬", "7": "৭", "8": "৮", "9": "৯", "v": "া", "w": "ি", "x": "ী", "y": "ু", "~": "ূ", "‚": "ূ", "„": "ৃ", "‡": "ে", "†": "ে", "‰": "ৈ", "Š": "ৗ", "Ô": "‘", "Õ": "’", "|": "।", "Ò": "“", "Ó": "”", "s": "ং", "t": "ঃ", "u": "ঁ", "ª": "্র", "Ö": "্র", "«": "্র", "¨": "্য", "&": "্", "…": "ৃ", "Ñ": "—", "\\": "॥"
+};
+
+var correctBijoy = { "&ª": "ª" };
+var correctUnicode = { "šত্ম": "ন্ত", "¯ত্ম": "স্ত" };
+var bijoyPatterns = null;
+
+function IsBanglaPreKar(n) { return n === "ি" || n === "ৈ" || n === "ে" ? !0 : !1 }
+function IsBanglaBanjonborno(n) { return n === "ক" || n === "খ" || n === "গ" || n === "ঘ" || n === "ঙ" || n === "চ" || n === "ছ" || n === "জ" || n === "ঝ" || n === "ঞ" || n === "ট" || n === "ঠ" || n === "ড" || n === "ঢ" || n === "ণ" || n === "ত" || n === "থ" || n === "দ" || n === "ধ" || n === "ন" || n === "প" || n === "ফ" || n === "ব" || n === "ভ" || n === "ম" || n === "শ" || n === "ষ" || n === "স" || n === "হ" || n === "য" || n === "র" || n === "ল" || n === "য়" || n === "ং" || n === "ঃ" || n === "ঁ" || n === "ৎ" ? !0 : !1 }
+function IsBanglaHalant(n) { return n === "্" ? !0 : !1 }
+function IsSpace(n) { return n === " " || n === "\t" || n === "\n" || n === "\r" ? !0 : !1 }
+function IsBanglaKar(n) { return IsBanglaPreKar(n) || (n === "া" || n === "ো" || n === "ৌ" || n === "ৗ" || n === "ু" || n === "ূ" || n === "ী" || n === "ৃ") ? !0 : !1 }
+function IsBanglaPostKar(n) { return n === "া" || n === "ো" || n === "ৌ" || n === "ৗ" || n === "ু" || n === "ূ" || n === "ী" || n === "ৃ" ? !0 : !1 }
+function IsBanglaNukta(n) { return n === "ং" || n === "ঃ" || n === "ঁ" ? !0 : !1 }
+function IsBanglaFola(n) { return n === "্য" || n === "্র" ? !0 : !1 }
+
+function buildConversionPatterns(n) {
+    function r(n) {
+        return n.split("").map(function(n) {
+            switch (n) {
+                case "\\": return "\\\\"; case ".": return "\\."; case "*": return "\\*"; case "+": return "\\+"; case "?": return "\\?"; case "^": return "\\^"; case "$": return "\\$"; case "{": return "\\{"; case "}": return "\\}"; case "(": return "\\("; case ")": return "\\)"; case "|": return "\\|"; case "[": return "\\["; case "]": return "\\]"; default: return n;
+            }
+        }).join("")
+    }
+    var i = [];
+    for (var t in n) Object.prototype.hasOwnProperty.call(n, t) && i.push({ regex: new RegExp(r(t), "g"), replacement: n[t] });
+    return i
+}
+
+function ensureUni2BijoyPatterns() { uni2bijoyPatterns || (uni2bijoyPatterns = buildConversionPatterns(uni2bijoy_string_conversion_map)) }
+function ensureBijoyPatterns() { bijoyPatterns || (bijoyPatterns = buildConversionPatterns(bijoy_string_conversion_map)) }
+
+function ReArrangeUnicodeText(n) {
+    for (var r, f, i, e, u, o = 0, t = 0; t < n.length; t++) {
+        if (t < n.length && IsBanglaPreKar(n.charAt(t))) {
+            for (r = 1; IsBanglaBanjonborno(n.charAt(t - r));) {
+                if (t - r < 0) break; if (t - r <= o) break; if (IsBanglaHalant(n.charAt(t - r - 1))) r += 2; else break
+            }
+            f = n.substring(0, t - r); f += n.charAt(t); f += n.substring(t - r, t); f += n.substring(t + 1, n.length); n = f; o = t + 1; continue
+        }
+        if (t < n.length - 1 && IsBanglaHalant(n.charAt(t)) && n.charAt(t - 1) === "র") {
+            for (i = 1, e = 0;;) if (IsBanglaBanjonborno(n.charAt(t + i)) && IsBanglaHalant(n.charAt(t + i + 1))) i += 2; else if (IsBanglaBanjonborno(n.charAt(t + i)) && IsBanglaPreKar(n.charAt(t + i + 1))) { e = 1; break } else break;
+            u = n.substring(0, t - 1); u += n.substring(t + i + 1, t + i + e + 1); u += n.substring(t + 1, t + i + 1); u += n.charAt(t - 1); u += n.charAt(t); u += n.substring(t + i + e + 1, n.length); n = u; t += i + e; o = t + 1; continue
+        }
+    }
+    return n
+}
+
+function ReArrangeUnicodeConvertedText(n) {
+    for (var f, e, i, o, u, r, h, s, t = 0; t < n.length; t++) {
+        if (t > 0 && n.charAt(t) === "্" && (IsBanglaKar(n.charAt(t - 1)) || IsBanglaNukta(n.charAt(t - 1))) && t < n.length - 1 && (f = n.substring(0, t - 1), f += n.charAt(t), f += n.charAt(t + 1), f += n.charAt(t - 1), f += n.substring(t + 2, n.length), n = f), t > 0 && t < n.length - 1 && n.charAt(t) === "্" && n.charAt(t - 1) === "র" && n.charAt(t - 2) !== "্" && IsBanglaKar(n.charAt(t + 1)) && (e = n.substring(0, t - 1), e += n.charAt(t + 1), e += n.charAt(t - 1), e += n.charAt(t), e += n.substring(t + 2, n.length), n = e), t < n.length - 1 && n.charAt(t) === "র" && IsBanglaHalant(n.charAt(t + 1)) && !IsBanglaHalant(n.charAt(t - 1))) {
+            for (i = 1; ; ) { if (t - i < 0) break; if (IsBanglaBanjonborno(n.charAt(t - i)) && IsBanglaHalant(n.charAt(t - i - 1))) i += 2; else if (i === 1 && IsBanglaKar(n.charAt(t - i))) i++; else break }
+            o = n.substring(0, t - i); o += n.charAt(t); o += n.charAt(t + 1); o += n.substring(t - i, t); o += n.substring(t + 2, n.length); n = o; t += 1; continue
+        }
+        if (t < n.length - 1 && IsBanglaPreKar(n.charAt(t)) && IsSpace(n.charAt(t + 1)) === !1) {
+            for (u = n.substring(0, t), r = 1; IsBanglaBanjonborno(n.charAt(t + r)); ) if (IsBanglaHalant(n.charAt(t + r + 1))) r += 2; else break;
+            u += n.substring(t + 1, t + r + 1); h = 0;
+            n.charAt(t) === "ে" && n.charAt(t + r + 1) === "া" ? (u += "ো", h = 1) : n.charAt(t) === "ে" && n.charAt(t + r + 1) === "ৗ" ? (u += "ৌ", h = 1) : u += n.charAt(t);
+            u += n.substring(t + r + h + 1, n.length); n = u; t += r
+        }
+        t < n.length - 1 && n.charAt(t) === "ঁ" && IsBanglaPostKar(n.charAt(t + 1)) && (s = n.substring(0, t), s += n.charAt(t + 1), s += n.charAt(t), s += n.substring(t + 2, n.length), n = s)
+    }
+    return n
+}
+
+function replaceFirstLetter(n, t, i) {
+    for (var r, f = n.split("\n"), e = "", u = 0; u < f.length; u++) {
+        var h = f[u], o = h.split(/(\s+)/), s = "";
+        for (r = 0; r < o.length; r++) s += r % 2 == 0 ? o[r].replace(new RegExp("^" + t, "g"), i) : o[r];
+        e += s.trim(); u < f.length - 1 && (e += "\n")
+    } return e
+}
+
+function replaceLastLetter(n, t, i) {
+    for (var r, f = n.split("\n"), e = "", u = 0; u < f.length; u++) {
+        var h = f[u], o = h.split(/(\s+)/), s = "";
+        for (r = 0; r < o.length; r++) s += r % 2 == 0 ? o[r].replace(new RegExp(t + "$", "g"), i) : o[r];
+        e += s.trim(); u < f.length - 1 && (e += "\n")
+    } return e
+}
+
+function replaceMultiple(n, t, i) {
+    var u = n, r, f;
+    for (r in t) Object.prototype.hasOwnProperty.call(t, r) && (f = i ? new RegExp(r, "g") : r, u = u.replace(f, t[r]));
+    return u
+}
+
+function ConvertToASCII(n) {
+    var t, i, r;
+    for (t = new RegExp("ব়", "g"), n = n.replace(t, "র"), t = new RegExp("ড়", "g"), n = n.replace(t, "ড়"), t = new RegExp("ঢ়", "g"), n = n.replace(t, "ঢ়"), t = new RegExp("য়", "g"), n = n.replace(t, "য়"), t = new RegExp("ো", "g"), n = n.replace(t, "ো"), t = new RegExp("ৌ", "g"), n = n.replace(t, "ৌ"), t = new RegExp("্র্য", "g"), n = n.replace(t, "্র‍্য"), n = replaceLastLetter(n, "র্", "i&"), n = replaceLastLetter(n, "র্‌", "i&"), n = ReArrangeUnicodeText(n), ensureUni2BijoyPatterns(), i = 0; i < uni2bijoyPatterns.length; i++)
+        r = uni2bijoyPatterns[i], n = n.replace(r.regex, r.replacement);
+    return n = replaceFirstLetter(n, "‡", "†"), n = replaceFirstLetter(n, "‰", "ˆ"), n = n.replace("(‡", "(†"), n = n.replace("[‡", "[†"), n = n.replace("Ô‡", "Ô†"), n = n.replace("Ò‡", "Ò†"), n = n.replace("(‰", "(ˆ"), n = n.replace("[‰", "[ˆ"), n = n.replace("Ô‰", "Ôˆ"), n = n.replace("Ò‰", "Òˆ"), n = replaceMultiple(n, bijoyKarReplacements, !0), replaceMultiple(n, bijoyRoFolaReplacements, !0)
+}
+
+function ConvertToUnicode(n) {
+    var t, i;
+    for (n = replaceMultiple(n, correctBijoy, !0), ensureBijoyPatterns(), t = 0; t < bijoyPatterns.length; t++)
+        i = bijoyPatterns[t], n = n.replace(i.regex, i.replacement);
+    return n = replaceMultiple(n, correctUnicode, !0), n = ReArrangeUnicodeConvertedText(n), n.replace(/অা/g, "আ")
+}
+
+/* ------------------------------------------------------------
+   2. TEXT SEPARATOR (TOKENIZER)
+   Same regex index.html uses inside handleConvert() to split a
+   string into Bangla-script / Latin+digit / whitespace / other-
+   symbol runs. index.html applies ConvertToASCII() to each
+   Bangla-run token individually (never to the whole string at
+   once) — this function generalises that exact split so both
+   the plain-text path and the DOCX run-splitting path reuse it.
+------------------------------------------------------------ */
+function tokenizeMixedText(text) {
+  var re = /([^\sa-zA-Z0-9\u0980-\u09FF\u0964\u0965]*[\u0980-\u09FF\u0964\u0965]+[^\sa-zA-Z0-9\u0980-\u09FF\u0964\u0965]*)|([^\sa-zA-Z0-9\u0980-\u09FF\u0964\u0965]*[a-zA-Z0-9]+[^\sa-zA-Z0-9\u0980-\u09FF\u0964\u0965]*)|(\s+)|([^\sa-zA-Z0-9\u0980-\u09FF\u0964\u0965]+)/g;
+  var match, tokens = [], lastType = 'latin';
+  while ((match = re.exec(text)) !== null) {
+    var raw, type;
+    if (match[1] !== undefined) { raw = match[1]; type = 'bangla'; }
+    else if (match[2] !== undefined) { raw = match[2]; type = 'latin'; }
+    else if (match[3] !== undefined) { raw = match[3]; type = 'space'; }
+    else { raw = match[4]; type = 'other'; }
+    var effectiveType = (type === 'space' || type === 'other') ? lastType : type;
+    tokens.push({ raw: raw, type: type, effectiveType: effectiveType });
+    if (raw.trim() !== '') lastType = effectiveType;
+  }
+  return tokens;
+}
+
+/* ------------------------------------------------------------
+   3. DOM REFERENCES
+------------------------------------------------------------ */
+var els = {
+  themeToggleBtn: document.getElementById('theme-toggle-btn'),
+  shortcutsOpenBtn: document.getElementById('shortcuts-open-btn'),
+  shortcutsCloseBtn: document.getElementById('shortcuts-close-btn'),
+  shortcutsPanel: document.getElementById('shortcuts-panel'),
+  shortcutsBackdrop: document.getElementById('shortcuts-backdrop'),
+  directionSelector: document.getElementById('direction-selector'),
+  liveModeBtn: document.getElementById('live-mode-btn'),
+  convertBtn: document.getElementById('convert-btn'),
+  convertBtnLabel: document.getElementById('convert-btn-label'),
+  pasteBtn: document.getElementById('paste-btn'),
+  fileUploadInput: document.getElementById('file-upload-input'),
+  clearBtn: document.getElementById('clear-btn'),
+  docxBanner: document.getElementById('docx-banner'),
+  docxBannerText: document.getElementById('docx-banner-text'),
+  docxBannerClear: document.getElementById('docx-banner-clear'),
+  inputTextarea: document.getElementById('input-textarea'),
+  inputCharCount: document.getElementById('input-char-count'),
+  inputWordCount: document.getElementById('input-word-count'),
+  swapBtn: document.getElementById('swap-btn'),
+  outputPanel: document.querySelector('.panel--output'),
+  copyBtn: document.getElementById('copy-btn'),
+  downloadTxtBtn: document.getElementById('download-txt-btn'),
+  downloadDocxBtn: document.getElementById('download-docx-btn'),
+  outputTextarea: document.getElementById('output-textarea'),
+  outputCharCount: document.getElementById('output-char-count'),
+  outputWordCount: document.getElementById('output-word-count'),
+  encodingBadge: document.getElementById('encoding-badge'),
+  encodingBadgeText: document.getElementById('encoding-badge-text'),
+  processingIndicator: document.getElementById('processing-indicator'),
+  processingText: document.getElementById('processing-text'),
+  warningBadge: document.getElementById('warning-badge'),
+  warningCount: document.getElementById('warning-count'),
+  offlineIndicator: document.getElementById('offline-indicator'),
+  offlineIndicatorText: document.getElementById('offline-indicator-text'),
+  toastContainer: document.getElementById('toast-container')
+};
+
+/* ------------------------------------------------------------
+   4. APPLICATION STATE
+------------------------------------------------------------ */
+var appState = {
+  liveMode: false,
+  docxZip: null,
+  docxFile: null,
+  parsedData: []
+};
+
+var STORAGE_TEXT_KEY = 'lipilab:input-text';
+var THEME_KEY = 'lipilab:theme';
+var MODE_LABELS = {
+  'unicode-to-bijoy': 'Unicode → Bijoy',
+  'bijoy-to-unicode': 'Bijoy → Unicode'
+};
+
+/* ------------------------------------------------------------
+   5. UTILITIES
+------------------------------------------------------------ */
+function showToast(message) {
+  var toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = message;
+  els.toastContainer.appendChild(toast);
+  setTimeout(function () {
+    toast.classList.add('toast--out');
+    setTimeout(function () { toast.remove(); }, 200);
+  }, 2200);
+}
+
+function showProcessing(active, label) {
+  if (label) els.processingText.textContent = label;
+  els.processingIndicator.hidden = !active;
+}
+
+function setWarningBadge(count) {
+  els.warningCount.textContent = String(count);
+  els.warningBadge.hidden = count === 0;
+}
+
+function countStats(text) {
+  var chars = text.length;
+  var words = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+  return { chars: chars, words: words };
+}
+
+function updateStats() {
+  var inStats = countStats(els.inputTextarea.value);
+  var outStats = countStats(els.outputTextarea.value);
+  els.inputCharCount.textContent = inStats.chars;
+  els.inputWordCount.textContent = inStats.words;
+  els.outputCharCount.textContent = outStats.chars;
+  els.outputWordCount.textContent = outStats.words;
+}
+
+function resolveMode() {
+  var checked = document.querySelector('input[name="conversion-direction"]:checked');
+  var value = checked ? checked.value : 'unicode-to-bijoy';
+  if (value === 'auto') {
+    return /[\u0980-\u09FF]/.test(els.inputTextarea.value) ? 'unicode-to-bijoy' : 'bijoy-to-unicode';
+  }
+  return value;
+}
+
+function setEncodingBadge(resolvedMode) {
+  var checked = document.querySelector('input[name="conversion-direction"]:checked');
+  var rawValue = checked ? checked.value : 'unicode-to-bijoy';
+  var label = rawValue === 'auto' ? ('Auto Detect → ' + MODE_LABELS[resolvedMode]) : MODE_LABELS[rawValue];
+  els.encodingBadgeText.textContent = label;
+  els.encodingBadge.setAttribute('data-encoding', rawValue);
+  els.encodingBadge.setAttribute('aria-label', 'Mode: ' + label);
+}
+
+function applyEncodingFonts() {
+  var mode = resolveMode();
+  if (mode === 'unicode-to-bijoy') {
+    els.inputTextarea.classList.remove('panel__textarea--bijoy');
+    els.outputTextarea.classList.add('panel__textarea--bijoy');
+    els.outputPanel.setAttribute('data-encoding-out', 'bijoy');
+  } else {
+    els.inputTextarea.classList.add('panel__textarea--bijoy');
+    els.outputTextarea.classList.remove('panel__textarea--bijoy');
+    els.outputPanel.setAttribute('data-encoding-out', 'unicode');
+  }
+}
+
+function lockInputForDocx(locked) {
+  els.inputTextarea.readOnly = locked;
+  els.inputTextarea.classList.toggle('panel__textarea--locked', locked);
+  if (locked) els.inputTextarea.setAttribute('aria-readonly', 'true');
+  else els.inputTextarea.removeAttribute('aria-readonly');
+}
+
+function setConvertButtonMode(docxLoaded) {
+  els.convertBtnLabel.textContent = docxLoaded ? 'Convert & Download' : 'Convert';
+  els.convertBtn.title = docxLoaded ? 'Convert & download the DOCX' : 'Convert (Ctrl+Enter)';
+}
+
+function updateDirectionPillPosition() {
+  var checked = document.querySelector('input[name="conversion-direction"]:checked');
+  if (!checked) return;
+  var label = checked.nextElementSibling;
+  var fieldRect = els.directionSelector.getBoundingClientRect();
+  var labelRect = label.getBoundingClientRect();
+  if (fieldRect.width === 0) return; // not laid out yet
+  els.directionSelector.style.setProperty('--thumb-x', (labelRect.left - fieldRect.left - 4) + 'px');
+  els.directionSelector.style.setProperty('--thumb-w', labelRect.width + 'px');
+}
+
+function updateOfflineIndicator() {
+  var online = navigator.onLine;
+  els.offlineIndicatorText.textContent = online ? 'Online' : 'Offline';
+  els.offlineIndicator.setAttribute('aria-label', 'Network: ' + (online ? 'Online' : 'Offline'));
+  els.offlineIndicator.classList.toggle('is-offline', !online);
+}
+
+function persistState() {
+  try { localStorage.setItem(STORAGE_TEXT_KEY, els.inputTextarea.value); } catch (e) { /* storage unavailable — non-fatal */ }
+}
+
+function restoreState() {
+  try {
+    var saved = localStorage.getItem(STORAGE_TEXT_KEY);
+    if (saved) { els.inputTextarea.value = saved; }
+  } catch (e) { /* storage unavailable — non-fatal */ }
+}
+
+var liveConvertTimer = null;
+function scheduleLiveConvert() {
+  if (!appState.liveMode || appState.docxZip) return;
+  clearTimeout(liveConvertTimer);
+  liveConvertTimer = setTimeout(convertPlainText, 180);
+}
+
+/* ------------------------------------------------------------
+   6. THEME
+------------------------------------------------------------ */
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  els.themeToggleBtn.setAttribute('aria-label', theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+  try { localStorage.setItem(THEME_KEY, theme); } catch (e) { /* non-fatal */ }
+}
+
+function initTheme() {
+  var saved = null;
+  try { saved = localStorage.getItem(THEME_KEY); } catch (e) { /* storage unavailable — non-fatal */ }
+  var systemDark = false;
+  try { systemDark = !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); } catch (e) { /* matchMedia unavailable — non-fatal */ }
+  applyTheme(saved || (systemDark ? 'dark' : 'light'));
+}
+
+function toggleTheme() {
+  var current = document.documentElement.getAttribute('data-theme');
+  applyTheme(current === 'dark' ? 'light' : 'dark');
+}
+
+/* ------------------------------------------------------------
+   7. SHORTCUTS MODAL
+------------------------------------------------------------ */
+var lastFocusedEl = null;
+function openShortcuts() {
+  lastFocusedEl = document.activeElement;
+  els.shortcutsPanel.hidden = false;
+  els.shortcutsOpenBtn.setAttribute('aria-expanded', 'true');
+  els.shortcutsCloseBtn.focus();
+}
+function closeShortcuts() {
+  els.shortcutsPanel.hidden = true;
+  els.shortcutsOpenBtn.setAttribute('aria-expanded', 'false');
+  if (lastFocusedEl && typeof lastFocusedEl.focus === 'function') lastFocusedEl.focus();
+}
+
+/* ------------------------------------------------------------
+   8. PLAIN-TEXT CONVERSION
+   Unicode→Bijoy: tokenize, convert only Bangla-script tokens
+   (identical granularity to index.html's handleConvert, which
+   calls ConvertToASCII on each Bangla-run match individually).
+   Bijoy→Unicode: whole string in one call — index.html never
+   separates English from Bijoy here, because in Bijoy encoding
+   Bangla glyphs and Latin ASCII share the same code points; the
+   two are only distinguishable by font, not by character, so no
+   separation is possible or attempted in this direction.
+------------------------------------------------------------ */
+function convertPlainText() {
+  var text = els.inputTextarea.value;
+  var mode = resolveMode();
+  setEncodingBadge(mode);
+  appState.parsedData = [];
+  var outputText = '';
+  var unmappable = 0;
+
+  if (mode === 'unicode-to-bijoy') {
+    var tokens = tokenizeMixedText(text);
+    tokens.forEach(function (tok) {
+      var item = { text: '', font: 'Times New Roman' };
+      if (tok.type === 'bangla') {
+        item.text = ConvertToASCII(tok.raw);
+        item.font = 'SutonnyMJ';
+        var leftover = item.text.match(/[\u0980-\u09FF]/g);
+        if (leftover) unmappable += leftover.length;
+      } else if (tok.type === 'latin') {
+        item.text = tok.raw;
+        item.font = 'Times New Roman';
+      } else {
+        item.text = tok.raw;
+        item.font = tok.effectiveType === 'bangla' ? 'SutonnyMJ' : 'Times New Roman';
+      }
+      appState.parsedData.push(item);
+      outputText += item.text;
+    });
+  } else {
+    outputText = ConvertToUnicode(text);
+    appState.parsedData.push({ text: outputText, font: 'Times New Roman' });
+  }
+
+  els.outputTextarea.value = outputText;
+  updateStats();
+  applyEncodingFonts();
+  setWarningBadge(mode === 'unicode-to-bijoy' ? unmappable : 0);
+  persistState();
+}
+
+/* ------------------------------------------------------------
+   9. DOCX — BLANK GENERATION (no template uploaded)
+   Adapted from index.html's downloadDoc(): identical minimal
+   OOXML package, now built from a token array instead of being
+   wired directly to the DOM.
+------------------------------------------------------------ */
+function buildBlankDocxBlob(tokens) {
+  var xmlContent = '';
+  tokens.forEach(function (item) {
+    var safeText = item.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    if (safeText.indexOf('\n') > -1) {
+      var parts = safeText.split('\n');
+      parts.forEach(function (part, index) {
+        if (part) {
+          xmlContent += '<w:r><w:rPr><w:rFonts w:ascii="' + item.font + '" w:hAnsi="' + item.font + '" w:cs="' + item.font + '"/></w:rPr><w:t xml:space="preserve">' + part + '</w:t></w:r>';
+        }
+        if (index < parts.length - 1) xmlContent += '</w:p><w:p>';
+      });
+    } else {
+      xmlContent += '<w:r><w:rPr><w:rFonts w:ascii="' + item.font + '" w:hAnsi="' + item.font + '" w:cs="' + item.font + '"/></w:rPr><w:t xml:space="preserve">' + safeText + '</w:t></w:r>';
+    }
+  });
+
+  var contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>';
+  var rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>';
+  var docRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+  var docXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>' + xmlContent + '</w:p></w:body></w:document>';
+
+  var zip = new JSZip();
+  zip.file('[Content_Types].xml', contentTypes);
+  zip.folder('_rels').file('.rels', rels);
+  zip.folder('word').file('document.xml', docXml);
+  zip.folder('word').folder('_rels').file('document.xml.rels', docRels);
+
+  return zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+}
+
+/* ------------------------------------------------------------
+   10. DOCX — TEMPLATE ROUND-TRIP (load, patch, download)
+
+   Design (new logic — this workflow did not exist in any
+   reference file, so it is built fresh, but every decision
+   below is anchored to an explicit requirement):
+
+   Unicode → Bijoy: each <w:r> run's text is tokenized with the
+   SAME tokenizer as the plain-text path. A run that mixes
+   Bangla and non-Bangla is SPLIT into sibling runs — one per
+   token — each cloning the original <w:rPr> (so bold/italic/
+   underline/size/color survive) and overriding only the font
+   for the Bangla-converted piece. Non-Bangla pieces keep their
+   original font untouched, which is what "preserve formatting/
+   keep English text unchanged" requires for DOCX specifically
+   (the plain-textbox path instead normalises English to Times
+   New Roman, matching index.html's own downloadDoc()).
+
+   Bijoy → Unicode: there is no character-level way to tell
+   Bijoy Bangla from English (same code points), exactly as in
+   index.html. For DOCX the separation instead uses the run's
+   *font name* — only runs tagged with a known Bijoy font are
+   converted; everything else is left completely untouched. This
+   is the "appropriate Bijoy-font detection" the brief asks for.
+
+   Only <w:t> text and the <w:rFonts> font name are ever touched;
+   <w:pPr> (alignment, list numbering, spacing) and the rest of
+   <w:rPr> (bold/italic/underline/size/color) are never rewritten,
+   only cloned, so paragraph/list/table formatting is preserved.
+
+   Known limitation (documented, not silently ignored): if a
+   single Bangla word was already split across multiple <w:r>
+   runs in the source document (this happens with spell-check or
+   tracked-changes artifacts), each run is still tokenized on its
+   own text. Cross-run word reconstruction is out of scope here.
+------------------------------------------------------------ */
+var BIJOY_FONT_NAMES = ['SutonnyMJ']; // extend this list for other legacy Bijoy-encoded fonts as needed
+var UNICODE_TARGET_FONT = 'Times New Roman'; // matches the reference script.md's established Bijoy→Unicode target
+var WORD_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+var XML_NS = 'http://www.w3.org/XML/1998/namespace';
+
+function isBijoyFontName(name) {
+  if (!name) return false;
+  return BIJOY_FONT_NAMES.some(function (fn) { return name.toLowerCase() === fn.toLowerCase(); });
+}
+
+function getRunFontName(rPrEl) {
+  if (!rPrEl) return null;
+  var rFonts = rPrEl.getElementsByTagName('w:rFonts')[0];
+  if (!rFonts) return null;
+  return rFonts.getAttribute('w:ascii') || rFonts.getAttribute('w:hAnsi') || rFonts.getAttribute('w:cs') || null;
+}
+
+function ensureRunFonts(rPrEl, doc) {
+  var rFonts = rPrEl.getElementsByTagName('w:rFonts')[0];
+  if (rFonts) return rFonts;
+  rFonts = doc.createElementNS(WORD_NS, 'w:rFonts');
+  var rStyle = rPrEl.getElementsByTagName('w:rStyle')[0];
+  if (rStyle) rPrEl.insertBefore(rFonts, rStyle.nextSibling);
+  else rPrEl.insertBefore(rFonts, rPrEl.firstChild);
+  return rFonts;
+}
+
+function setRunFont(rFontsEl, fontName) {
+  rFontsEl.setAttribute('w:ascii', fontName);
+  rFontsEl.setAttribute('w:hAnsi', fontName);
+  rFontsEl.setAttribute('w:cs', fontName);
+}
+
+function splitRunForConversion(runEl, doc, direction) {
+  var tEl = runEl.getElementsByTagName('w:t')[0];
+  if (!tEl) return; // w:tab, w:br, drawings, etc. — nothing to convert
+  var originalText = tEl.textContent;
+  if (!originalText) return;
+
+  var rPrEl = runEl.getElementsByTagName('w:rPr')[0] || null;
+
+  if (direction === 'bijoy2uni') {
+    var currentFont = getRunFontName(rPrEl);
+    if (!isBijoyFontName(currentFont)) return; // not Bijoy-tagged — leave untouched
+    tEl.textContent = ConvertToUnicode(originalText);
+    tEl.setAttributeNS(XML_NS, 'xml:space', 'preserve');
+    if (!rPrEl) { rPrEl = doc.createElementNS(WORD_NS, 'w:rPr'); runEl.insertBefore(rPrEl, runEl.firstChild); }
+    setRunFont(ensureRunFonts(rPrEl, doc), UNICODE_TARGET_FONT);
+    return;
+  }
+
+  // direction === 'uni2bijoy'
+  var tokens = tokenizeMixedText(originalText);
+  var hasBangla = tokens.some(function (t) { return t.type === 'bangla'; });
+  if (!hasBangla) return; // nothing Bangla in this run — leave untouched
+
+  if (tokens.length === 1) {
+    // whole run is a single Bangla token — convert in place, no split needed
+    tEl.textContent = ConvertToASCII(tokens[0].raw);
+    tEl.setAttributeNS(XML_NS, 'xml:space', 'preserve');
+    if (!rPrEl) { rPrEl = doc.createElementNS(WORD_NS, 'w:rPr'); runEl.insertBefore(rPrEl, runEl.firstChild); }
+    setRunFont(ensureRunFonts(rPrEl, doc), 'SutonnyMJ');
+    return;
+  }
+
+  var newRuns = tokens.map(function (tok) {
+    var newRun = doc.createElementNS(WORD_NS, 'w:r');
+    var newRPr = rPrEl ? rPrEl.cloneNode(true) : null;
+    var text = tok.raw;
+    if (tok.type === 'bangla') {
+      text = ConvertToASCII(tok.raw);
+      if (!newRPr) newRPr = doc.createElementNS(WORD_NS, 'w:rPr');
+      setRunFont(ensureRunFonts(newRPr, doc), 'SutonnyMJ');
+    }
+    if (newRPr) newRun.appendChild(newRPr);
+    var newT = doc.createElementNS(WORD_NS, 'w:t');
+    newT.setAttributeNS(XML_NS, 'xml:space', 'preserve');
+    newT.textContent = text;
+    newRun.appendChild(newT);
+    return newRun;
+  });
+
+  var parent = runEl.parentNode;
+  newRuns.forEach(function (r) { parent.insertBefore(r, runEl); });
+  parent.removeChild(runEl);
+}
+
+function patchDocumentXmlString(xmlString, direction) {
+  var doc = new DOMParser().parseFromString(xmlString, 'application/xml');
+  if (doc.getElementsByTagName('parsererror').length) throw new Error('DOCX XML পার্স করা যায়নি');
+  var runs = Array.prototype.slice.call(doc.getElementsByTagName('w:r'));
+  runs.forEach(function (r) { splitRunForConversion(r, doc, direction); });
+  var serialized = new XMLSerializer().serializeToString(doc);
+  if (serialized.indexOf('<?xml') !== 0) {
+    serialized = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n' + serialized;
+  }
+  return serialized;
+}
+
+function extractPreviewText(xmlString) {
+  // No truncation: the full document's text is shown, however long it is.
+  var doc = new DOMParser().parseFromString(xmlString, 'application/xml');
+  var paragraphs = Array.prototype.slice.call(doc.getElementsByTagName('w:p'));
+  var lines = paragraphs.map(function (p) {
+    var ts = Array.prototype.slice.call(p.getElementsByTagName('w:t'));
+    return ts.map(function (t) { return t.textContent; }).join('');
+  });
+  return lines.join('\n');
+}
+
+function findHeaderFooterParts(zip) {
+  var relsFile = zip.file('word/_rels/document.xml.rels');
+  if (!relsFile) return Promise.resolve([]);
+  return relsFile.async('string').then(function (relsXml) {
+    var doc = new DOMParser().parseFromString(relsXml, 'application/xml');
+    var rels = Array.prototype.slice.call(doc.getElementsByTagName('Relationship'));
+    var parts = [];
+    rels.forEach(function (rel) {
+      var type = rel.getAttribute('Type') || '';
+      var target = rel.getAttribute('Target') || '';
+      if (type.indexOf('/header') > -1 || type.indexOf('/footer') > -1) {
+        var path = target.charAt(0) === '/' ? target.slice(1) : ('word/' + target);
+        if (zip.file(path)) parts.push(path);
+      }
+    });
+    return parts;
+  }).catch(function () { return []; });
+}
+
+function loadDocxFile(file) {
+  showProcessing(true, 'DOCX লোড হচ্ছে…');
+  JSZip.loadAsync(file).then(function (zip) {
+    var docXmlFile = zip.file('word/document.xml');
+    if (!docXmlFile) throw new Error('word/document.xml পাওয়া যায়নি — এটি একটি বৈধ DOCX ফাইল নয়');
+    appState.docxFile = file;
+    appState.docxZip = zip;
+    return docXmlFile.async('string');
+  }).then(function (xmlStr) {
+    var preview = extractPreviewText(xmlStr);
+    els.inputTextarea.value = preview;
+    lockInputForDocx(true);
+    els.docxBannerText.textContent = file.name;
+    els.docxBanner.classList.add('show');
+    updateStats();
+    applyEncodingFonts();
+    setConvertButtonMode(true);
+    showProcessing(false);
+    showToast('DOCX টেমপ্লেট লোড হয়েছে — Convert চাপুন');
+  }).catch(function (err) {
+    showProcessing(false);
+    appState.docxFile = null; appState.docxZip = null;
+    showToast('DOCX পড়তে ব্যর্থ হয়েছে: ' + err.message);
+  });
+}
+
+function clearDocxTemplate() {
+  appState.docxZip = null;
+  appState.docxFile = null;
+  els.docxBanner.classList.remove('show');
+  lockInputForDocx(false);
+  setConvertButtonMode(false);
+}
+
+function convertDocxTemplate() {
+  if (!appState.docxZip || !appState.docxFile) { showToast('কোনো DOCX টেমপ্লেট লোড করা নেই।'); return; }
+  var mode = resolveMode();
+  var direction = mode === 'unicode-to-bijoy' ? 'uni2bijoy' : 'bijoy2uni';
+  setEncodingBadge(mode);
+  showProcessing(true, 'DOCX রূপান্তর হচ্ছে…');
+
+  var patchedMainXml = null;
+
+  JSZip.loadAsync(appState.docxFile).then(function (freshZip) {
+    return findHeaderFooterParts(freshZip).then(function (extraParts) {
+      var partsToPatch = ['word/document.xml'].concat(extraParts);
+      var jobs = partsToPatch.map(function (path) {
+        var partFile = freshZip.file(path);
+        if (!partFile) return Promise.resolve();
+        return partFile.async('string').then(function (xml) {
+          var patched = patchDocumentXmlString(xml, direction);
+          if (path === 'word/document.xml') patchedMainXml = patched;
+          freshZip.file(path, patched);
+        });
+      });
+      return Promise.all(jobs).then(function () { return freshZip; });
+    });
+  }).then(function (zip) {
+    return zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+  }).then(function (blob) {
+    if (patchedMainXml) {
+      els.outputTextarea.value = extractPreviewText(patchedMainXml);
+      updateStats();
+    }
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    var suffix = direction === 'uni2bijoy' ? 'bijoy' : 'unicode';
+    a.href = url;
+    a.download = appState.docxFile.name.replace(/\.docx$/i, '') + '_' + suffix + '.docx';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+    showProcessing(false);
+    showToast('DOCX রূপান্তরিত হয়ে ডাউনলোড হয়েছে!');
+  }).catch(function (err) {
+    showProcessing(false);
+    showToast('ত্রুটি: ' + err.message);
+  });
+}
+
+/* ------------------------------------------------------------
+   11. EVENT WIRING
+------------------------------------------------------------ */
+function wireFontSizeButtons() {
+  var FONT_SIZES = { small: '13px', medium: '16px', large: '20px' };
+  document.querySelectorAll('.font-size-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var panel = btn.getAttribute('data-panel');
+      var size = btn.getAttribute('data-size');
+      var textarea = panel === 'input' ? els.inputTextarea : els.outputTextarea;
+      document.querySelectorAll('.font-size-btn[data-panel="' + panel + '"]').forEach(function (b) {
+        b.classList.remove('font-size-btn--active');
+        b.removeAttribute('aria-pressed');
+      });
+      btn.classList.add('font-size-btn--active');
+      btn.setAttribute('aria-pressed', 'true');
+      textarea.style.setProperty('--ta-font-size', FONT_SIZES[size]);
+    });
+  });
+}
+
+function wireEvents() {
+  els.themeToggleBtn.addEventListener('click', toggleTheme);
+
+  els.shortcutsOpenBtn.addEventListener('click', openShortcuts);
+  els.shortcutsCloseBtn.addEventListener('click', closeShortcuts);
+  els.shortcutsBackdrop.addEventListener('click', closeShortcuts);
+
+  document.querySelectorAll('input[name="conversion-direction"]').forEach(function (radio) {
+    radio.addEventListener('change', function () {
+      updateDirectionPillPosition();
+      applyEncodingFonts();
+      setEncodingBadge(resolveMode());
+      if (appState.liveMode && !appState.docxZip) convertPlainText();
+    });
+  });
+
+  els.liveModeBtn.addEventListener('click', function () {
+    appState.liveMode = !appState.liveMode;
+    els.liveModeBtn.setAttribute('aria-checked', String(appState.liveMode));
+    els.encodingBadge.classList.toggle('encoding-badge--live', appState.liveMode);
+    if (appState.liveMode && !appState.docxZip) convertPlainText();
+  });
+
+  els.convertBtn.addEventListener('click', function () {
+    if (appState.docxZip) { convertDocxTemplate(); return; }
+    convertPlainText();
+  });
+
+  els.pasteBtn.addEventListener('click', function () {
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      navigator.clipboard.readText().then(function (text) {
+        clearDocxTemplate();
+        els.inputTextarea.value = text;
+        updateStats();
+        scheduleLiveConvert();
+      }).catch(function () { els.inputTextarea.focus(); });
+    } else {
+      els.inputTextarea.focus();
+    }
+  });
+
+  els.fileUploadInput.addEventListener('change', function (e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    if (file.name.toLowerCase().endsWith('.docx')) {
+      loadDocxFile(file);
+    } else {
+      var reader = new FileReader();
+      reader.onload = function (ev) {
+        clearDocxTemplate();
+        els.inputTextarea.value = ev.target.result;
+        updateStats();
+        scheduleLiveConvert();
+      };
+      reader.readAsText(file);
+    }
+    e.target.value = '';
+  });
+
+  els.clearBtn.addEventListener('click', function () {
+    els.inputTextarea.value = '';
+    els.outputTextarea.value = '';
+    clearDocxTemplate();
+    appState.parsedData = [];
+    updateStats();
+    setWarningBadge(0);
+    try { localStorage.removeItem(STORAGE_TEXT_KEY); } catch (e) { /* non-fatal */ }
+    showToast('মুছে ফেলা হয়েছে');
+  });
+
+  els.docxBannerClear.addEventListener('click', function () {
+    clearDocxTemplate();
+    els.inputTextarea.value = '';
+    updateStats();
+    showToast('টেমপ্লেট সরানো হয়েছে');
+  });
+
+  els.swapBtn.addEventListener('click', function () {
+    var inputVal = els.inputTextarea.value;
+    var outputVal = els.outputTextarea.value;
+    clearDocxTemplate();
+    els.inputTextarea.value = outputVal;
+    els.outputTextarea.value = inputVal;
+    appState.parsedData = [];
+    updateStats();
+    persistState();
+  });
+
+  els.copyBtn.addEventListener('click', function () {
+    var text = els.outputTextarea.value;
+    if (!text.trim()) { showToast('কপি করার মতো কিছু নেই'); return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { showToast('ক্লিপবোর্ডে কপি হয়েছে!'); });
+    } else {
+      els.outputTextarea.select();
+      document.execCommand('copy');
+      showToast('কপি হয়েছে!');
+    }
+  });
+
+  els.downloadTxtBtn.addEventListener('click', function () {
+    var text = els.outputTextarea.value;
+    if (!text) { els.convertBtn.click(); return; }
+    var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'LipiLab_converted.txt';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  });
+
+  els.downloadDocxBtn.addEventListener('click', function () {
+    if (appState.docxZip) { convertDocxTemplate(); return; }
+    if (appState.parsedData.length === 0) convertPlainText();
+    if (appState.parsedData.length === 0) { showToast('ডাউনলোড করার মতো কিছু নেই'); return; }
+    showProcessing(true, 'DOCX তৈরি হচ্ছে…');
+    buildBlankDocxBlob(appState.parsedData).then(function (blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = 'Converted_Document.docx';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1200);
+      showProcessing(false);
+    }).catch(function (err) {
+      showProcessing(false);
+      showToast('ত্রুটি: ' + err.message);
+    });
+  });
+
+  wireFontSizeButtons();
+
+  els.inputTextarea.addEventListener('input', function () {
+    updateStats();
+    persistState();
+    scheduleLiveConvert();
+  });
+
+  window.addEventListener('resize', updateDirectionPillPosition);
+  window.addEventListener('online', updateOfflineIndicator);
+  window.addEventListener('offline', updateOfflineIndicator);
+}
+
+/* ------------------------------------------------------------
+   12. KEYBOARD SHORTCUTS
+   Matches frontend.html's own shortcuts panel exactly (that
+   file was established as the UI/UX source of truth, so its
+   documented bindings win over script.md's differing ones).
+------------------------------------------------------------ */
+function wireKeyboardShortcuts() {
+  document.addEventListener('keydown', function (e) {
+    var key = e.key;
+    var inOutput = document.activeElement === els.outputTextarea;
+    var inField = document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT';
+
+    if (e.ctrlKey && !e.shiftKey && !e.altKey && key === 'Enter') { e.preventDefault(); els.convertBtn.click(); return; }
+    if (e.ctrlKey && !e.shiftKey && !e.altKey && (key === 'l' || key === 'L')) { e.preventDefault(); els.liveModeBtn.click(); return; }
+    if (e.ctrlKey && e.shiftKey && !e.altKey && (key === 'c' || key === 'C')) { e.preventDefault(); els.clearBtn.click(); return; }
+    if (e.ctrlKey && e.shiftKey && !e.altKey && (key === 's' || key === 'S')) { e.preventDefault(); els.swapBtn.click(); return; }
+    if (e.ctrlKey && !e.shiftKey && !e.altKey && (key === 'c' || key === 'C') && inOutput) { e.preventDefault(); els.copyBtn.click(); return; }
+    if (e.ctrlKey && !e.shiftKey && !e.altKey && (key === 's' || key === 'S')) { e.preventDefault(); els.downloadTxtBtn.click(); return; }
+    if (e.ctrlKey && !e.shiftKey && !e.altKey && (key === 'd' || key === 'D')) { e.preventDefault(); els.themeToggleBtn.click(); return; }
+    if (key === '?' && !inField && !e.ctrlKey && !e.altKey) { openShortcuts(); return; }
+    if (key === 'Escape' && !els.shortcutsPanel.hidden) { closeShortcuts(); return; }
+  });
+}
+
+/* ------------------------------------------------------------
+   13. INIT
+------------------------------------------------------------ */
+function safeInitStep(fn, label) {
+  try {
+    fn();
+  } catch (err) {
+    if (window.console && console.error) console.error('LipiLab init step failed (' + label + '):', err);
+  }
+}
+
+function init() {
+  // Each step is fault-isolated: a problem in one (e.g. theme detection on an
+  // unusual browser) must never stop wireEvents() from running, or every
+  // button on the page silently goes dead with no visible error.
+  safeInitStep(initTheme, 'theme');
+  safeInitStep(restoreState, 'restore-state');
+  safeInitStep(updateStats, 'stats');
+  safeInitStep(applyEncodingFonts, 'encoding-fonts');
+  safeInitStep(function () { setEncodingBadge(resolveMode()); }, 'encoding-badge');
+  safeInitStep(function () { setConvertButtonMode(false); }, 'convert-button-mode');
+  safeInitStep(wireEvents, 'wire-events');
+  safeInitStep(wireKeyboardShortcuts, 'wire-keyboard-shortcuts');
+  safeInitStep(updateOfflineIndicator, 'offline-indicator');
+  requestAnimationFrame(function () { safeInitStep(updateDirectionPillPosition, 'direction-pill'); });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+
+})();
+</script>
+</body>
+</html>

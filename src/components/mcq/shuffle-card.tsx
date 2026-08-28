@@ -110,7 +110,7 @@ export function ShuffleCard({
             <RadioGroup value={distribution} onValueChange={(v) => onDistributionChange(v as Distribution)} className="gap-2">
               <div className="flex items-start gap-2">
                 <RadioGroupItem value="original" id="dist-original" className="mt-0.5" />
-                <Label htmlFor="dist-original" className="cursor-pointer text-sm leading-snug">
+                <Label htmlFor="dist-original" className="cursor-pointer text-sm leading-snug flex-col items-start gap-0.5">
                   <span className="font-medium">⭐ Original Shuffle — সব সেটে সব প্রশ্ন</span>
                   <span className="block text-xs text-muted-foreground">
                     ১০০ প্রশ্ন × ৫ সেট = প্রতি সেটেই ১০০টা প্রশ্ন, কিন্তু সিরিয়াল ক্রম সেটভেদে আলাদা — সেট A: ১,২,৩,৪… সেট B: ৪,১,২,৫,৩… এক সেটের ক্রম আরেক সেটের সাথে মিলবে না। প্রশ্ন-অপশন হুবহু অপরিবর্তিত।
@@ -119,21 +119,21 @@ export function ShuffleCard({
               </div>
               <div className="flex items-start gap-2">
                 <RadioGroupItem value="interleaved" id="dist-inter" className="mt-0.5" />
-                <Label htmlFor="dist-inter" className="cursor-pointer text-sm leading-snug">
+                <Label htmlFor="dist-inter" className="cursor-pointer text-sm leading-snug flex-col items-start gap-0.5">
                   <span className="font-medium">পরপর ভাগ (রাউন্ড-রবিন)</span>
                   <span className="block text-xs text-muted-foreground">প্রশ্ন ১→সেটA, ২→সেটB, ৩→সেটC... প্রতি সেটে সমান মানের মিক্স</span>
                 </Label>
               </div>
               <div className="flex items-start gap-2">
                 <RadioGroupItem value="chunk" id="dist-chunk" className="mt-0.5" />
-                <Label htmlFor="dist-chunk" className="cursor-pointer text-sm leading-snug">
+                <Label htmlFor="dist-chunk" className="cursor-pointer text-sm leading-snug flex-col items-start gap-0.5">
                   <span className="font-medium">ধারাবাহিক ব্লক</span>
                   <span className="block text-xs text-muted-foreground">সেটA = প্রশ্ন ১–২৫, সেটB = ২৬–৫০ (শাফল বন্ধ রাখলে প্রতি সেট সিরিয়াল থাকে)</span>
                 </Label>
               </div>
               <div className="flex items-start gap-2">
                 <RadioGroupItem value="random" id="dist-random" className="mt-0.5" />
-                <Label htmlFor="dist-random" className="cursor-pointer text-sm leading-snug">
+                <Label htmlFor="dist-random" className="cursor-pointer text-sm leading-snug flex-col items-start gap-0.5">
                   <span className="font-medium">একদম এলোমেলো ভাগ</span>
                   <span className="block text-xs text-muted-foreground">পুরো পুল আগে শাফল হয়ে তারপর সেটে ভাগ হবে</span>
                 </Label>

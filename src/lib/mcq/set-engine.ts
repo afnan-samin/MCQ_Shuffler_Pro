@@ -4,6 +4,11 @@
 
 import type { McqQuestion } from "./parser";
 
+/** যেকোনো { id } থাকা অবজেক্ট শাফল হতে পারে — text-mode ও docx-mode দুটোতেই */
+export interface PoolItem {
+  id: number;
+}
+
 export type Distribution = "interleaved" | "chunk" | "random" | "original";
 
 export type NameStyle = "letter" | "bangla" | "number" | "setn";
@@ -38,14 +43,14 @@ export interface BuildSetsOptions {
  *   shuffleWithin=false দিলে প্রতিটি সেট নিজেই একটি সিরিয়াল সেট হয়।
  * - random: পুরো পুল শাফল করে তারপর interleaved ভাগ।
  */
-export function buildSets(pool: McqQuestion[], opts: BuildSetsOptions): McqQuestion[][] {
+export function buildSets<T extends PoolItem>(pool: T[], opts: BuildSetsOptions): T[][] {
   const k = Math.max(1, Math.min(opts.setCount, pool.length));
-  const sets: McqQuestion[][] = Array.from({ length: k }, () => []);
+  const sets: T[][] = Array.from({ length: k }, () => []);
 
   if (opts.distribution === "original") {
     // প্রতি সেটে সবগুলো প্রশ্ন — শুধু ক্রম সেটপ্রতি আলাদা হবে।
     // অরিজিনাল ক্রম ও আগের সেটগুলোর ক্রমের সাথে কোনো সেট মিলবে না।
-    const keyOf = (arr: McqQuestion[]) => arr.map((q) => q.id).join(",");
+    const keyOf = (arr: T[]) => arr.map((q) => q.id).join(",");
     const seen = new Set<string>([keyOf(pool)]);
     for (let s = 0; s < k; s++) {
       let arr = shuffled(pool);

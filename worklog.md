@@ -44,3 +44,24 @@ Stage Summary:
 - ইউজারের ৪টি নতুন চাহিদা পূরণ: ① আপলোডের পরেই শব্দ-ধরে Bijoy/Unicode/English ডিটেক্টর (রঙ + পরিসংখ্যান, Bijoy শব্দ SutonnyMJ ফন্টে দেখায় — PC-তে ফন্ট থাকলে সেটাই, নাহলে এমবেডেড ওয়েব-ফন্ট) ② Original Shuffle মোড — ১০০ প্রশ্ন × ৫ সেট = প্রতি সেটে ১০০টাই, সিরিয়াল ক্রম সেটভেদে ভিন্ন ③ আউটপুটে সিরিয়াল প্লেইন টেক্সট (নমPr=0 প্রমাণিত), প্রতি সেট আলাদা পেজ/সেগমেন্টে ④ পুরো ওয়েবসাইট Kalpurush ফন্ট
 - Word এক্সপোর্ট এখন মিক্সড ফাইলেও শব্দ ধরে ফন্ট বসায় (Bijoy→SutonnyMJ, ইউনিকোড→Nirmala UI/Kalpurush, English→Times) — ইউজার চাইলে বদলানো যায়
 - মোট টেস্ট: ৬১ ইউনিট + ৭ এক্সপোর্ট-XML + ব্রাউজার E2E — সব পাস, 0 কস্ট, সব প্রসেসিং client-side
+
+---
+Task ID: 3
+Agent: Main Agent (Super Z)
+Task: আসল Bijoy .docx ফাইল সাপোর্ট — XML-preserving pipeline (tab/equation/sub/sup হুবহু), serial replace (click toggle + ২ ডাউনলোড), মোবাইল পলিশ
+
+Work Log:
+- ইউজারের আসল ফাইল (HSC'27 Physics, ৬০ প্রশ্ন, ৬ সেকশন) inspect: pure Bijoy (SutonnyMJ ×৯৯১), ৩০ OMML equation, ৪৭৩ run-tab, ৩৯ vertAlign, ০ Unicode; সিরিয়াল ডুপ্লিকেট/লাফানো (32..40,5,19,13,13,2,...); অপশন "K. L. M. N." + উত্তর "Dt K" bold
+- jszip + jsdom ইনস্টল; আসল ফাইল public/sample/hsc27-physics-bijoy.docx হিসেবে বান্ডেল (নমুনা বাটন + E2E)
+- `src/lib/mcq/docx-xml.ts` (নতুন কোর) — docx-এর word/document.xml সরাসরি: extractParaText (w:t/w:tab/w:sym/oMath-linear, pPr স্কিপ), প্রশ্ন-ব্লক বিল্ডার (serial + tab টিয়ার-১ / অপশন-লেড টিয়ার-২ / ডেসিমাল-গার্ড টিয়ার-৩), সেকশন-সেপারেটর (PHYSICS, A), সিরিয়াল ডিটেক্ট en/bn/Bijoy-ডিজিট («ˆµ∏Ï¾˜Ùœø), অপশন+উত্তর স্ক্যান (K/L/M/N ফ্যামিলি + Dt), Unicode-স্ক্যান, renumberSerialPara (মাল্টি-রান সিরিয়াল "3"+"2." ক্রস-রান রিপ্লেস, সেপারেটর/ট্যাব অক্ষত)
+- `src/lib/mcq/docx-exporter.ts` (নতুন) — buildShuffledXml: অরিজিনাল XML-এর ব্লক cloneNode করে সেট-প্রতি সাজায়, position-based renumber (প্রথম=১), "Set A/B/C" ASCII হেডার, পেজ-ব্রেক প্যারা, sectPr শেষে; downloadShuffledDocx (JSZip রাউন্ডট্রিপ) + downloadSerialFixedDocx (অরিজিনাল অর্ডারে ১..N)
+- set-engine buildSets এখন generic (DocxQuestion-ও চলে)
+- UI: `docx-detect-card.tsx` (স্ট্যাট/ডিটেক্টর/সিরিয়াল-রিপোর্ট/Unicode-warning/প্রশ্ন-লিস্ট, সিরিয়াল SutonnyMJ ওয়েবফন্টে ৩২→৩২ লুক), `docx-sets-result.tsx` (সেট ফ্র্যাগমেন্ট, সিরিয়াল-এ ক্লিক করলেই renumber ON/OFF টগল, ২ ডাউনলোড: রিনাম্বারড + আসল-নম্বরসহ), input-card-এ .docx client-side রাউট + নমুনা Bijoy .docx বাটন, page.tsx-এ docx/text মোড রাউটিং (docx মোডে সিরিয়াল gate নেই — renumber অটো ঠিক করে)
+- মোবাইল ফিক্স: shuffle-card-এর ৪টা রেডিও লেবেল flex-col (আগে চাপা লাগছিল)
+- টেস্ট: scripts/test-docx.ts — ৪৩ টেস্ট আসল ফাইলে পাস (৬০ প্রশ্ন, ডুপ্লিকেট সিরিয়াল, রিনাম্বার মাল্টি-রান, এক্সপোর্টে tab ৪৭৩×২ / oMath ৩০×২ / vertAlign ৩৯×২ অক্ষত, আউটপুটে ০ Unicode, ZIP রাউন্ডট্রিপ); পুরনো ৬১ + verify-export ৭ টেস্টও পাস; lint ক্লিন (পুরনো verify-export-এর require ফিক্স)
+- E2E (agent-browser, মোবাইল 390×844 + ডেস্কটপ): নমুনা Bijoy .docx→৬০ প্রশ্ন ডিটেক্ট (১৬৮৯ শব্দ: ৮২% Bijoy, ০% Unicode)→Original Shuffle ৩ সেট×৬০→সিরিয়াল-এ ক্লিক টগল (১,২,৩ ↔ ৩৮,৪০,১৯…)→৩টাই ডাউনলোড সফল; ডাউনলোড হওয়া আসল ফাইল python দিয়ে যাচাই: Set A/B/C, সিরিয়াল ১..৬০/সেট, tab-স্ট্রাকচার+রান হুবহু, ০ Unicode; console/page error শূন্য
+
+Stage Summary:
+- মূল আর্কিটেকচার বদল: mammoth-টেক্সট-রিজেনারেশন → সরাসরি docx XML manipulation — তাই আপলোড করা ফাইলের tab, ইকুয়েশন (OMML), sub/superscript, সিম্বল, ছবি, SutonnyMJ ফন্ট-রান হুবহু অক্ষত থাকে; আউটপুটে নতুন Unicode ঢোকে না (নতুন সিরিয়ালও ফাইলের নিজের ডিজিট-স্টাইলে)
+- ইউজারের চাহিদা পূরণ: উদাহরণের tab-ফরম্যাট ডাউনলোডে অটল, serial replace = পজিশন-ভিত্তিক ১,২,৩… (ক্লিক টগল + রিনাম্বারড/আসল-নম্বর দুই ডাউনলোড), সিরিয়াল-ফিক্স .docx (Start), মোবাইল-ফার্স্ট UI
+- সব টেস্ট: ৪৩ (docx) + ৬১ (টেক্সট) + ৭ (এক্সপোর্ট) পাস, E2E ব্রাউজার-ভেরিফাইড, ০ কস্ট, client-side

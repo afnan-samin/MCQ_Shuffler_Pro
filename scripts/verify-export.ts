@@ -45,8 +45,9 @@ writeFileSync("/home/z/my-project/scripts/test-export.docx", Buffer.from(buf));
 
 // XML ইন্সপেক্ট
 const { execSync } = await import("child_process");
+const { readFileSync: readF } = await import("fs");
 execSync("cd /home/z/my-project/scripts && python3 -c \"import zipfile; open('document.xml','wb').write(zipfile.ZipFile('test-export.docx').read('word/document.xml'))\"");
-const xml = require("fs").readFileSync("/home/z/my-project/scripts/document.xml", "utf8");
+const xml = readF("/home/z/my-project/scripts/document.xml", "utf8");
 
 let pass = 0, fail = 0;
 const check = (name: string, cond: boolean, extra = "") => {
