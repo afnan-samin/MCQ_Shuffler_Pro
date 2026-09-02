@@ -49,7 +49,7 @@ export function ColorSerialCard({ analysis, fileName, busy, onSerial }: ColorSer
   return (
     <Card className="border-primary/30">
       <CardHeader className="pb-3">
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <PaintBucket className="h-5 w-5" />
           </div>

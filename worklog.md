@@ -179,3 +179,21 @@ Work Log:
 Stage Summary:
 - ওয়েবসাইট সম্পূর্ণ OK: ইউজারের রিপোর্ট করা দুটো সমস্যাই (B1-ক্লিক error + করাপ্ট ডাউনলোড) ফিক্সড ও লাইভ-ভেরিফাইড
 - ইউজার এখন নিজে ওয়েবসাইট থেকে বানাতে পারবে; ৫টা যাচাইকৃত আউটপুট download/-এ আগেই আছে
+
+---
+Task ID: 16
+Agent: main
+Task: উপরে দুইটা মোড-বাটন — "MCQ শাফল" ও "MCQ সিরিয়াল" (শাফল আর সিরিয়ালের কাজ সম্পূর্ণ আলাদা, স্ট্রেস কমানো)
+
+Work Log:
+- নতুন কম্পোনেন্ট mode-tabs.tsx — হেডারের নিচে দুইটা বড় বাটন (role=tablist/tab, aria-selected): 🔀 MCQ শাফল (শাফল+সেট) ও 🔢 MCQ সিরিয়াল (রঙ-অনুযায়ী নম্বর); active = emerald fill; শেষ মোড localStorage-এ মনে থাকে (mcq-shuffler-mode)
+- নতুন serial-input-card.tsx — সিরিয়াল মোডের নিজস্ব .docx-only আপলোড (নন-docx-এ বাংলা error), লোডেড ফাইলনাম দেখায়
+- নতুন serial-extra-cards.tsx — (১) ColorFileShuffleNotice: শাফল মোডে রঙ-ফাইল উঠলে শাফল বন্ধ-ব্যাখ্যা + "সিরিয়াল মোডে এই ফাইল খুলুন" বাটন (ফাইল ফ্রি-হাতে সিরিয়াল মোডে চলে যায়, re-upload লাগে না); (২) NoColorSerialCard: রঙ না পেলে {n} প্রশ্ন জেনে "একটানা ১..N সিরিয়াল" ডাউনলোড
+- page.tsx রিফ্যাক্টর: mode স্টেট + SerialState (file/baseName/xml/analysis) সম্পূর্ণ শাফল-স্টেট থেকে আলাদা; handleSerialFile (আপলোডে analyzeColorDocx একবার, স্টোর); handleColorSerial এখন serialDoc থেকে; DocxState-এ colorAn যোগ (হাত-অফে reuse); পুরনো auto colorMode-hijack বাদ — মোড এখন ইউজারের হাতে; হেডার সাবটাইটেল আপডেট
+- মোবাইল বাগ-ফিক্স: CardHeader (column-flex)-এর ভিতরের flex-row-এ min-w-0 না থাকায় truncate বিবরণ ~৭৫০px টেনে ওভারফ্লো করত (৩৫৯px) — serial-input-card / serial-extra-cards / color-serial-card-এ flex-row ও span-এ min-w-0 যোগ → overflow 0px (পুরনো color-serial-card-এর hidden বাগও ধরা পড়ে ঠিক)
+- টেস্ট: e2e-mode-tabs.ts (playwright) ৮ চেক পাস — ডিফল্ট শাফল ট্যাব; সিরিয়াল মোডে Chemistry → ৪ চিপ → B1 ডাউনলোড (ফাইলনাম যাচাই); শাফল মোডে রঙ-ফাইল → নোটিস + হাত-অফ → সিরিয়াল মোডে ফাইলসহ পৌঁছয়; রঙহীন docx → নো-কালার কার্ড + continuous ডাউনলোড; reload-এ মোড স্মরণ; রঙহীন ফাইলে শাফল ফ্লো নোটিসহীন; JS error শূন্য; মোবাইল 390px overflow 0; lint ক্লিন; tsc src ক্লিন
+- আবিষ্কার: নমুনা hsc27-physics-bijoy.docx নিজেই রঙ-স্ট্রাকচার্ড (B1×৬ কালো হেডার) — তাই রঙহীন-কেসের জন্য python-docx দিয়ে upload/color-free-test.docx (shd=0, ১২ প্রশ্ন) বানানো হয়েছে
+
+Stage Summary:
+- ওয়েবসাইটে এখন দুইটা স্পষ্ট আলাদা মোড: 🔀 MCQ শাফল (টেক্সট/ডক আপলোড → ডিটেক্ট → শাফল → সেট) ও 🔢 MCQ সিরিয়াল (docx → রঙ-চিপ → সেকশন-সিরিয়াল / একটানা সিরিয়াল) — আলাদা আপলোড, আলাদা স্টেট, আলাদা UI; ভুল মোডে ভুল ফাইল গেলে ব্যাখ্যাসহ হাত-অফ
+- E2E-ভেরিফাইড, মোবাইল-নিরাপদ, JS-error শূন্য
