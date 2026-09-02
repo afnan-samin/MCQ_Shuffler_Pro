@@ -164,3 +164,18 @@ Stage Summary:
 - ইউজারের ৫ ফাইলের রায়: B1/A4/A3/continuous = কাঠামোগতভাবে ঠিক ও Word-নিরাপদ (তবে ৬+৬ আইসোটোপ-ফাঁক/ভুল ছিল); B6 = ব্যর্থ (continuous-এর কপি)
 - ২টা বাগ ফিক্সড: (১) অধ্যায়ের রঙ বদলালে B6-স্টাইল স্কিম পুরো ফাইল নম্বর দিয়ে ফেলত, (২) আইসোটোপ লাইন ভুয়া প্রশ্ন হয়ে সিরিয়াল-ফাঁক/ভুল রিনাম্বার হতো
 - ফিক্সড ৫ আউটপুট: download/Final Chemistry 1st paper only varsity Question (1-5) (color serial - {B1,A4,A3,B6,continuous}).docx
+
+---
+Task ID: 15
+Agent: main
+Task: ইউজারের প্রশ্নের চূড়ান্ত যাচাই — "Website ki ok? Same somossa ki r hbe?"
+
+Work Log:
+- dev server চেক: HTTP 200 (localhost:3000)
+- ফুল টেস্ট ব্যাটারি রি-রান: test-color-serial 74/74, test-docx 43/43, test-mcq 61/61 (মোট 178, 0 fail)
+- e2e-browser-chem.ts-এ পুরনো comparison-পাথ প্যাচ (download/Chemistry (color serial - B6).docx → নতুন regen নাম)
+- ফ্রেশ ব্রাউজার E2E (playwright, আসল Chemistry ফাইল): রঙ-কার্ড ✓ → ডিটেক্ট-টোস্ট ✓ → A3/A4/B1/B6 চিপ ✓ → B1 সিলেক্ট (৪ সেকশন — ইউজারের রিপোর্ট করা fail-কেস) ✓ → ডাউনলোড ✓ → error-টোস্ট নেই ✓ → B6 সিলেক্ট (১ সেকশন) ✓ → ব্রাউজার-ডাউনলোড B6 যাচাইকৃত আউটপুটের সাথে byte-identical (md5 c0d1ad15607b) ✓ → JS error শূন্য ✓
+
+Stage Summary:
+- ওয়েবসাইট সম্পূর্ণ OK: ইউজারের রিপোর্ট করা দুটো সমস্যাই (B1-ক্লিক error + করাপ্ট ডাউনলোড) ফিক্সড ও লাইভ-ভেরিফাইড
+- ইউজার এখন নিজে ওয়েবসাইট থেকে বানাতে পারবে; ৫টা যাচাইকৃত আউটপুট download/-এ আগেই আছে

@@ -92,7 +92,7 @@ const cmp = exec6(
   `python3 -c "
 import zipfile, hashlib
 a = zipfile.ZipFile('${path6}').read('word/document.xml')
-b = zipfile.ZipFile('download/Chemistry (color serial - B6).docx').read('word/document.xml')
+b = zipfile.ZipFile('download/Final Chemistry 1st paper only varsity Question (1-5) (color serial - B6).docx').read('word/document.xml')
 print('IDENTICAL' if a == b else 'DIFF')
 print('b6-md5', hashlib.md5(a).hexdigest()[:12])
 "`,
