@@ -218,3 +218,20 @@ Stage Summary:
 - শাফল মোড এখন রঙ-হেডার ফাইলও নেয় — হেডারগুলো বাদ দিয়ে সবগুলো প্রশ্ন এক সিরিয়ালে ধরে ইউজারের সেট-সেটিং (interleaved/chunk/random/original) অনুযায়ী শাফল; আউটপুটে হেডার যায়ই না, প্রতি সেট আলাদা পেজে ১,২,৩… ; চাইলে এক ক্লিকে সিরিয়াল মোডে হাত-অফ
 - সিরিয়াল মোডে হেডার না থাকলে অটো NoColorSerialCard → একটানা ১..N ডাউনলোড (আগেই ছিল, এখন E2E-প্রমাণিত)
 - বোনাস ফিক্স: সব শাফল/সিরিয়াল-ফিক্স ডাউনলোড এখন strict-XML পরিষ্কার (ডাবল ডেক্লারেশন নির্মূল)
+
+---
+Task ID: 18
+Agent: main
+Task: প্রজেক্ট ক্লিনআপ — দরকারি না থাকা সব ফাইল/ফোল্ডার ডিলিট (ইউজারের অনুরোধ)
+
+Work Log:
+- আগে পুরো dependency-map (grep দিয়ে প্রতিটা import যাচাই) — কোন ফাইল কোথায় ব্যবহৃত সেটা নিশ্চিত হয়ে তারপর ডিলিট
+- scripts/ থেকে ডিলিট: ১৩টা probe/debug ts, forensic-outputs + regen-chem-fixed, ৭টা python ফরেনসিক স্ক্রিপ্ট, ৪টা পুরনো/stale E2E (e2e-browser-chem, e2e-color-chem, e2e-color-agri, e2e-mode-tabs-mobile), ১৮টা PNG স্ক্রিনশট, document.xml, test-export.docx, tmp-e2e/ — রাখা হয়েছে: test-mcq / test-docx / test-color-serial (১৯৪ টেস্ট) + e2e-mode-tabs / e2e-shuffle-headers (বর্তমান আচরণের E2E) + verify-export
+- upload/ থেকে ডিলিট: palette docx, HSC Premedical, ৫টা Chemistry আউটপুট-কপি, ২টা pasted image, lipilab-index.html — রাখা হয়েছে ৩টা টেস্ট-নির্ভর ফাইল (Chemistry original, Agri original, color-free-test.docx)
+- download/ খালি (সব যাচাইকৃত আউটপুট ইউজারের হাতে আগেই গেছে)
+- স্ক্যাফোল্ড ডিলিট: examples/, tests/, tool-results/, db/, prisma/, src/lib/db.ts (অব্যবহৃত Prisma), src/app/api/route.ts (hello-world), src/hooks/use-mobile.ts (শুধু sidebar ব্যবহার করত), public/logo.svg (layout CDN লোগো ব্যবহার করে)
+- ৩৫টা অব্যবহৃত shadcn ui কম্পোনেন্ট ডিলিট — ব্যবহৃত ১৩টা রাখা: badge, button, card, checkbox, input, label, radio-group, select, switch, tabs, textarea, toast, toaster (+use-toast hook)
+- ভেরিফিকেশন: টেস্ট ৬১+৪৩+৯০ = ১৯৪/১৯৪ পাস; tsc --noEmit-এ src+scripts শূন্য এরর (skills/ ফোল্ডারের ২টা প্রি-একজিস্টিং এরর এনভায়রনমেন্টের নিজস্ব, স্পর্শ করা হয়নি); dev server HTTP 200; শাফল+সিরিয়াল দুই মোড-বাটনই রেন্ডার
+
+Stage Summary:
+- প্রজেক্টে এখন শুধু দরকারি জিনিস: অ্যাপ-কোড (src), ১৩টা ব্যবহৃত ui কম্পোনেন্ট, ৬টা ভেরিফিকেশন-স্ক্রিপ্ট, ৩টা টেস্ট docx অ্যাসেট, ফন্ট+নমুনা, কনফিগ; সব টেস্ট পাস, ওয়েবসাইট সম্পূর্ণ কার্যকর
