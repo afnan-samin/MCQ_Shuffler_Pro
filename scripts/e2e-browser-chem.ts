@@ -71,6 +71,37 @@ print('entries:', len(z.namelist()), 'dir-entries:', sum(1 for n in z.namelist()
 console.log("B1-পরের প্রথম টেক্সটগুলো:", out.trim().split("\n")[0]);
 console.log(out.trim().split("\n")[1]);
 
+// ---- B6 ফ্লো (বাগ-ফিক্স যাচাই): সিলেক্ট → ডাউনলোড → সার্ভার-জেনারেটেডের সাথে byte-compare ----
+await page.click('button:has-text("B6")');
+await page.waitForSelector('button:has-text("B6") >> nth=0', { timeout: 20000 });
+await page.waitForFunction(
+  () => document.body.innerText.includes("1 টি সেকশন পাওয়া গেছে"),
+  { timeout: 20000 }
+);
+console.log("✓ B6 সিলেক্ট — ১ সেকশন ব্যাখ্যা দেখা গেছে");
+
+const [dl6] = await Promise.all([
+  page.waitForEvent("download", { timeout: 180000 }),
+  page.click('button:has-text("সিরিয়াল করে .docx ডাউনলোড")'),
+]);
+console.log("✓ B6 ডাউনলোড হয়েছে:", dl6.suggestedFilename());
+const path6 = await dl6.path();
+
+const { execSync: exec6 } = await import("node:child_process");
+const cmp = exec6(
+  `python3 -c "
+import zipfile, hashlib
+a = zipfile.ZipFile('${path6}').read('word/document.xml')
+b = zipfile.ZipFile('download/Chemistry (color serial - B6).docx').read('word/document.xml')
+print('IDENTICAL' if a == b else 'DIFF')
+print('b6-md5', hashlib.md5(a).hexdigest()[:12])
+"`,
+  { encoding: "utf-8" }
+);
+const cmpLines = cmp.trim().split("\n");
+console.log(cmpLines[0] === "IDENTICAL" ? "✓ ব্রাউজার-ডাউনলোড B6 == যাচাইকৃত আউটপুট (byte-identical)" : "✗ B6 ফাইল মিলছে না!");
+console.log(cmpLines[1]);
+
 await page.screenshot({ path: "scripts/e2e-chem-final.png", fullPage: false });
 console.log("\nJS errors:", errors.length ? errors : "শূন্য ✓");
 await browser.close();

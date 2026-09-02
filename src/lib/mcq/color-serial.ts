@@ -303,7 +303,7 @@ export function colorKeyName(key: string): string {
 export type SerialScheme = { kind: "color"; key: string } | { kind: "continuous" };
 
 /**
- * স্ট্যাক-অ্যালগরিদম (ইউজারের নিয়ম হুবহু):
+ * স্ট্যাক-অ্যালগরিদম v2 (ইউজারের নিয়ম হুবহু):
  *  - রঙ-দেওয়া হেডার C এলে: স্ট্যাকে C আগে থাকলে C-সহ ওপরের সব বন্ধ করে
  *    C নতুন সেকশন হিসেবে খোলা হয় (ভাই-সেকশন); না থাকলে সবচেয়ে ভিতরের
  *    খোলা সেকশনের সন্তান হিসেবে খোলে
@@ -314,13 +314,21 @@ export type SerialScheme = { kind: "color"; key: string } | { kind: "continuous"
  *    X-সেকশনের ক্রমের অংশ
  *  - continuous: পুরো ফাইলে একটানা ১,২,৩…
  *
- * 🛡️ X-প্রোটেকশন (আসল ফাইলের বাগ-ফিক্স): অধ্যায়ের রঙ ফাইলভেদে বদলায়
- *    (যেমন অধ্যায়-১ = B6, অধ্যায়-২…৫ = B1)। তখন আগের অধ্যায়ের Type/Varsity
- *    এন্ট্রি স্ট্যাকে পুঁজে থাকে; নতুন অধ্যায়ের প্রথম Type হেডার এসেই
- *    "ভাই-রিস্টার্ট" মনে করে স্ট্যাক কেটে খোলা X-সেকশন (B1) বন্ধ করে
- *    দিত — ফলে কোনো প্রশ্ন নম্বরই পেত না। এখন চেক করা হয়: C যদি এই
- *    X-সেকশনের শেষ হওয়ার আগেই (nextX-এর আগে) আবার ফিরে আসে, তাহলে C
- *    হলো X-এর ভিতরের লেভেলের হেডার — X-কে রেখে তার ভিতরে নেস্ট হয়।
+ * 🎓 অধ্যায়-সোদক সোয়াপ (বাগ-ফিক্স: "অধ্যায়ের রঙ বদলালে" সমস্যা):
+ *    বাস্তব ফাইলে একই স্তরের (যেমন অধ্যায়) হেডারের রঙ বদলায় — অধ্যায়-১ = B6,
+ *    অধ্যায়-২…৫ = B1। পুরনো অ্যালগরিদমে নতুন রঙ B1-কে আগের অধ্যায়ের *সন্তান*
+ *    ভেবে বসালে B6-সেকশন কখনো বন্ধ হতো না — B6-স্কিম পুরো ফাইলকে একটানা
+ *    নম্বর দিয়ে দিত (আউটপুট continuous-এর হুবহু কপি হয়ে যেত)।
+ *    এখন: fresh রঙ C এলে যদি — (১) স্ট্যাকের রুট R এ পর্যন্ত মাত্র ১ বার
+ *    এসে থাকে (তার একটাই সেকশন খোলা), (২) R-এর সরাসরি-সন্তান রঙের প্রমাণ
+ *    থাকে (R আসলেই একটা অভিভাবক-স্তর), (৩) C ও R-এর হেডার-ঘনত্ব একই
+ *    অর্ডারে (≤১০×) — তাহলে C হলো R-এর *সোদক* (নতুন অধ্যায়): রুট-সেকশন
+ *    বন্ধ করে C নতুন রুট হয়। ইউজারের A5/A2/A6 নেস্টিং উদাহরণে এই নিয়ম
+ *    কখনো ফায়ার করে না (সেখানে রুট A5 বারবার রি-অ্যারাইভ করে)।
+ *
+ * 🛡️ ২×-গার্ড: কোনো রঙের রিস্টার্ট তার স্ট্যাক-পজিশনের ওপরে থাকা ২×-এর কম ঘন
+ *    (তাই তুলনামূলক উঁচু-লেভেলের) সেকশনকে বন্ধ করতে পারে না — ঘন রঙের
+ *    রিস্টার্ট কখনো উঁচু-লেভেলের খোলা সেকশন (যেমন সিলেক্টেড X) মেরে ফেলবে না।
  *
  * রিটার্ন: Map<paraIdx, newNumber> — শুধু প্রশ্ন-শুরু প্যারারাই থাকে
  */
@@ -328,60 +336,76 @@ export function planSerialByColor(analysis: ColorAnalysis, scheme: SerialScheme)
   const plan = new Map<number, number>();
   const X = scheme.kind === "color" ? scheme.key : null;
 
-  // প্রতি রঙের সেকশন-সংখ্যা — লেভেল অনুমানের ভিত্তি:
-  // যে রঙ তত বেশি ঘন (বেশি হেডার), সে তত নিচু লেভেলের (Type ×২৭ অধ্যায় ×৪-এর ভিতরে)।
-  // তাই C-এর সংখ্যা X-এর কমপক্ষে ২ গুণ হলে C হলো X-এর ভিতরের লেভেলের রঙ —
-  // C রি-অ্যারাইভ করলেও X-সেকশন বন্ধ হবে না। না হলে C সম-উচ্চ-লেভেল —
-  // ভাই-রিস্টার্টে X বন্ধ (সীমানায় "থিমে যাওয়া")।
+  // গ্লোবাল ঘনত্ব: যে রঙের হেডার তত বেশি, সে তত গভীর-লেভেলের (Type ×২৭ ⊂ অধ্যায় ×৪)
   const countOf = new Map<string, number>();
   for (const c of analysis.colors) countOf.set(c.key, c.sections);
 
-  const stack: Array<{ color: string; pos: number }> = [];
+  const stack: string[] = [];
+  const seen = new Map<string, number>(); // রঙ → এ পর্যন্ত হেডার-সংখ্যা
+  const kids = new Map<string, Set<string>>(); // রঙ → তার সরাসরি-সন্তান রঙের প্রমাণ (fresh-পুশ এজ)
   let counter = 0;
-  let inX = false;
+  let inX = X === null; // continuous → সব প্রশ্ন নম্বর পায়
 
-  analysis.paras.forEach((para) => {
+  for (const para of analysis.paras) {
     if (para.colorKey) {
+      const C = para.colorKey;
       let at = -1;
       for (let s = stack.length - 1; s >= 0; s--) {
-        if (stack[s].color === para.colorKey) {
-          at = s;
-          break;
-        }
+        if (stack[s] === C) { at = s; break; }
       }
       if (at >= 0) {
-        let protectXAt = -1;
-        if (X !== null && X !== para.colorKey) {
-          // `at`-এর ওপরে কোনো খোলা X-এন্ট্রি আছে কি? (থাকলে এই pop X-কে মারতে চলেছিল)
-          let xAt = -1;
-          for (let s = stack.length - 1; s > at; s--) {
-            if (stack[s].color === X) {
-              xAt = s;
-              break;
-            }
-          }
-          const cCount = countOf.get(para.colorKey) ?? 0;
-          const xCount = countOf.get(X) ?? 0;
-          if (xAt > at && cCount >= 2 * xCount) {
-            protectXAt = xAt; // C হলো X-এর ভিতরের লেভেলের হেডার — X খোলা থাকুক
-          }
+        // ভাই-রিস্টার্ট — ২×-গার্ড
+        const cCount = countOf.get(C) ?? 0;
+        let cut = at;
+        for (let s = at + 1; s < stack.length; s++) {
+          if ((countOf.get(stack[s]) ?? 0) * 2 <= cCount) { cut = s + 1; break; }
         }
-        if (protectXAt >= 0) {
-          stack.length = protectXAt + 1; // X ধরে রেখে তার ওপরেরগুলো বন্ধ
-        } else {
-          stack.length = at; // সাধারণ ভাই-রিস্টার্ট: C-সহ ওপরের সব বন্ধ
+        stack.length = cut;
+      } else if (stack.length > 0) {
+        // fresh রঙ — অধ্যায়-সোদক সোয়াপ কি হবে?
+        const root = stack[0];
+        const seenRoot = seen.get(root) ?? 0;
+        const cN = countOf.get(C) ?? 0;
+        const rN = countOf.get(root) ?? 0;
+        const hi = Math.max(cN, rN);
+        const lo = Math.min(cN, rN);
+        // প্রমাণ: রুটের অন্তত একটা সন্তান-রঙ ২+ বার এসেছে — অর্থাৎ রুটের
+        // ভিতরের স্তরটা রিপিট হয়ে স্ট্রাকচার প্রতিষ্ঠিত (আসল ফাইলে অধ্যায়-১-এ
+        // Type-সেকশন বারবার রিস্টার্ট হয়েছে; প্রথম Type-এর মাঝেই যে ভিতরের
+        // লেভেল প্রথমবার খুলছে সেটা অধ্যায় নয় — varsity-স্টাইল গভীর স্তর)
+        const childEstablished = [...(kids.get(root) ?? [])].some((ch) => (seen.get(ch) ?? 0) >= 2);
+        // আরও প্রমাণ: C রুটের প্রতিষ্ঠিত সন্তানদের চেয়ে রেয়ার (তাই C-ও
+        // সন্তানদের মতো উঁচু-লেভেলের ব্যান্ডে — গভীর-লেভেলের হেডার নয়)
+        const childDensest = Math.max(...[...(kids.get(root) ?? [])].map((ch) => countOf.get(ch) ?? 0));
+        // সবচেয়ে জোরালো প্রমাণ: C রুট ছাড়া বাকি *সব খোলা* রঙের চেয়ে কঠোরভাবে
+        // রেয়ার — নতুন অধ্যায়ের রঙ সবসময় চলমান Type/varsity-স্তরের চেয়ে রেয়ার
+        // (B1=৪ < Type=২৭ < varsity=২৫৭)। ইউজারের A5/A6-নেস্টিংয়ে A6(৩) A2(৩)-এর
+        // চেয়ে রেয়ার নয় — তাই ভুল সোয়াপ হয় না।
+        let openMin = Infinity;
+        for (let s = 1; s < stack.length; s++) openMin = Math.min(openMin, countOf.get(stack[s]) ?? 0);
+        if (seenRoot === 1 && childEstablished && cN <= childDensest && cN < openMin && hi <= lo * 10) {
+          stack.length = 0; // হ্যাঁ — C রুটের সোদক: রুট-সেকশন বন্ধ, C নতুন রুট
+        }
+        // fresh পুশ-এজ: parent = বর্তমান টপ
+        const parent = stack.length ? stack[stack.length - 1] : null;
+        if (parent) {
+          if (!kids.has(parent)) kids.set(parent, new Set());
+          kids.get(parent)!.add(C);
         }
       }
-      stack.push({ color: para.colorKey, pos: 0 });
-      if (X !== null && para.colorKey === X) counter = 0; // নতুন X-সেকশন
-      inX = X !== null && stack.some((e) => e.color === X);
+      seen.set(C, (seen.get(C) ?? 0) + 1);
+      stack.push(C);
+      if (X !== null) {
+        if (C === X) counter = 0; // নতুন X-সেকশন (হুবহু রঙে)
+        inX = stack.includes(X); // স্কোপিংও হুবহু রঙে
+      }
     } else if (para.isQuestion) {
-      if (X === null || inX) {
+      if (inX) {
         counter++;
         plan.set(para.idx, counter);
       }
     }
-  });
+  }
   return plan;
 }
 
@@ -509,17 +533,14 @@ export function applyColorSerialXml(xml: string, plan: Map<number, number>, targ
 
 /** একটা প্যারা-সাবস্ট্রিংয়ের সিরিয়াল নতুন নম্বরে বদলায় (ডিজিট+সেপারেটর) */
 function renumberParaSub(sub: string, newNum: number, targetSep: string): string {
-  const segs: WtSegment[] = [];
-  WT_RE.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = WT_RE.exec(sub))) {
-    const openEnd = m.index + m[0].indexOf(">") + 1;
-    segs.push({ rawStart: openEnd, rawEnd: m.index + m[0].length - "</w:t>".length, text: decodeXmlEntities(m[1]) });
-  }
+  const segs = collectWtSegs(sub);
   if (!segs.length) return sub;
 
   const joined = segs.map((s) => s.text).join("");
-  const spans = serialMatchSpans(joined);
+  const segEnds: number[] = [];
+  let acc = 0;
+  for (const s of segs) { acc += s.text.length; segEnds.push(acc); }
+  const spans = serialMatchSpans(joined, segEnds);
   if (!spans) return sub;
 
   // জিরো-প্যাডিং সংরক্ষণ: "01" স্টাইলের ফাইলে ১ → "01"
@@ -535,7 +556,10 @@ function renumberParaSub(sub: string, newNum: number, targetSep: string): string
     // আগের এডিটের পরে সেগমেন্ট raw-পজিশন বদলাতে পারে — আবার স্ক্যান
     const segs2 = collectWtSegs(out);
     const joined2 = segs2.map((s) => s.text).join("");
-    const spans2 = serialMatchSpans(joined2);
+    const segEnds2: number[] = [];
+    let acc2 = 0;
+    for (const s of segs2) { acc2 += s.text.length; segEnds2.push(acc2); }
+    const spans2 = serialMatchSpans(joined2, segEnds2);
     if (spans2 && spans2.sepEnd > spans2.sepStart) {
       out = replaceDecodedSpan(out, segs2, spans2.sepStart, spans2.sepEnd, targetSep);
     }

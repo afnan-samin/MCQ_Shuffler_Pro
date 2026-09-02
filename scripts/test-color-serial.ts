@@ -211,10 +211,27 @@ console.log("\n== ৩) applyColorSerialXml — সার্জিক্যাল
 
 // ---- সেপারেটর না থাকলে যোগ হয় না (গ্লুড অক্ষত) ----
 {
+  // আইসোটোপ-গার্ড: ডিজিটের পরে সরাসরি ইংরেজি অক্ষর = সিরিয়াল নয় ("714N" = ₇¹⁴N)
   const el = new DOMParser().parseFromString(wrapDoc(plainP("12abc")), "application/xml");
   const p = el.getElementsByTagNameNS(W, "p")[0];
   renumberSerialParaTo(p, 3);
-  ok(extractParaText(p) === "3abc", "সেপারেটরহীন: '12abc' → '3abc' (নতুন সেপ ঢোকে না)");
+  ok(extractParaText(p) === "12abc", "আইসোটোপ-গার্ড: '12abc' অপরিবর্তিত (ডিজিট+অক্ষর = সিরিয়াল নয়)");
+}
+{
+  // সেপারেটরহীন কিন্তু বৈধ: ডিজিট + স্পেস + লেখা → রিনাম্বার হয়, নতুন সেপ ঢোকে না
+  const el = new DOMParser().parseFromString(wrapDoc(plainP("12 abc")), "application/xml");
+  const p = el.getElementsByTagNameNS(W, "p")[0];
+  renumberSerialParaTo(p, 3);
+  ok(extractParaText(p) === "3 abc", "সেপারেটরহীন: '12 abc' → '3 abc' (নতুন সেপ ঢোকে না)");
+}
+{
+  // আসল ফাইলের ভুয়া-পজিটিভগুলো: আইসোটোপ লাইন সিরিয়াল হিসেবে ধরা হয় না
+  for (const t of ["714N + α → 817O + X", "12Cl2(g) → Cl(g)", "1224Mg emissoin"]) {
+    const el = new DOMParser().parseFromString(wrapDoc(plainP(t)), "application/xml");
+    const p = el.getElementsByTagNameNS(W, "p")[0];
+    renumberSerialParaTo(p, 1);
+    ok(extractParaText(p) === t, `আইসোটোপ-গার্ড: '${t.slice(0, 20)}…' অপরিবর্তিত`);
+  }
 }
 
 // ---- ডিজিট দৈর্ঘ্য বদলালেও সেপ ঠিক জায়গায় (এক-পাস স্প্যান) ----
@@ -291,60 +308,98 @@ console.log(`\n  (XML সাইজ: আসল ${agriXml.length} → আউটপ
 // ============================================================
 console.log("\n== ৫) রিগ্রেশন: অধ্যায়ের রঙ বদলানো ফাইল (আসল Chemistry-ফাইল সিনারিও) ==");
 // অধ্যায়-১ = B6 (0D0D0D), অধ্যায়-২…৩ = B1 (000000); Type = A4, Varsity = A3
-// আগের বাগ: অধ্যায়-১-এর পুরনো A4/A3 স্ট্যাকে পুঁজে থাকায় অধ্যায়-২-এর প্রথম
-// Type হেডারই B1-সেকশন বন্ধ করে দিত → B1 প্ল্যানে ০ প্রশ্ন
+// আগের বাগ-১: অধ্যায়-২-এর প্রথম Type হেডার B1-সেকশন মেরে ফেলত → B1 প্ল্যানে ০
+// আগের বাগ-২: অধ্যায়-২-এর ভিন্ন রঙ B6-এর সন্তান বসত → B6-সেকশন কখনো বন্ধ হতো না
+//             → B6 আউটপুট continuous-এর হুবহু কপি হয়ে যেত
+// ডেটা বাস্তবের মতো ঘনত্ব-অনুপাতে (varsity ≫ Type ≫ অধ্যায়) প্রোগ্রাম্যাটিক জেনারেটেড —
+// কারণ অধ্যায়-সোদক সোয়াপের ≤১০× ঘনত্ব-শর্ত বাস্তব ফাইলের মতোই ডেটায় যাচাই করতে হয়
 {
-  const chem: Array<[kind: "h" | "q", color: string | null, text: string]> = [
-    ["h", "0D0D0D", "অধ্যায়-১"],
-    ["h", "BFBFBF", "Type-১"],
-    ["q", null, "1.প্রশ্ন-১"],
-    ["q", null, "2.প্রশ্ন-২"],
-    ["h", "D9D9D9", "ঢাকা বিশ্ববিদ্যালয়"],
-    ["q", null, "3.প্রশ্ন-৩"],
-    ["q", null, "4.প্রশ্ন-৪"],
-    ["h", "BFBFBF", "Type-২"],
-    ["q", null, "5.প্রশ্ন-৫"],
-    ["h", "000000", "অধ্যায়-২"], // নতুন অধ্যায়ের রঙ — B6 থেকে B1
-    ["h", "BFBFBF", "Type-৩"],   // ← এই হেডারই আগে B1 মেরে ফেলত
-    ["h", "D9D9D9", "ঢাকা বিশ্ববিদ্যালয়"],
-    ["q", null, "1.প্রশ্ন-৬"],
-    ["q", null, "2.প্রশ্ন-৭"],
-    ["h", "D9D9D9", "রাজশাহী বিশ্ববিদ্যালয়"],
-    ["q", null, "3.প্রশ্ন-৮"],
-    ["h", "BFBFBF", "Type-৪"],
-    ["q", null, "4.প্রশ্ন-৯"],
-    ["h", "000000", "অধ্যায়-৩"],
-    ["h", "BFBFBF", "Type-৫"],
-    ["q", null, "1.প্রশ্ন-১০"],
-    ["q", null, "2.প্রশ্ন-১১"],
-  ];
-  const chemXml = wrapDoc(chem.map(([k, c, t]) => (k === "h" ? shadedP(t, c!) : q(t))).join(""));
+  const items: Array<[kind: "h" | "q", color: string | null, text: string]> = [];
+  let qn = 0;
+  const varsityNames = ["ঢাকা", "রাজশাহী", "চট্টগ্রাম", "খুলনা", "যবিপ্রবি", "জাবি", "ইবি", "কুবি", "রুবি", "সাবি", "নবি", "ববি"];
+  // অধ্যায়-১ (B6): Type-১(১q) + ১২ varsity(১q) + Type-২(১q) = ১৪ প্রশ্ন
+  items.push(["h", "0D0D0D", "অধ্যায়-১"]);
+  items.push(["h", "BFBFBF", "Type-১"]);
+  items.push(["q", null, `${++qn}.প্রশ্ন-${qn}`]);
+  for (let v = 0; v < 12; v++) {
+    items.push(["h", "D9D9D9", `${varsityNames[v]} বিশ্ববিদ্যালয়`]);
+    items.push(["q", null, `${++qn}.প্রশ্ন-${qn}`]);
+  }
+  items.push(["h", "BFBFBF", "Type-২"]);
+  items.push(["q", null, `${++qn}.প্রশ্ন-${qn}`]);
+  // অধ্যায়-২ (B1): Type-৩(১q) + ১০ varsity(১q) + Type-৪(১q) = ১২ প্রশ্ন
+  items.push(["h", "000000", "অধ্যায়-২"]); // নতুন অধ্যায়ের রঙ — B6 থেকে B1
+  items.push(["h", "BFBFBF", "Type-৩"]);
+  items.push(["q", null, `${++qn}.প্রশ্ন-${qn}`]);
+  for (let v = 0; v < 10; v++) {
+    items.push(["h", "D9D9D9", `${varsityNames[v]} বিশ্ববিদ্যালয়`]);
+    items.push(["q", null, `${++qn}.প্রশ্ন-${qn}`]);
+  }
+  items.push(["h", "BFBFBF", "Type-৪"]);
+  items.push(["q", null, `${++qn}.প্রশ্ন-${qn}`]);
+  // অধ্যায়-৩ (B1): Type-৫ + ২ প্রশ্ন
+  items.push(["h", "000000", "অধ্যায়-৩"]);
+  items.push(["h", "BFBFBF", "Type-৫"]);
+  items.push(["q", null, `${++qn}.প্রশ্ন-${qn}`]);
+  items.push(["q", null, `${++qn}.প্রশ্ন-${qn}`]);
+
+  const chemXml = wrapDoc(items.map(([k, c, t]) => (k === "h" ? shadedP(t, c!) : q(t))).join(""));
   const anC = analyzeColorDocx(chemXml);
+  ok(anC.questionCount === 28 && anC.colors.length === 4, "সিনারিও: ২৮ প্রশ্ন, ৪ রঙ (B6×১, B1×২, A4×৫, A3×২২)");
+
+  const seq = (plan: Map<number, number>): number[] => anC.paras.filter((p) => plan.has(p.idx)).map((p) => plan.get(p.idx)!);
 
   const planB1 = planSerialByColor(anC, { kind: "color", key: "000000" });
-  ok(planB1.size === 6, "B1 প্ল্যানে অধ্যায়-২+৩ এর ৬টা প্রশ্ন (আগে ছিল ০ — বাগ)");
-  const nums: number[] = [];
-  anC.paras.filter((p) => planB1.has(p.idx)).forEach((p) => nums.push(planB1.get(p.idx)!));
+  ok(planB1.size === 14, `B1 প্ল্যানে অধ্যায়-২+৩ এর ১৪টা প্রশ্ন (আগে ছিল ০ — বাগ), পাওয়া গেল ${planB1.size}`);
   ok(
-    JSON.stringify(nums) === JSON.stringify([1, 2, 3, 4, 1, 2]),
-    `B1-সেকশনগুলো প্রতিটা ১ থেকে শুরু, অধ্যায়-১ বাদ (${nums.join(",")})`
+    JSON.stringify(seq(planB1)) === JSON.stringify([1,2,3,4,5,6,7,8,9,10,11,12, 1,2]),
+    `অধ্যায়-২ একটানা ১..১২, অধ্যায়-৩ আবার ১,২ — অধ্যায়-১ বাদ (${seq(planB1).join(",")})`
   );
 
   const planA3 = planSerialByColor(anC, { kind: "color", key: "D9D9D9" });
-  ok(planA3.size === 5, "A3 প্ল্যানে শুধু varsity-সেকশনের প্রশ্ন (Type-ব্লকের বাড়তি q5 বাদ)");
-  const numsA3: number[] = [];
-  anC.paras.filter((p) => planA3.has(p.idx)).forEach((p) => numsA3.push(planA3.get(p.idx)!));
-  ok(
-    JSON.stringify(numsA3) === JSON.stringify([1, 2, 1, 2, 1]),
-    `প্রতিটা A3-হেডারে কাউন্টার ১ থেকে রিসেট (${numsA3.join(",")})`
-  );
+  ok(planA3.size === 22, `A3 প্ল্যানে ২২টা varsity-সেকশনের ২২ প্রশ্ন, পাওয়া গেল ${planA3.size}`);
+  ok(seq(planA3).every((n) => n === 1), "প্রতিটা A3-হেডারে কাউন্টার ১ থেকে রিসেট (সব মান ১)");
 
   const planA4 = planSerialByColor(anC, { kind: "color", key: "BFBFBF" });
-  ok(planA4.size === 11, "A4/Type প্ল্যানে সব ১১টা প্রশ্ন (ভিতরের varsity-সীমায় থামে না)");
+  ok(planA4.size === 28, `A4/Type প্ল্যানে সব ২৮টা প্রশ্ন (ভিতরের varsity-সীমায় থামে না), পাওয়া গেল ${planA4.size}`);
 
-  // অধ্যায়-১ প্রশ্নগুলো B1-প্ল্যানে নেই কিন্তু continuous-এ আছে
   const planCont = planSerialByColor(anC, { kind: "continuous" });
-  ok(planCont.size === 11, "continuous-এ সব ১১টা প্রশ্ন একটানা");
+  ok(planCont.size === 28, "continuous-এ সব ২৮টা প্রশ্ন একটানা");
+
+  // B6-প্ল্যান (বাগ-২ ফিক্স): অধ্যায়-সোদক সোয়াপে অধ্যায়-১-এর ১৪টা প্রশ্ন ১..১৪
+  const planB6 = planSerialByColor(anC, { kind: "color", key: "0D0D0D" });
+  const numsB6 = seq(planB6);
+  ok(planB6.size === 14, `B6 প্ল্যানে শুধু অধ্যায়-১-এর ১৪টা প্রশ্ন (আগে পুরোটা একটানা হয়ে যেত — বাগ), পাওয়া গেল ${planB6.size}`);
+  ok(
+    numsB6.every((n, i) => n === i + 1),
+    `B6-সেকশনের ভিতরে একটানা ১..১৪, অধ্যায়-২ (ভিন্ন রঙ) এলেই থামে (${numsB6.slice(0, 5).join(",")}…${numsB6.slice(-2).join(",")})`
+  );
+
+  // তিন-অধ্যায় চেইন: ভিন্ন ভিন্ন অধ্যায়-রঙও পরপর সোদক সোয়াপ হয়
+  // (প্রতি অধ্যায়ে ২ Type + ৪ varsity — স্ট্রাকচার/ঘনত্ব বাস্তবের মতো)
+  const items3: Array<[kind: "h" | "q", color: string | null, text: string]> = [];
+  let q3 = 0;
+  const chapterColor = ["111111", "222222", "333333"];
+  for (let ch = 0; ch < 3; ch++) {
+    items3.push(["h", chapterColor[ch], `অধ্যায়-${ch + 1}`]);
+    for (let t = 0; t < 2; t++) {
+      items3.push(["h", "BFBFBF", `Type-${ch * 2 + t + 1}`]);
+      items3.push(["q", null, `${++q3}.ক-${q3}`]);
+      for (let v = 0; v < 2; v++) {
+        items3.push(["h", "D9D9D9", `${varsityNames[(ch * 4 + t * 2 + v) % 12]} বিশ্ববিদ্যালয়`]);
+        items3.push(["q", null, `${++q3}.ক-${q3}`]);
+      }
+    }
+  }
+  const an3ch = analyzeColorDocx(wrapDoc(items3.map(([k, c, t]) => (k === "h" ? shadedP(t, c!) : q(t))).join("")));
+  const plan111 = planSerialByColor(an3ch, { kind: "color", key: "111111" });
+  ok(plan111.size === 6, `প্রথম অধ্যায়-রঙ সিলেক্টে শুধু নিজের সেকশনের ৬ প্রশ্ন, পাওয়া গেল ${plan111.size}`);
+  const plan222 = planSerialByColor(an3ch, { kind: "color", key: "222222" });
+  ok(plan222.size === 6, `মাঝের অধ্যায়-রঙ সিলেক্টে শুধু নিজের সেকশনের ৬ প্রশ্ন, পাওয়া গেল ${plan222.size}`);
+  const plan333 = planSerialByColor(an3ch, { kind: "color", key: "333333" });
+  ok(plan333.size === 6, `তৃতীয় অধ্যায়-রঙ সিলেক্টে শুধু নিজের সেকশনের ৬ প্রশ্ন, পাওয়া গেল ${plan333.size}`);
+  const planCont3 = planSerialByColor(an3ch, { kind: "continuous" });
+  ok(planCont3.size === 18, "continuous-এ ৩ অধ্যায় মিলে ১৮ প্রশ্ন একটানা");
 }
 
 // জিরো-প্যাডিং সংরক্ষণ: "01." স্টাইলের ফাইলে ১ → "01."

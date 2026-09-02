@@ -167,12 +167,24 @@ const SEP_CLASS = ".।):\\-–—:|";
 const ALL_DIGITS = DIGIT_CLASS.en + DIGIT_CLASS.bn + DIGIT_CLASS.bijoy;
 const SERIAL_RE = new RegExp(`^\\s*([${ALL_DIGITS}]{1,4})\\s*([${SEP_CLASS}])?`);
 
+/**
+ * আইসোটোপ-গার্ড: ডিজিটের ঠিক পরে (স্পেস/সেপারেটর ছাড়াই) ইংরেজি অক্ষর বসলে
+ * সেটা সিরিয়াল নয় — পারমাণবিক আইসোটোপ নোটেশন: "714N" = ₇¹⁴N, "12Cl2" = ¹²Cl₂,
+ * "1224Mg" = ₁₂²⁴Mg। বাস্তব সিরিয়ালের পরে থাকে সেপারেটর (".", "|", "।") বা স্পেস।
+ */
+function isotopeLikeAfterDigits(text: string, digitsEnd: number): boolean {
+  const ch = text[digitsEnd];
+  return ch !== undefined && /[A-Za-z]/.test(ch);
+}
+
 /** প্যারা-টেক্সটের একদম শুরুতে সিরিয়াল আছে কিনা ("32. …" স্টাইল) */
 export function detectSerialPrefix(text: string): SerialPrefix | null {
   const m = SERIAL_RE.exec(text);
   if (!m) return null;
   const conv = digitsToNumber(m[1]);
   if (!conv || conv.num <= 0) return null;
+  const digitsEnd = m.index + m[0].indexOf(m[1]) + m[1].length;
+  if (isotopeLikeAfterDigits(text, digitsEnd)) return null;
   const after = text.slice(m[0].length);
   if (!after.trim()) return null;
   return { raw: m[0], digits: m[1], num: conv.num, enc: conv.enc, separator: m[2] ?? "", after };
@@ -477,7 +489,7 @@ function replaceSpans(stream: Element[], spans: Array<{ start: number; end: numb
 }
 
 /** joined w:t-টেক্সটে সিরিয়ালের ডিজিট+সেপারেটরের decoded-স্প্যান বের করে */
-export function serialMatchSpans(joined: string): { digitsStart: number; digitsEnd: number; sepStart: number; sepEnd: number; enc: DigitEnc } | null {
+export function serialMatchSpans(joined: string, segEnds?: number[]): { digitsStart: number; digitsEnd: number; sepStart: number; sepEnd: number; enc: DigitEnc } | null {
   const m = SERIAL_RE.exec(joined);
   if (!m) return null;
   const conv = digitsToNumber(m[1]);
@@ -485,6 +497,12 @@ export function serialMatchSpans(joined: string): { digitsStart: number; digitsE
   // ডিজিট ম্যাচের শুরু: লিডিং স্পেস ও ডিজিট-সেপারেটরের মাঝের স্পেস সঠিকভাবে স্কিপ
   const digitsStart = m.index + joined.indexOf(m[1], m.index);
   const digitsEnd = digitsStart + m[1].length;
+  if (isotopeLikeAfterDigits(joined, digitsEnd)) {
+    // ব্যতিক্রম: ডিজিট যদি নিজের w:t-রানের একদম শেষে থাকে, অক্ষরটা পরের রানে —
+    // তাহলে মাঝে ট্যাব/স্পেস থাকতে পারে ("02<tab>প্রশ্ন") — আইসোটোপ নয়
+    const atRunBoundary = segEnds ? segEnds.includes(digitsEnd) : false;
+    if (!atRunBoundary) return null;
+  }
   const sepLen = m[2] ? m[2].length : 0;
   const sepStart = m.index + m[0].length - sepLen;
   return { digitsStart, digitsEnd, sepStart, sepEnd: sepStart + sepLen, enc: conv.enc };
@@ -500,8 +518,12 @@ export function renumberSerialPara(p: Element, newNum: number): void {
   collectTs(p, stream);
   if (!stream.length) return;
 
-  const joined = stream.map((t) => t.textContent ?? "").join("");
-  const spans = serialMatchSpans(joined);
+  const texts = stream.map((t) => t.textContent ?? "");
+  const joined = texts.join("");
+  const segEnds: number[] = [];
+  let acc = 0;
+  for (const t of texts) { acc += t.length; segEnds.push(acc); }
+  const spans = serialMatchSpans(joined, segEnds);
   if (!spans) return;
 
   replaceSpans(stream, [
@@ -519,8 +541,12 @@ export function renumberSerialParaTo(p: Element, newNum: number, targetSep = "."
   collectTs(p, stream);
   if (!stream.length) return;
 
-  const joined = stream.map((t) => t.textContent ?? "").join("");
-  const spans = serialMatchSpans(joined);
+  const texts = stream.map((t) => t.textContent ?? "");
+  const joined = texts.join("");
+  const segEnds: number[] = [];
+  let acc = 0;
+  for (const t of texts) { acc += t.length; segEnds.push(acc); }
+  const spans = serialMatchSpans(joined, segEnds);
   if (!spans) return;
 
   // জিরো-প্যাডিং সংরক্ষণ: "01." স্টাইলের ফাইলে ১ → "01." (ফাইলের নিজের স্টাইল)

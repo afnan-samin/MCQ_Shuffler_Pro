@@ -125,3 +125,42 @@ Stage Summary:
 - দুটোই ফিক্সড ও যাচাইকৃত: B1 (এবং যেকোনো রঙ) সিলেক্টে ২৩৭১ প্রশ্ন ১-থেকে নম্বর পায়; ডাউনলোড Word/LibreOffice-উদ্দেশ্যে কঠোরভাবে বৈধ
 - আর্কিটেকচার আপগ্রেড: কালার-পাইপলাইন এখন পুরো string-level — বড় ফাইলে মেমোরি-নিরাপদ (analyze ১৫৩ms, apply ১৪৮ms @16.5MB)
 - ডেলিভারেবল: download/Chemistry (color serial - B1).docx (+A3/B6/continuous ভ্যারিয়েন্ট)
+
+---
+Task ID: 13-integrity
+Agent: integrity-battery agent
+Task: ZIP/XML/LibreOffice integrity battery on 5 user-downloaded Chemistry color-serial outputs
+
+Work Log:
+- Read worklog (tasks 1-3, 10-12) for context; verified env: python3.12 + lxml 6.0.2, soffice + pdfinfo present; file sizes: original 979,799 B, outputs 931,726-933,836 B
+- Wrote scripts/integrity-battery.py (read-only, zero writes): per output file — (a) zipfile.testzip() + full per-member decompress/CRC + dup-name check, (b) entry-set diff vs original + uncompressed size & CRC-32 compare of every shared entry except word/document.xml, (c) strict lxml parse (recover=False) of word/document.xml with line/col + approx byte offset on failure, (d) strict parse of [Content_Types].xml + word/_rels/document.xml.rels, (e) <?xml decl + </w:document> tail + <w:p open/self-close/close tag counts + balance + top-level <w:p> count (lxml direct body children; depth-aware byte-scanner fallback), (f) <m:oMath lookahead-count vs original, (g) w:t-concat plain text of top-level paras 518/532/536/932/2120/7787 in output + orig-same-idx context
+- Battery result 5/5 PASS: 0 bad CRC, 0 unreadable members, 0 duplicate names; no missing/extra FILE entries (outputs add 8 harmless dir-entries: _rels/, customXml/, customXml/_rels/, docProps/, word/, word/_rels/, word/media/, word/theme/); all shared non-document entries byte-identical (fontTable/settings/styles/numbering/theme1/media image1-10 untouched); document.xml strict-parse OK ×5 (16,549,700-16,554,805 B); Content_Types + rels parse OK ×5; 9252 top-level paras in every file == original; oMath=891 in every file == original
+- LibreOffice smoke test (HOME=/tmp/lohome, isolated -env:UserInstallation, headless → PDF): 5/5 exit 0; pdfinfo pages: B1=158, A4=158, A3=153, B6=158, continuous=158
+- Extra read-only forensics: B6 and continuous are content-identical archives — all 36 entries have identical CRC/size/flags, document.xml md5 both c54078fa277a7cd35a7cb6ee7f5b4bc7, only ZIP timestamps differ (08:09:32 vs 08:09:36, two separate downloads); whole-file md5 differs only due to those timestamps. Para-level text diff vs original: B1=2096, A4=517, A3=2215, B6=continuous=2447 changed paras. B6/continuous first change at para[169] orig '01.'→'42.' (Type-02 restart renumbered continuously), para[521] '12.'→'136.' — B6's open section scope is never closed by later B1 chapter headers (treated as children), so B6 renumber == file-wide continuous
+- Suspicious paras identified: 518/532/536/932/2120 are OMML-only nuclear-chemistry equation paras (w:t empty/near-empty, text lives in m:t; oMath 1-3 each; orig-same-idx identical → math intact); 7787 is a Bijoy answer line 'K. ev®úxKiY Gb_vjwcL. B‡jKUªb Avmw³' identical to original
+
+Stage Summary:
+- VERDICT: ALL 5 OUTPUTS VALID (no corrupt file) — B1: zip OK / entries OK / XML OK / oMath 891=891 / 158 pp. A4: OK / OK / OK / 891=891 / 158 pp. A3: OK / OK / OK / 891=891 / 153 pp (shorter per-section serials → benign reflow). B6: OK / OK / OK / 891=891 / 158 pp. continuous: OK / OK / OK / 891=891 / 158 pp
+- Entries missing in outputs: none (files); only extra ZIP dir-entries (8, harmless JSZip artifact) vs original
+- Anomaly: B6 ≡ continuous byte-content — expected from nesting algorithm (B6 scope stays open across later chapter headers), but user should know both downloads contain the same numbering; A3's 153 vs 158 pages is reflow, not corruption
+
+---
+Task ID: 14
+Agent: main
+Task: ইউজারের ৫টা Chemistry আউটপুট ফরেনসিক অডিট + B6-বাগ ও আইসোটোপ-ভুয়া-সিরিয়াল ফিক্স
+
+Work Log:
+- ইউজারের ৫ আউটপুট md5/zip/XML ফরেনসিক (scripts/forensic-outputs.ts + integrity agent): B1/A4/A3/continuous সঠিক (প্ল্যানের প্রতিটা ডিজিট ম্যাচ, প্ল্যানের বাইরে ০ পরিবর্তন, LibreOffice 153-158 পৃষ্ঠা); B6 আউটপুট continuous-এর হুবহু কপি (sha 8a9eecc3) — B6-বাগ নিশ্চিত
+- B6-বাগের কারণ: অধ্যায়ের রঙ বদলালে (অধ্যায়-১=B6 → অধ্যায়-২..৫=B1) নতুন রঙ B1 আগের অধ্যায়ের "সন্তান" হিসেবে স্ট্যাকে বসত → B6-সেকশন কখনো বন্ধ হতো না → পুরো ফাইল ১..২৪৯৪ নম্বর পেয়ে যেত
+- ফিক্স (planSerialByColor v2): "অধ্যায়-সোদক সোয়াপ" — fresh রঙ C এলে যদি (১) স্ট্যাক-রুট R মাত্র ১ বার এসে থাকে, (২) R-এর সন্তান-রঙ ২+ বার এসে স্ট্রাকচার প্রতিষ্ঠিত, (৩) C প্রতিষ্ঠিত সন্তানদের চেয়ে রেয়ার, (৪) C রুট ছাড়া সব খোলা রঙের চেয়ে কঠোরভাবে রেয়ার, (৫) C-R ঘনত্ব ≤১০× — তবে C রুটের সোদক: রুট-সেকশন বন্ধ। + ২×-রিস্টার্ট-গার্ড (পুরনো X-প্রোটেকশনের সাধারণীকরণ, X-নিরপেক্ষ)
+- ২য় বাগ (সব আউটপুটে ছিল): আইসোটোপ নোটেশনের ভুয়া সিরিয়াল — "714N"=₇¹⁴N, "12Cl2"=¹²Cl₂, "1224Mg" ইত্যাদি ১২টা পারমাণবিক-ইকুয়েশন লাইন প্রশ্ন ভেবে নম্বর খেয়ে ফেলত (৬টা apply-অক্ষম → সিরিয়ালে ফাঁক; ৬টা w:t-ডিজিটসহ → নীরব ভুল রিনাম্বার!)। ফিক্স: isotope-guard (detectSerialPrefix + serialMatchSpans) — ডিজিটের ঠিক পরে একই রানে ইংরেজি অক্ষর হলে সিরিয়াল নয়; রান-বাউন্ডারি ব্যতিক্রম ("02<tab>প্রশ্ন" টাইপ বাঁওয়ায়, idx=6201 কেস)
+- প্রশ্ন-গণনা ২৪৯৪→২৪৮২ (১২ ভুয়া বাদ); B6-প্ল্যান = অধ্যায়-১-এর ঠিক ১২৩ প্রশ্ন ১..১২৩; B1=২৩৫৯(৪ সেকশন), A4=২৪৮২(২৭), A3=২৪৮২(২৫৭)
+- টেস্ট: test-color-serial.ts ৭৪/৭৪ (নতুন: আইসোটোপ-গার্ড ×৫, বাস্তব-ঘনত্বের Chemistry সিনারিও B6-ফিক্স, ৩-অধ্যায় চেইন, সেপারেটরহীন '12 abc'), test-docx ৪৩/৪৩, test-mcq ৬১/৬১, src tsc-ক্লিন
+- রিজেনারেশন: scripts/regen-chem-fixed.ts — ৫টা আউটপুট নতুন করে; প্রতিটায় প্ল্যান-ডিজিট ১০০% ম্যাচ, প্ল্যানের বাইরে byte-identical, zip CRC + lxml strict-parse OK, oMath ৮৯৪=৮৯৪, LibreOffice ৫টাই রেন্ডার OK
+- ব্রাউজার E2E: B1+B6 ফ্লো — চিপ, ব্যাখ্যা, ডাউনলোড, সাফল্য-টোস্ট, JS-error শূন্য; ব্রাউজার-ডাউনলোড B6 == যাচাইকৃত আউটপুট byte-identical (md5 c0d1ad15)
+- UI: color-serial-card ব্যাখ্যায় সোদক-অধ্যায় নিয়ম যোগ; ডেলিভারেবল টুল-স্টাইল নামে download/-এ
+
+Stage Summary:
+- ইউজারের ৫ ফাইলের রায়: B1/A4/A3/continuous = কাঠামোগতভাবে ঠিক ও Word-নিরাপদ (তবে ৬+৬ আইসোটোপ-ফাঁক/ভুল ছিল); B6 = ব্যর্থ (continuous-এর কপি)
+- ২টা বাগ ফিক্সড: (১) অধ্যায়ের রঙ বদলালে B6-স্টাইল স্কিম পুরো ফাইল নম্বর দিয়ে ফেলত, (২) আইসোটোপ লাইন ভুয়া প্রশ্ন হয়ে সিরিয়াল-ফাঁক/ভুল রিনাম্বার হতো
+- ফিক্সড ৫ আউটপুট: download/Final Chemistry 1st paper only varsity Question (1-5) (color serial - {B1,A4,A3,B6,continuous}).docx
