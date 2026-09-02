@@ -1,0 +1,292 @@
+// ============================================================
+// Color-Serial unit tests — ইউজারের B1/A2/A5/A6 উদাহরণ + রিনাম্বার
+// রান: bun run scripts/test-color-serial.ts
+// ============================================================
+
+import { readFileSync } from "node:fs";
+import { JSDOM } from "jsdom";
+import JSZip from "jszip";
+
+// ---- ব্রাউজার DOM API emulation (jsdom) ----
+const dom = new JSDOM("<!doctype html><html><body></body></html>");
+(globalThis as unknown as Record<string, unknown>).DOMParser = dom.window.DOMParser;
+(globalThis as unknown as Record<string, unknown>).XMLSerializer = dom.window.XMLSerializer;
+
+const {
+  analyzeColorDocx,
+  planSerialByColor,
+  applyColorSerialXml,
+  paletteCodeOf,
+  paletteHexOf,
+} = await import("../src/lib/mcq/color-serial");
+const { renumberSerialParaTo, extractParaText } = await import("../src/lib/mcq/docx-xml");
+
+let passed = 0;
+let failed = 0;
+function ok(cond: boolean, name: string) {
+  if (cond) {
+    passed++;
+    console.log("  ✓", name);
+  } else {
+    failed++;
+    console.error("  ✗ FAIL:", name);
+  }
+}
+
+// ---------- সিনথেটিক docx XML বিল্ডার ----------
+
+const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+
+/** শেডেড হেডার প্যারা */
+function shadedP(text: string, fill: string): string {
+  return (
+    `<w:p xmlns:w="${W}"><w:pPr><w:shd w:val="clear" w:color="auto" w:fill="${fill}"/></w:pPr>` +
+    `<w:r><w:t xml:space="preserve">${text}</w:t></w:r></w:p>`
+  );
+}
+
+/** প্রশ্ন প্যারা — সেপারেটর/প্রিফিক্স কাস্টমাইজযোগ্য */
+function qP(text: string, runs?: string[]): string {
+  const body = (runs ?? [text])
+    .map((r) => `<w:r><w:t xml:space="preserve">${r}</w:t></w:r>`)
+    .join("");
+  return `<w:p xmlns:w="${W}">${body}</w:p>`;
+}
+
+function plainP(text: string): string {
+  return `<w:p xmlns:w="${W}"><w:r><w:t xml:space="preserve">${text}</w:t></w:r></w:p>`;
+}
+
+function wrapDoc(body: string): string {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${W}"><w:body>${body}<w:sectPr/></w:body></w:document>`;
+}
+
+function q(text: string): string {
+  return qP(text);
+}
+
+// ============================================================
+console.log("\n== ১) প্যালেট ==");
+ok(paletteCodeOf("000000") === "B1", "000000 → B1");
+ok(paletteCodeOf("F2F2F2") === "A2", "F2F2F2 → A2");
+ok(paletteCodeOf("D0CECE") === null, "D0CECE প্যালেটের বাইরে (কাস্টম)");
+ok(paletteHexOf("E1") === "4F81BD", "E1 → 4F81BD");
+ok(paletteHexOf("A5") === "A6A6A6", "A5 → A6A6A6");
+ok(paletteHexOf("A8") === null, "A8 অবৈধ");
+
+// ============================================================
+// ইউজারের হুবহু উদাহরণ:
+// B1 | A2 | A5 A5 A5 | A2 | A5 A5 A5 | A2 | A5 A5 A5 A6 | A2 | A5 A5 A6 | A5 A6
+// (A5/A6-এর ভিতরে প্রশ্ন আছে; B1=অধ্যায়, A2=Type, A5=sub-type, A6=A5-এর ভিতরে)
+// ============================================================
+
+console.log("\n== ২) ইউজারের B1/A2/A5/A6 নেস্টিং উদাহরণ ==");
+// প্রতিটা হেডারের পরে কিছু প্রশ্ন; সহজ যাচাইয়ের জন্য প্রশ্নগুলো q1,q2... টেক্সটে
+type Node = ["H" | "Q", string, string]; // ধরন, রঙ(হেডার হলে), টেক্সট
+const userSeq: Array<[kind: "h" | "q", color: string | null, text: string]> = [
+  ["h", "B1", "অধ্যায়-১"],
+  ["h", "A2", "Type-১"],
+  ["q", null, "1.প্রশ্ন-A"],
+  ["h", "A5", "সাব-১"],
+  ["q", null, "2.প্রশ্ন-B"],
+  ["q", null, "2.প্রশ্ন-C"],
+  ["h", "A2", "Type-২"],
+  ["q", null, "3.প্রশ্ন-D"],
+  ["h", "A5", "সাব-২"],
+  ["q", null, "4.প্রশ্ন-E"],
+  ["h", "A6", "সূক্ষ্ম-১"],
+  ["q", null, "5.প্রশ্ন-F"],
+  ["q", null, "6.প্রশ্ন-G"],
+  ["h", "A2", "Type-৩"],
+  ["q", null, "7.প্রশ্ন-H"],
+  ["h", "A5", "সাব-৩"],
+  ["q", null, "8.প্রশ্ন-I"],
+  ["h", "A6", "সূক্ষ্ম-২"],
+  ["q", null, "9.প্রশ্ন-J"],
+  ["h", "A5", "সাব-৪"],
+  ["q", null, "10.প্রশ্ন-K"],
+  ["h", "A6", "সূক্ষ্ম-৩"],
+  ["q", null, "11.প্রশ্ন-L"],
+];
+
+const bodyXml = userSeq
+  .map(([kind, color, text]) => (kind === "h" ? shadedP(text, color!) : q(text)))
+  .join("");
+const xml1 = wrapDoc(bodyXml);
+const an1 = analyzeColorDocx(xml1);
+
+ok(an1.questionCount === 12, "১২টা প্রশ্ন ডিটেক্ট");
+const colorMap = new Map(an1.colors.map((c) => [c.key, c.sections]));
+ok(colorMap.get("B1") === 1, "B1 ×১");
+ok(colorMap.get("A2") === 3, "A2 ×৩");
+ok(colorMap.get("A5") === 4, "A5 ×৪");
+ok(colorMap.get("A6") === 3, "A6 ×৩");
+
+// ---- A6 সিলেক্ট: ৩টা A6-সেকশনের প্রশ্ন আলাদা ১ থেকে ----
+{
+  const plan = planSerialByColor(an1, { kind: "color", key: "A6" });
+  // প্রশ্ন টেক্সট → নতুন নম্বর
+  const byText = new Map<string, number>();
+  for (const p of an1.paras) if (plan.has(p.idx)) byText.set(p.text.replace(/^\d+\./, ""), plan.get(p.idx)!);
+  ok(byText.get("প্রশ্ন-F") === 1 && byText.get("প্রশ্ন-G") === 2, "A6#১ (সূক্ষ্ম-১): F=১, G=২");
+  ok(byText.get("প্রশ্ন-J") === 1, "A6#২ (সূক্ষ্ম-২): J=১ (নতুন সেকশন, ১ থেকে)");
+  ok(byText.get("প্রশ্ন-L") === 1, "A6#৩ (সূক্ষ্ম-৩): L=১");
+  ok(byText.size === 4, "A6-সেকশনে মোট ৪টা প্রশ্নই নম্বর পেল");
+  ok(!byText.has("প্রশ্ন-K"), "প্রশ্ন-K সাব-৪-এর (A5), A6#২-এর ক্রমে মেশেনি ← 'ek oddayer sate arek odday' আটকানো");
+  ok(!byText.has("প্রশ্ন-E") && !byText.has("প্রশ্ন-H"), "A5/A2-লেভেলের প্রশ্ন A6-প্ল্যানে বাদ");
+}
+
+// ---- A5 সিলেক্ট: A6-এর প্রশ্নও A5-এর ক্রমের অংশ ----
+{
+  const plan = planSerialByColor(an1, { kind: "color", key: "A5" });
+  const byText = new Map<string, number>();
+  for (const p of an1.paras) if (plan.has(p.idx)) byText.set(p.text.replace(/^\d+\./, ""), plan.get(p.idx)!);
+  ok(byText.get("প্রশ্ন-B") === 1 && byText.get("প্রশ্ন-C") === 2, "সাব-১: B=১, C=২");
+  ok(byText.get("প্রশ্ন-E") === 1, "সাব-২: E=১ (নতুন A5 সেকশন)");
+  ok(byText.get("প্রশ্ন-F") === 2 && byText.get("প্রশ্ন-G") === 3, "সাব-২-এর ভিতরের A6-প্রশ্নও ক্রমে: F=২, G=৩");
+  ok(byText.get("প্রশ্ন-I") === 1, "সাব-৩: I=১");
+  ok(byText.get("প্রশ্ন-J") === 2, "সাব-৩-এর A6-প্রশ্ন J=২");
+  ok(byText.get("প্রশ্ন-K") === 1 && byText.get("প্রশ্ন-L") === 2, "সাব-৪: K=১, L=২ (A6#৩ শেষে নতুন A5 → থেমে নতুন ক্রম)");
+  ok(!byText.has("প্রশ্ন-A") && !byText.has("প্রশ্ন-D") && !byText.has("প্রশ্ন-H"), "A2-স্তরের প্রশ্ন A5-প্ল্যানে বাদ");
+}
+
+// ---- A2 সিলেক্ট: ভিতরের A5/A6-সহ সব প্রশ্ন টাইপের ক্রমে ----
+{
+  const plan = planSerialByColor(an1, { kind: "color", key: "A2" });
+  const byText = new Map<string, number>();
+  for (const p of an1.paras) if (plan.has(p.idx)) byText.set(p.text.replace(/^\d+\./, ""), plan.get(p.idx)!);
+  ok(byText.get("প্রশ্ন-A") === 1, "Type-১: A=১");
+  ok(byText.get("প্রশ্ন-B") === 2 && byText.get("প্রশ্ন-C") === 3, "Type-১-এর A5-প্রশ্ন চলমান: B=২, C=৩");
+  ok(byText.get("প্রশ্ন-D") === 1, "Type-২: D=১ (নতুন Type → ১ থেকে)");
+  ok(byText.get("প্রশ্ন-E") === 2 && byText.get("প্রশ্ন-F") === 3 && byText.get("প্রশ্ন-G") === 4, "Type-২: E=২, F=৩, G=৪");
+  ok(byText.get("প্রশ্ন-H") === 1 && byText.get("প্রশ্ন-I") === 2 && byText.get("প্রশ্ন-J") === 3, "Type-৩: H=১, I=২, J=৩");
+  ok(byText.get("প্রশ্ন-K") === 4 && byText.get("প্রশ্ন-L") === 5, "Type-৩ চলমান: K=৪, L=৫ (A5/A6 ভাই-সেকশন A2-নম্বর ভাঙে না)");
+  ok(byText.size === 12, "A2-প্ল্যানে সব ১২টা প্রশ্ন নম্বর পেল");
+}
+
+// ---- B1 সিলেক্ট: সব একটানা ----
+{
+  const plan = planSerialByColor(an1, { kind: "color", key: "B1" });
+  const nums = [...plan.entries()].sort((a, b) => a[0] - b[0]).map(([, n]) => n);
+  ok(nums.length === 12 && nums.every((n, i) => n === i + 1), "B1: সব ১২টা প্রশ্ন একটানা ১..১২ (ভিতরের কিছুই থামায় না)");
+}
+
+// ---- একটানা (continuous) ----
+{
+  const plan = planSerialByColor(an1, { kind: "continuous" });
+  const nums = [...plan.entries()].sort((a, b) => a[0] - b[0]).map(([, n]) => n);
+  ok(nums.length === 12 && nums.every((n, i) => n === i + 1), "একটানা: ১..১২");
+}
+
+// ============================================================
+console.log("\n== ৩) applyColorSerialXml — সার্জিক্যাল রিপ্লেস ==");
+{
+  // pipe → dot নরমালাইজ + ডিজিট বদল
+  const xml2 = wrapDoc(
+    shadedP("Type-X", "000000") + q("44|g~L¨vq mvaviY¬vh© —") + qP("ignored", ["1", "2", ".", "বাকি লেখা"])
+  );
+  const an2 = analyzeColorDocx(xml2);
+  ok(an2.questionCount === 2, "pipe-সিরিয়ালও প্রশ্ন ডিটেক্ট (SEP এ | যোগের পর)");
+  const plan2 = planSerialByColor(an2, { kind: "color", key: "000000" });
+  const out2 = applyColorSerialXml(xml2, plan2);
+  const an2b = analyzeColorDocx(out2);
+  const texts2 = an2b.paras.map((p) => p.text);
+  ok(texts2.includes("1.g~L¨vq mvaviY¬vh© —"), `"44|g~L¨vq…" → "1.g~L¨vq…" (সেকশনের ১ম প্রশ্ন=১, pipe→dot, লেখা অক্ষত)`);
+  ok(texts2.includes("2.বাকি লেখা"), "মাল্টি-রান '12.' → '2.' (ক্রস-রান রিপ্লেস, সেপ অক্ষত)");
+  // হেডারের টেক্সট/শেডিং অক্ষত
+  ok(out2.includes('w:fill="000000"') && out2.includes("Type-X"), "হেডারের শেডিং + লেখা অক্ষত");
+}
+
+// ---- বাংলা ডিজিট ----
+{
+  const xml3 = wrapDoc(plainP("৪৪|প্রশ্ন তিন"));
+  const an3 = analyzeColorDocx(xml3);
+  ok(an3.questionCount === 1, "বাংলা ডিজিট '৪৪|' প্রশ্ন ডিটেক্ট");
+  // একটানা প্ল্যানে ৭ নম্বর ধরি
+  const plan3 = new Map([[an3.paras.find((p) => p.isQuestion)!.idx, 7]]);
+  const out3 = applyColorSerialXml(xml3, plan3);
+  const t3 = analyzeColorDocx(out3).paras.map((p) => p.text).join("");
+  ok(t3 === "৭.প্রশ্ন তিন", "বাংলা ডিজিট প্রিজার্ভ: '৪৪|' → '৭.'");
+}
+
+// ---- সেপারেটর না থাকলে যোগ হয় না (গ্লুড অক্ষত) ----
+{
+  const el = new DOMParser().parseFromString(wrapDoc(plainP("12abc")), "application/xml");
+  const p = el.getElementsByTagNameNS(W, "p")[0];
+  renumberSerialParaTo(p, 3);
+  ok(extractParaText(p) === "3abc", "সেপারেটরহীন: '12abc' → '3abc' (নতুন সেপ ঢোকে না)");
+}
+
+// ---- ডিজিট দৈর্ঘ্য বদলালেও সেপ ঠিক জায়গায় (এক-পাস স্প্যান) ----
+{
+  const el = new DOMParser().parseFromString(wrapDoc(plainP("১২|দীর্ঘ নম্বর")), "application/xml");
+  const p = el.getElementsByTagNameNS(W, "p")[0];
+  renumberSerialParaTo(p, 7);
+  ok(extractParaText(p) === "৭.দীর্ঘ নম্বর", "'১২|' → '৭.' (২→১ ডিজিট, সেপ সরে যায় না)");
+}
+
+// ---- ডেসিমাল গার্ড: '2.5 মিটার' প্রশ্ন না (পরের লাইন অপশন-লেড না হলে) ----
+{
+  const xml4 = wrapDoc(plainP("2.5 মিটার লম্বা একটা দণ্ড") + plainP("এইটা সাধারণ লেখা"));
+  const an4 = analyzeColorDocx(xml4);
+  ok(an4.questionCount === 0, "ডেসিমাল '2.5 মিটার' প্রশ্ন হিসেবে ধরা হয়নি");
+}
+
+// ============================================================
+console.log("\n== ৪) আসল Agri ফাইল ==");
+const AGRI = "upload/Agri MCQ Botany 997 mcq - Copy - type serial.docx";
+const zip = await JSZip.loadAsync(readFileSync(AGRI));
+const agriXml = await zip.file("word/document.xml")!.async("string");
+const anA = analyzeColorDocx(agriXml);
+
+ok(anA.colors.length === 2, "২টা রঙ: 000000 + D0CECE");
+const cBlack = anA.colors.find((c) => c.key === "000000");
+const cGray = anA.colors.find((c) => c.key === "D0CECE");
+ok(cBlack?.name === "B1" && cBlack.sections === 126, "000000 = B1, ১২৬ Type-হেডার");
+ok(cGray?.name === "কাস্টম রঙ" && cGray.sections === 9, "D0CECE = কাস্টম, ৯টা অধ্যায়-হেডার");
+ok(anA.questionCount === 435, "৪৩৫ প্রশ্ন ডিটেক্ট (আগে ৩৮৩ ছিল — pipe যোগে পূর্ণ)");
+
+// B1 প্ল্যান: ১২৬টা Type-সেকশন, প্রতিটায় ১ থেকে
+{
+  const plan = planSerialByColor(anA, { kind: "color", key: "000000" });
+  ok(plan.size === 435, "B1 প্ল্যানে ৪৩৫টা প্রশ্নই নম্বর পায় (প্রতিটা Type-এর ভিতরে)");
+  // প্রতিটা Type-সেকশনের প্রথম প্রশ্ন = ১
+  let firstOfSection: number[] = [];
+  let seen = 0;
+  for (const p of anA.paras) {
+    if (p.colorKey === "000000") { seen = 0; continue; }
+    if (p.colorKey === null && plan.has(p.idx)) {
+      seen++;
+      if (seen === 1) firstOfSection.push(plan.get(p.idx)!);
+    }
+  }
+  ok(firstOfSection.length === 122 && firstOfSection.every((n) => n === 1), "১২২টা প্রশ্ন-যুক্ত Type-সেকশনের প্রথম প্রশ্ন = ১ (৪টা খালি সেকশন বাদ)");
+}
+
+// D0CECE (অধ্যায়) প্ল্যান: ৭টা প্রকৃত অধ্যায় + ২ খালি → ৪৩৫ প্রশ্ন, অধ্যায়ে ১ থেকে
+{
+  const plan = planSerialByColor(anA, { kind: "color", key: "D0CECE" });
+  ok(plan.size === 435, "অধ্যায়-প্ল্যানেও সব ৪৩৫ প্রশ্ন নম্বর পায়");
+}
+
+// apply + পুনঃযাচাই: B1 প্ল্যান অ্যাপ্লাই করে আবার প্ল্যান বসালে হুবহু এক হয় (idempotent)
+{
+  const plan = planSerialByColor(anA, { kind: "color", key: "000000" });
+  const outXml = applyColorSerialXml(agriXml, plan);
+  const anB = analyzeColorDocx(outXml);
+  ok(anB.questionCount === 435, "আউটপুটেও ৪৩৫ প্রশ্ন");
+  ok(anB.colors.length === 2 && anB.colors.find((c) => c.key === "000000")!.sections === 126, "আউটপুটে রঙ/হেডার অক্ষত");
+  const plan2 = planSerialByColor(anB, { kind: "color", key: "000000" });
+  let same = true;
+  for (const [idx, n] of plan) if (plan2.get(idx) !== n) { same = false; break; }
+  ok(same, "আউটপুটে আবার প্ল্যান করলে হুবহু এক (idempotent) — অর্থাৎ সিরিয়াল ঠিকমতো বসেছে");
+  // pipe সেপ সব ডট হয়েছে কিনা
+  const pipes = anB.paras.filter((p) => p.isQuestion && /^\s*[0-9০-৯ø«ˆµ∏Ï¾˜Ùœ]+\s*\|/.test(p.text)).length;
+  ok(pipes === 0, "আউটপুটে pipe-সেপারেটর শূন্য (সব ডট-স্টাইল)");
+}
+
+// ফাইল সাইজ স্যানিটি: XML দৈর্ঘ্য প্রায় সমান (শুধু ডিজিট/সেপ বদলায়)
+console.log(`\n  (XML সাইজ: আসল ${agriXml.length} → আউটপুট ${applyColorSerialXml(agriXml, planSerialByColor(anA, { kind: "color", key: "000000" })).length})`);
+
+console.log(`\n===== ফলাফল: ${passed} পাস, ${failed} ফেল =====`);
+process.exit(failed ? 1 : 0);

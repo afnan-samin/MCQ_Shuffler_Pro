@@ -31,6 +31,14 @@ import {
   type DocxParseResult,
 } from "@/lib/mcq/docx-xml";
 import {
+  analyzeColorDocx,
+  downloadColorSerialDocx,
+  planSerialByColor,
+  type ColorAnalysis,
+  type SerialScheme,
+} from "@/lib/mcq/color-serial";
+import { ColorSerialCard } from "@/components/mcq/color-serial-card";
+import {
   downloadSerialFixedDocx,
   downloadShuffledDocx,
   englishSetName,
@@ -78,6 +86,7 @@ export default function Home() {
   const [exportOpts, setExportOpts] = useState<ExportOptions>(DEFAULT_EXPORT_OPTIONS);
   const [busy, setBusy] = useState<string | null>(null);
   const [copiedSet, setCopiedSet] = useState<number | null>(null);
+  const [colorSerialBusy, setColorSerialBusy] = useState(false);
 
   const resultsRef = useRef<HTMLDivElement>(null);
 
@@ -221,13 +230,25 @@ export default function Home() {
     try {
       const xml = await loadDocxXml(f);
       const parse = parseDocxXml(xml);
+      let hasColors = false;
+      try {
+        hasColors = analyzeColorDocx(xml).colors.length > 0;
+      } catch {}
       setDocx({ file: f, baseName: f.name.replace(/\.docx$/i, ""), xml, parse });
       setParsed(null);
       resetResults();
       setSelected(new Set(parse.questions.map((q) => q.id)));
       setAllowBroken(false);
 
-      if (parse.questions.length === 0) {
+      if (hasColors) {
+        toast({
+          title: "🎨 রঙ-স্ট্রাকচার্ড ফাইল ডিটেক্ট হয়েছে",
+          description: `এই ফাইলে রঙ-দেওয়া হেডার আছে — শাফল বন্ধ। নিচে রঙ বাছাই করে সিরিয়াল করুন।${parse.questions.length ? ` (${parse.questions.length} টি প্রশ্ন পাওয়া গেছে)` : ""}`,
+        });
+        return;
+      }
+
+      if (parse.questions.length === 0 && !hasColors) {
         toast({
           title: "কোনো প্রশ্ন পাওয়া যায়নি",
           description: "প্রশ্নগুলো সিরিয়াল দিয়ে শুরু আছে কিনা দেখুন (যেমন: 32. / ১. / 1.)",
@@ -257,6 +278,52 @@ export default function Home() {
   }, []);
 
   const toggleSerialByClick = (v: boolean) => setRenumber(v);
+
+  // ================== COLOR-SERIAL MODE (রঙ-স্ট্রাকচার্ড ফাইল) ==================
+
+  const colorAnalysis: ColorAnalysis | null = useMemo(() => {
+    if (!docx) return null;
+    try {
+      return analyzeColorDocx(docx.xml);
+    } catch {
+      return null;
+    }
+  }, [docx]);
+  const colorMode = !!colorAnalysis && colorAnalysis.colors.length > 0;
+
+  const handleColorSerial = async (scheme: SerialScheme, label: string) => {
+    if (!docx || !colorAnalysis) return;
+    setColorSerialBusy(true);
+    try {
+      const plan = planSerialByColor(colorAnalysis, scheme);
+      if (plan.size === 0) {
+        toast({
+          title: "নম্বর দেওয়ার মতো প্রশ্ন পাওয়া যায়নি",
+          description: "এই রঙের সেকশনের ভিতরে সিরিয়াল-দেওয়া প্রশ্ন-লাইন নেই।",
+          variant: "destructive",
+        });
+        return;
+      }
+      await downloadColorSerialDocx({
+        originalFile: docx.file,
+        xml: docx.xml,
+        plan,
+        baseName: docx.baseName,
+        schemeLabel: label,
+      });
+      toast({
+        title: "✅ রঙ-অনুযায়ী সিরিয়াল করা .docx ডাউনলোড হয়েছে",
+        description:
+          scheme.kind === "continuous"
+            ? `${plan.size} টি প্রশ্ন একটানা ১,২,৩… নম্বর পেয়েছে। বাকি সব হুবহু অক্ষত।`
+            : `${plan.size} টি প্রশ্ন রঙ-সেকশন অনুযায়ী ১ থেকে নম্বর পেয়েছে। হেডার/ইকুয়েশন/ছবি অক্ষত।`,
+      });
+    } catch (e) {
+      toast({ title: "সিরিয়াল করা যায়নি", description: String(e), variant: "destructive" });
+    } finally {
+      setColorSerialBusy(false);
+    }
+  };
 
   const handleDocxShuffle = () => {
     if (!docx || !canShuffle) return;
@@ -563,35 +630,46 @@ export default function Home() {
               dominant={encData.dominant}
             />
 
-            <ShuffleCard
-              enabled={canShuffle}
-              lockReason={gateReason ?? null}
-              selectedCount={selected.size}
-              setCount={setCount}
-              onSetCountChange={setSetCount}
-              distribution={distribution}
-              onDistributionChange={setDistribution}
-              shuffleWithin={shuffleWithin}
-              onShuffleWithinChange={setShuffleWithin}
-              onShuffle={handleShuffle}
-              shuffling={shuffling}
-            />
-
-            <div ref={resultsRef} className="scroll-mt-4">
-              {setsDocx && (
-                <DocxSetsResult
-                  sets={setsDocx}
-                  questions={docx.parse.questions}
-                  renumber={renumber}
-                  onRenumberChange={toggleSerialByClick}
-                  busy={busy}
-                  copiedSet={copiedSet}
-                  onDownload={handleDocxDownload}
-                  onCopySet={handleDocxCopySet}
-                  dominant={encData.dominant}
+            {colorMode && colorAnalysis ? (
+              <ColorSerialCard
+                analysis={colorAnalysis}
+                fileName={docx.file.name}
+                busy={colorSerialBusy}
+                onSerial={handleColorSerial}
+              />
+            ) : (
+              <>
+                <ShuffleCard
+                  enabled={canShuffle}
+                  lockReason={gateReason ?? null}
+                  selectedCount={selected.size}
+                  setCount={setCount}
+                  onSetCountChange={setSetCount}
+                  distribution={distribution}
+                  onDistributionChange={setDistribution}
+                  shuffleWithin={shuffleWithin}
+                  onShuffleWithinChange={setShuffleWithin}
+                  onShuffle={handleShuffle}
+                  shuffling={shuffling}
                 />
-              )}
-            </div>
+
+                <div ref={resultsRef} className="scroll-mt-4">
+                  {setsDocx && (
+                    <DocxSetsResult
+                      sets={setsDocx}
+                      questions={docx.parse.questions}
+                      renumber={renumber}
+                      onRenumberChange={toggleSerialByClick}
+                      busy={busy}
+                      copiedSet={copiedSet}
+                      onDownload={handleDocxDownload}
+                      onCopySet={handleDocxCopySet}
+                      dominant={encData.dominant}
+                    />
+                  )}
+                </div>
+              </>
+            )}
           </>
         ) : (
           <>

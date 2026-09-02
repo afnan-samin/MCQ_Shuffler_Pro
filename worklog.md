@@ -81,3 +81,23 @@ Stage Summary:
 - File shading map: D0CECE (light gray) = 9 chapter headers (Aa¨vq-1..7, incl. 2 empty shaded separator paras at 1121/1195; note 'Aa¨vq 7' has NO hyphen - text matching would miss it, color catches it); 000000 (black) = exactly 126 Type headers (Type-1 x43, Type-2 x51, Type-3 x25, Type-4 x7)
 - Questions/options/answers: zero shading; no run-level/highlight/table shading anywhere; styles.xml has none
 - Design impact: shading color becomes the PRIMARY header detector (text patterns = fallback for unshaded files). Black-shaded para = serial restart point; gray-shaded = chapter boundary. Fully compatible with planned docx->docx surgical serial-fix pipeline (same XML we edit).
+
+---
+Task ID: 11
+Agent: main
+Task: রঙ-ভিত্তিক নেস্টিং-সচেতন সিরিয়াল সিস্টেম (color palette A1–J7, user's B1/A2/A5/A6 design)
+
+Work Log:
+- ইউজারের palette docx ডিকোড: 10×7 গ্রিড (A1–J7, ৭০ রঙ) → scripts/inspect-palette.py; সিদ্ধান্ত: ফিক্সড ৩-রঙ ম্যাপিং বাদ — যেকোনো প্যালেট/কাস্টম রঙ যেকোনো লেভেলে, রঙের ক্রম থেকে nesting অটো-ইনফার
+- docx-xml.ts: SEP_CLASS-এ "|" যোগ (SutonnyMJ-এ pipe=দাড়ি "৪৪।" রেন্ডার করে — এতে ২৪১টা pipe-সিরিয়াল প্রশ্ন ডিটেক্ট হয়: ৩৮৩→৪৩৫); serialMatchSpans + replaceSpans (এক-পাস মাল্টি-স্প্যান — ডিজিট-দৈর্ঘ্য বদলালেও সেপ offset ঠিক); renumberSerialParaTo(p, n, sep=".") নরমালাইজিং রিনাম্বার; looksOptionLed/countRunTabs/isQuestionStart এক্সপোর্ট
+- color-serial.ts (নতুন কোর): PALETTE_ROWS A1–J7 + paletteCodeOf/paletteHexOf; paraShadingKey (w:pPr/w:shd @fill, সাদা/auto বাদ, themeFill fallback কী); analyzeColorDocx (প্যারা-প্রতি রঙ+প্রশ্ন-শুরু, রঙ-সারাংশ); planSerialByColor — স্ট্যাক অ্যালগরিদম (same color=ভাই সেকশন pop&push, নতুন রঙ=গভীরতম সন্তান, X-হেডারে কাউন্টার ০, X স্ট্যাকে না থাকলে নম্বর বন্ধ — "অভিভাবক সীমানায় থেমে যাওয়া", গভীর রঙ X-নম্বর ভাঙে না); continuous স্কিম; applyColorSerialXml (শুধু প্ল্যানের প্যারা রিনাম্বার, বাকি XML হুবহু); downloadColorSerialDocx (JSZip রাউন্ডট্রিপ)
+- color-serial-card.tsx (নতুন UI): রঙ-চিপ (সোয়াচ+প্যালেট কোড+সেকশন সংখ্যা), "পুরো ফাইলে একটানা" চিপ, নেস্টিং ব্যাখ্যা, সিরিয়াল-ডাউনলোড বাটন
+- page.tsx: colorAnalysis useMemo, colorMode-এ ShuffleCard+DocxSetsResult লুকানো (ইউজারের সিদ্ধান্ত: স্ট্রাকচার্ড ফাইলে শাফল বন্ধ), আপলোড-টোস্ট, handleColorSerial
+- টেস্ট: scripts/test-color-serial.ts — ৫৩/৫৩ পাস (ইউজারের B1/A2/A5/A6 হুবহু নেস্টিং উদাহরণ: A6-প্ল্যানে F/G=১,২ নতুন A5-এ থেমে J/L=১; A5-প্ল্যানে A6-প্রশ্ন অন্তর্ভুক্ত; A2-প্ল্যানে A5/A6 ভাঙে না; B1/একটানা ১..N; pipe→dot; বাংলা ডিজিট ৪৪|→৭.; মাল্টি-রান; ডেসিমাল-গার্ড; আসল ফাইল: B1×126+কাস্টম×৯, ৪৩৫ প্রশ্ন, ১২২ প্রশ্ন-যুক্ত Type-সেকশন সব ১..n, idempotent) + পুরনো ৪৩+৬১ টেস্ট অক্ষত
+- E2E আসল ফাইল: scripts/e2e-color-agri.ts → download/Agri MCQ Botany (color serial - B1).docx; python যাচাই: ১৭৫৪ প্যারা অপরিবর্তিত, math ২৯→২৯, image1.png+ফন্ট অক্ষত, নন-প্রশ্ন লাইন ০ পরিবর্তন, প্রশ্ন-বডি সিরিয়ালের পরে ০ পরিবর্তন, pipe শূন্য, ১২২ সেকশন সব ১..n; LibreOffice PDF ২৭ পৃষ্ঠা ✓
+- ব্রাউজার E2E (agent-browser): আসল ফাইল আপলোড → রঙ-কার্ড (B1 ১২৬/কাস্টম ৯/একটানা ৪৩৫) → B1 সিলেক্ট → ডাউনলোড → সফল টোস্ট; console/page error শূন্য
+
+Stage Summary:
+- নতুন ফিচার: রঙ-স্ট্রাকচার্ড .docx আপলোড হলে শাফল অটো-বন্ধ; ফাইলের রঙগুলো চিপ আকারে দেখায়; ইউজার রঙ বাছলে প্রতিটা ওই-রঙ-সেকশনের প্রশ্ন ১ থেকে নম্বর পায় (নেস্টিং-সচেতন — অভিভাবক রঙের সীমানায় ক্রম থেমে যায়, দুই জায়গার প্রশ্ন কখনো মেশে না); সেপারেটর সব "1." ডট-স্টাইলে নরমালাইজ; math/ছবি/ফন্ট/হেডার হুবহু অক্ষত (docx→docx)
+- ডেলিভারেবল স্যাম্পল: download/Agri MCQ Botany (color serial - B1).docx (৪৩৫ প্রশ্ন, ১২৬ Type-সেকশনে ১ থেকে)
+- সব প্রসেসিং client-side, ০ কস্ট

@@ -126,7 +126,7 @@ export function extractParaText(el: Element): string {
 }
 
 /** রান-লেভেল ট্যাব (<w:tab/>) সংখ্যা — ট্যাব-স্টপ নয় */
-function countRunTabs(el: Element): number {
+export function countRunTabs(el: Element): number {
   const tabs = el.getElementsByTagNameNS(W_NS, "tab");
   let n = 0;
   for (let i = 0; i < tabs.length; i++) {
@@ -162,7 +162,8 @@ export interface SerialPrefix {
   after: string;
 }
 
-const SEP_CLASS = ".।):\\-–—:";
+// "|" = SutonnyMJ-এ দাঁড়ি (।) — Bijoy ফাইলে "44|" = "৪৪।" — তাই pipe-ও সেপারেটর
+const SEP_CLASS = ".।):\\-–—:|";
 const ALL_DIGITS = DIGIT_CLASS.en + DIGIT_CLASS.bn + DIGIT_CLASS.bijoy;
 const SERIAL_RE = new RegExp(`^\\s*([${ALL_DIGITS}]{1,4})\\s*([${SEP_CLASS}])?`);
 
@@ -177,7 +178,7 @@ export function detectSerialPrefix(text: string): SerialPrefix | null {
   return { raw: m[0], digits: m[1], num: conv.num, enc: conv.enc, separator: m[2] ?? "", after };
 }
 
-function looksOptionLed(t: string): boolean {
+export function looksOptionLed(t: string): boolean {
   if (/^\t/.test(t)) return true;
   return /^\s*(?:[KLMNklmn]\s*[.।):]|[কখগঘ]\s*[.।):]|[a-dA-D]\s*[.):]|[([]\s*[কখগঘa-dA-D]\s*[)\]]|Dt\b|উঃ|উত্তর)/.test(t);
 }
@@ -190,7 +191,7 @@ function isSectionSeparator(text: string): boolean {
   return /^[A-Za-z][A-Za-z0-9 .\-]{1,29}$/.test(t) && t === t.toUpperCase();
 }
 
-function isQuestionStart(si: SerialPrefix, hasRunTab: boolean, nextText: string | null): boolean {
+export function isQuestionStart(si: SerialPrefix, hasRunTab: boolean, nextText: string | null): boolean {
   if (si.num > 5000) return false;
   // টিয়ার ১: সিরিয়ালের পরে ট্যাব আছে (ইউজারের ফরম্যাট: "32.<tab>প্রশ্ন")
   if (hasRunTab) return true;
@@ -444,6 +445,51 @@ function setTText(t: Element, text: string): void {
 }
 
 /**
+ * একাধিক [start,end)→text স্প্যান এক পাসে মাল্টি-রান w:t স্ট্রিমে রিপ্লেস —
+ * স্প্যানগুলো ascending + non-overlapping হতে হবে। এক পাসে করায় আগের
+ * রিপ্লেসমেন্টের দৈর্ঘ্য বদলালেও পরের স্প্যানের offset ঠিক থাকে
+ * (যেমন "৪৪|" → "৭." — ডিজিট ২ অক্ষর থেকে ১ হলেও সেপ ঠিক জায়গায় বসে)।
+ */
+function replaceSpans(stream: Element[], spans: Array<{ start: number; end: number; text: string }>): void {
+  if (!spans.length) return;
+  const sorted = [...spans].sort((a, b) => a.start - b.start);
+  let offset = 0;
+  for (const t of stream) {
+    const s = t.textContent ?? "";
+    const tStart = offset;
+    offset += s.length;
+    const tEnd = offset;
+    if (tEnd <= sorted[0].start) continue;
+    if (tStart >= sorted[sorted.length - 1].end) continue;
+    let out = "";
+    let pos = 0; // local স্লাইস পজিশন
+    for (const sp of sorted) {
+      if (sp.end <= tStart || sp.start >= tEnd) continue;
+      const ls = Math.max(0, sp.start - tStart);
+      const le = Math.min(s.length, sp.end - tStart);
+      out += s.slice(pos, ls);
+      if (tStart <= sp.start) out += sp.text; // স্প্যান এই t-তে শুরু হলে রিপ্লেসমেন্ট ঢোকে
+      pos = le;
+    }
+    out += s.slice(pos);
+    if (out !== s) setTText(t, out);
+  }
+}
+
+function serialMatchSpans(joined: string): { digitsStart: number; digitsEnd: number; sepStart: number; sepEnd: number; enc: DigitEnc } | null {
+  const m = SERIAL_RE.exec(joined);
+  if (!m) return null;
+  const conv = digitsToNumber(m[1]);
+  if (!conv) return null;
+  // ডিজিট ম্যাচের শুরু: লিডিং স্পেস ও ডিজিট-সেপারেটরের মাঝের স্পেস সঠিকভাবে স্কিপ
+  const digitsStart = m.index + joined.indexOf(m[1], m.index);
+  const digitsEnd = digitsStart + m[1].length;
+  const sepLen = m[2] ? m[2].length : 0;
+  const sepStart = m.index + m[0].length - sepLen;
+  return { digitsStart, digitsEnd, sepStart, sepEnd: sepStart + sepLen, enc: conv.enc };
+}
+
+/**
  * সিরিয়াল প্যারার ডিজিট নতুন নম্বর দিয়ে রিপ্লেস করে —
  * ডিজিট একাধিক রানে ভাগ থাকলেও ঠিকঠাক বসে; সেপারেটর ("." ইত্যাদি),
  * ট্যাব, পরের লেখা — সব অক্ষত থাকে। এনকোডিং ফাইলের নিজের স্টাইলেই।
@@ -454,28 +500,33 @@ export function renumberSerialPara(p: Element, newNum: number): void {
   if (!stream.length) return;
 
   const joined = stream.map((t) => t.textContent ?? "").join("");
-  const m = SERIAL_RE.exec(joined);
-  if (!m) return;
-  const conv = digitsToNumber(m[1]);
-  if (!conv) return;
+  const spans = serialMatchSpans(joined);
+  if (!spans) return;
 
-  const sepLen = m[2] ? m[2].length : 0;
-  const digitsStart = m.index + m[0].length - m[1].length - sepLen;
-  const digitsEnd = digitsStart + m[1].length;
-  const newDigits = numberToDigits(newNum, conv.enc);
+  replaceSpans(stream, [
+    { start: spans.digitsStart, end: spans.digitsEnd, text: numberToDigits(newNum, spans.enc) },
+  ]);
+}
 
-  let offset = 0;
-  for (const t of stream) {
-    const text = t.textContent ?? "";
-    const tStart = offset;
-    const tEnd = offset + text.length;
-    offset = tEnd;
-    if (tEnd <= digitsStart || tStart >= digitsEnd) continue;
-    const localStart = Math.max(0, digitsStart - tStart);
-    const localEnd = Math.min(text.length, digitsEnd - tStart);
-    let replacement = "";
-    if (tStart <= digitsStart) replacement = text.slice(0, localStart) + newDigits;
-    if (tEnd >= digitsEnd) replacement += text.slice(localEnd);
-    setTText(t, replacement);
+/**
+ * রিনাম্বার + সেপারেটর নরমালাইজ (যেমন "44|" → "45.") —
+ * ডিজিট বদলায়, আর পুরনো সেপারেটর থাকলে সেটাকে targetSep করে দেয়।
+ * সেপারেটর না থাকলে নতুন করে যোগ করে না (গ্লুড-লেখা অক্ষত থাকে)।
+ */
+export function renumberSerialParaTo(p: Element, newNum: number, targetSep = "."): void {
+  const stream: Element[] = [];
+  collectTs(p, stream);
+  if (!stream.length) return;
+
+  const joined = stream.map((t) => t.textContent ?? "").join("");
+  const spans = serialMatchSpans(joined);
+  if (!spans) return;
+
+  const edits: Array<{ start: number; end: number; text: string }> = [
+    { start: spans.digitsStart, end: spans.digitsEnd, text: numberToDigits(newNum, spans.enc) },
+  ];
+  if (spans.sepEnd > spans.sepStart) {
+    edits.push({ start: spans.sepStart, end: spans.sepEnd, text: targetSep });
   }
+  replaceSpans(stream, edits);
 }
