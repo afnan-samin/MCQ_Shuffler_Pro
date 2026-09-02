@@ -34,6 +34,7 @@ import {
   analyzeColorDocx,
   downloadColorSerialDocx,
   planSerialByColor,
+  stripShadedParasXml,
   type ColorAnalysis,
   type SerialScheme,
 } from "@/lib/mcq/color-serial";
@@ -41,7 +42,7 @@ import { ColorSerialCard } from "@/components/mcq/color-serial-card";
 import { ModeTabs, type McqMode } from "@/components/mcq/mode-tabs";
 import { SerialInputCard } from "@/components/mcq/serial-input-card";
 import {
-  ColorFileShuffleNotice,
+  ColorShuffleInfoCard,
   NoColorSerialCard,
 } from "@/components/mcq/serial-extra-cards";
 import {
@@ -59,11 +60,16 @@ const MODE_KEY = "mcq-shuffler-mode";
 interface DocxState {
   file: File;
   baseName: string;
+  /** শাফল-পাইপলাইনের xml — রঙ-ফাইলে হেডার-বিহীন (হেডার বাদ দিয়ে সব প্রশ্ন এক সিরিয়ালে) */
   xml: string;
-  /** রঙ-স্ট্রাকচার্ড ফাইলে null (ভারী DOM পার্স এড়াতে) — শাফল মোড তখন বন্ধই */
+  /** অরিজিনাল xml — সিরিয়াল মোডে হাত-অফের সময় লাগে (রঙ-ইনডেক্স অরিজিনালের সাথে মেলে) */
+  originalXml: string;
+  /** xml-এর সাথে সবসময় consistent — রঙ-ফাইলেও null না */
   parse: DocxParseResult | null;
   /** রঙ-স্ট্রাকচার্ড হলে বিশ্লেষণ — সিরিয়াল মোডে হাত-অফে পুনঃব্যবহৃত হয় */
   colorAn: ColorAnalysis | null;
+  /** শাফলের জন্য বাদ পড়া রঙ-হেডার সংখ্যা (0 = রঙ-ফাইল না) */
+  headersStripped: number;
 }
 
 /** সিরিয়াল মোডের আলাদা স্টেট — শাফলের সাথে কোনো মিল নেই */
@@ -268,47 +274,70 @@ export default function Home() {
   const handleDocxFile = useCallback(async (f: File) => {
     setDocxLoading(true);
     try {
-      const xml = await loadDocxXml(f);
-      // রঙ-বিশ্লেষণ আগে (string-level, হালকা) — রঙ থাকলে ভারী DOM পার্স এড়ায়
-      // (বিশাল ফাইলে DOMParser × একাধিকবার চললে মেমোরি ফুলে ফাইল করাপ্ট হতো)
+      const originalXml = await loadDocxXml(f);
+      // রঙ-বিশ্লেষণ (string-level, হালকা)
       let colorAn: ColorAnalysis | null = null;
       try {
-        colorAn = analyzeColorDocx(xml);
+        colorAn = analyzeColorDocx(originalXml);
       } catch {}
       const hasColors = !!colorAn && colorAn.colors.length > 0;
-      const parse = hasColors ? null : parseDocxXml(xml);
-      setDocx({ file: f, baseName: f.name.replace(/\.docx$/i, ""), xml, parse, colorAn: hasColors ? colorAn : null });
+
+      // ইউজারের নিয়ম: শাফল মোডে হেডার থাকলে হেডার বাদ দিয়ে সবগুলো প্রশ্ন
+      // এক সিরিয়ালে নিয়ে শাফল — তাই রঙ-হেডারগুলো আগে সরিয়ে নিই,
+      // যাতে হেডার কোনো প্রশ্ন-ব্লকের সাথে জড়িয়ে শাফলে এলোমেলো না যায়
+      let xml = originalXml;
+      let headersStripped = 0;
+      if (hasColors && colorAn) {
+        const st = stripShadedParasXml(originalXml);
+        xml = st.xml;
+        headersStripped = st.removed;
+      }
+
+      const parse = parseDocxXml(xml);
+      setDocx({
+        file: f,
+        baseName: f.name.replace(/\.docx$/i, ""),
+        xml,
+        originalXml,
+        parse,
+        colorAn: hasColors ? colorAn : null,
+        headersStripped,
+      });
       setParsed(null);
       resetResults();
-      setSelected(new Set(parse?.questions.map((q) => q.id) ?? []));
+      setSelected(new Set(parse.questions.map((q) => q.id)));
       setAllowBroken(false);
 
       if (hasColors && colorAn) {
         toast({
-          title: "🎨 রঙ-স্ট্রাকচার্ড ফাইল — এটা সিরিয়াল মোডের কাজ",
-          description: `এই ফাইলে রঙ-দেওয়া হেডার আছে — শাফল মোডে করা যায় না। নিচের বাটনে সিরিয়াল মোডে খুলুন।${colorAn.questionCount ? ` (${colorAn.questionCount} টি প্রশ্ন পাওয়া গেছে)` : ""}`,
+          title: `🎨 রঙ-হেডার ${headersStripped} টি বাদ দিয়ে ${parse.questions.length} টি প্রশ্ন এক সিরিয়ালে ডিটেক্ট হয়েছে`,
+          description: "শাফলে হেডারগুলো যাবে না — সব প্রশ্ন আপনার সেট-সেটিং অনুযায়ী শাফল হবে।",
         });
-        return;
-      }
-
-      if (!parse) {
+      } else if (parse.questions.length === 0) {
         toast({
           title: "কোনো প্রশ্ন পাওয়া যায়নি",
           description: "প্রশ্নগুলো সিরিয়াল দিয়ে শুরু আছে কিনা দেখুন (যেমন: 32. / ১. / 1.)",
           variant: "destructive",
         });
         return;
+      } else {
+        const serialMsg =
+          parse.serial?.status === "ok"
+            ? "সিরিয়াল ঠিক আছে — শাফল রেডি!"
+            : `সিরিয়ালে ${parse.serial?.issues.length ?? 0} টি জায়গায় সমস্যা — শাফলের সময় serial replace ON রাখলে ঠিক হয়ে যাবে।`;
+
+        toast({
+          title: `✅ ${parse.questions.length} টি প্রশ্ন ডিটেক্ট হয়েছে`,
+          description: `${serialMsg}${parse.unicodeQuestionIds.length ? ` ⚠️ ${parse.unicodeQuestionIds.length} টি প্রশ্নে Unicode আছে (ডাউনলোডে অরিজিনালই থাকবে)।` : ""}`,
+        });
       }
 
-      const serialMsg =
-        parse.serial?.status === "ok"
-          ? "সিরিয়াল ঠিক আছে — শাফল রেডি!"
-          : `সিরিয়ালে ${parse.serial?.issues.length ?? 0} টি জায়গায় সমস্যা — শাফলের সময় serial replace ON রাখলে ঠিক হয়ে যাবে।`;
-
-      toast({
-        title: `✅ ${parse.questions.length} টি প্রশ্ন ডিটেক্ট হয়েছে`,
-        description: `${serialMsg}${parse.unicodeQuestionIds.length ? ` ⚠️ ${parse.unicodeQuestionIds.length} টি প্রশ্নে Unicode আছে (ডাউনলোডে অরিজিনালই থাকবে)।` : ""}`,
-      });
+      if (originalXml.length > 8_000_000) {
+        toast({
+          title: "⚠️ বিশাল ফাইল",
+          description: "ফাইলটা বড় — শাফল ও ডাউনলোডে কিছু সময় লাগতে পারে, ট্যাব বন্ধ করবেন না।",
+        });
+      }
     } catch (e) {
       toast({
         title: "ফাইল পড়া যায়নি",
@@ -394,7 +423,8 @@ export default function Home() {
     setSerialDoc({
       file: docx.file,
       baseName: docx.baseName,
-      xml: docx.xml,
+      // সিরিয়াল মোডে অরিজিনাল xml লাগে — রঙ-ইনডেক্স অরিজিনাল ফাইলের সাথে মেলে
+      xml: docx.originalXml,
       analysis: docx.colorAn,
     });
     changeMode("serial");
@@ -721,63 +751,64 @@ export default function Home() {
             />
 
             {docx ? (
-              docx.colorAn ? (
-                <ColorFileShuffleNotice
-                  analysis={docx.colorAn}
-                  fileName={docx.file.name}
-                  onOpenSerial={openInSerialMode}
+              <>
+                {docx.colorAn && (
+                  <ColorShuffleInfoCard
+                    analysis={docx.colorAn}
+                    headersStripped={docx.headersStripped}
+                    fileName={docx.file.name}
+                    onOpenSerial={openInSerialMode}
+                  />
+                )}
+
+                {docx.parse && (
+                  <DocxDetectCard
+                    parse={docx.parse}
+                    fileName={docx.file.name}
+                    selected={selected}
+                    onToggle={toggleQuestion}
+                    onSelectAll={selectAll}
+                    onSelectNone={selectNone}
+                    onSelectRange={selectRange}
+                    onSerialFix={handleDocxSerialFix}
+                    fixing={fixing}
+                    allowBroken={allowBroken}
+                    onAllowBrokenChange={setAllowBroken}
+                    encStats={encData.stats}
+                    dominant={encData.dominant}
+                  />
+                )}
+
+                <ShuffleCard
+                  enabled={canShuffle}
+                  lockReason={gateReason ?? null}
+                  selectedCount={selected.size}
+                  setCount={setCount}
+                  onSetCountChange={setSetCount}
+                  distribution={distribution}
+                  onDistributionChange={setDistribution}
+                  shuffleWithin={shuffleWithin}
+                  onShuffleWithinChange={setShuffleWithin}
+                  onShuffle={handleShuffle}
+                  shuffling={shuffling}
                 />
-              ) : (
-                <>
-                  {docx.parse && (
-                    <DocxDetectCard
-                      parse={docx.parse}
-                      fileName={docx.file.name}
-                      selected={selected}
-                      onToggle={toggleQuestion}
-                      onSelectAll={selectAll}
-                      onSelectNone={selectNone}
-                      onSelectRange={selectRange}
-                      onSerialFix={handleDocxSerialFix}
-                      fixing={fixing}
-                      allowBroken={allowBroken}
-                      onAllowBrokenChange={setAllowBroken}
-                      encStats={encData.stats}
+
+                <div ref={resultsRef} className="scroll-mt-4">
+                  {setsDocx && docx.parse && (
+                    <DocxSetsResult
+                      sets={setsDocx}
+                      questions={docx.parse.questions}
+                      renumber={renumber}
+                      onRenumberChange={toggleSerialByClick}
+                      busy={busy}
+                      copiedSet={copiedSet}
+                      onDownload={handleDocxDownload}
+                      onCopySet={handleDocxCopySet}
                       dominant={encData.dominant}
                     />
                   )}
-
-                  <ShuffleCard
-                    enabled={canShuffle}
-                    lockReason={gateReason ?? null}
-                    selectedCount={selected.size}
-                    setCount={setCount}
-                    onSetCountChange={setSetCount}
-                    distribution={distribution}
-                    onDistributionChange={setDistribution}
-                    shuffleWithin={shuffleWithin}
-                    onShuffleWithinChange={setShuffleWithin}
-                    onShuffle={handleShuffle}
-                    shuffling={shuffling}
-                  />
-
-                  <div ref={resultsRef} className="scroll-mt-4">
-                    {setsDocx && docx.parse && (
-                      <DocxSetsResult
-                        sets={setsDocx}
-                        questions={docx.parse.questions}
-                        renumber={renumber}
-                        onRenumberChange={toggleSerialByClick}
-                        busy={busy}
-                        copiedSet={copiedSet}
-                        onDownload={handleDocxDownload}
-                        onCopySet={handleDocxCopySet}
-                        dominant={encData.dominant}
-                      />
-                    )}
-                  </div>
-                </>
-              )
+                </div>
+              </>
             ) : (
               <>
                 <DetectCard

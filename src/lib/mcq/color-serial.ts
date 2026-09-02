@@ -298,6 +298,36 @@ export function colorKeyName(key: string): string {
   return code ?? "কাস্টম রঙ";
 }
 
+// ---------- হেডার-স্ট্রিপ (শাফল মোডের জন্য) ----------
+
+/**
+ * টপ-লেভেল শেডিং-দেওয়া (রঙ-হেডার) প্যারাগুলো document.xml থেকে সরিয়ে দেয়।
+ * শাফল মোডের নিয়ম (ইউজার): "header takle seta bad diye sobgolo ek serial e
+ * niye ese shuffle" — হেডার বাদ পড়লে বাকি সব প্রশ্ন একটাই পুল/সিরিয়াল হয়,
+ * আর শাফলের সময় হেডার কোনো প্রশ্নের সাথে জড়িয়ে এলোমেলো যায় না।
+ *
+ * • শুধু body-র depth-1 w:p — টেবিল/টেক্সটবক্সের ভিতরের শেড কখনো ধরা হয় না
+ * • ডিটেকশন হুবহু analyzeColorDocx-এর paraShadingKey নিয়মে (সাদা/auto বাদ)
+ * • string-level splice — বাকি বাইট byte-identical, বিশাল ফাইলেও মেমোরি-নিরাপদ
+ */
+export function stripShadedParasXml(xml: string): { xml: string; removed: number } {
+  const children = scanBodyChildren(xml);
+  const cuts: Array<{ start: number; end: number }> = [];
+  for (const ch of children) {
+    if (ch.kind !== "w:p" || ch.selfClosing) continue;
+    if (paraShadingKeyOf(xml.slice(ch.start, ch.end))) cuts.push({ start: ch.start, end: ch.end });
+  }
+  if (!cuts.length) return { xml, removed: 0 };
+  const parts: string[] = [];
+  let pos = 0;
+  for (const c of cuts) {
+    parts.push(xml.slice(pos, c.start));
+    pos = c.end;
+  }
+  parts.push(xml.slice(pos));
+  return { xml: parts.join(""), removed: cuts.length };
+}
+
 // ---------- নম্বর-প্ল্যান (স্ট্যাক/নেস্টিং অ্যালগরিদম) ----------
 
 export type SerialScheme = { kind: "color"; key: string } | { kind: "continuous" };

@@ -121,7 +121,12 @@ export function buildShuffledXml(
   if (sectPr) body.appendChild(sectPr);
 
   const out = new XMLSerializer().serializeToString(doc);
-  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n' + out;
+  // ⚠️ ব্রাউজারের XMLSerializer নিজেই <?xml …?> ডেক্লারেশন সিরিয়ালাইজ করে
+  // (jsdom করে না) — দুবার ঢোকালে XML অবৈধ হয়ে যায়, তাই আগেটা কেটে ফেলি
+  const bodyXml = out.startsWith("<?xml")
+    ? out.slice(out.indexOf("?>") + 2).replace(/^[\r\n]+/, "")
+    : out;
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n' + bodyXml;
 }
 
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";

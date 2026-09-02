@@ -418,5 +418,89 @@ console.log("\n== ৬) জিরো-প্যাডিং ==");
   ok(!outP.includes(">1.\t") && !outP.includes(">7.\t"), "প্যাড-হারানো নম্বর (1./7.) নেই");
 }
 
+// ============================================================
+// শাফল মোডের হেডার-স্ট্রিপ: "header takle bad diye sob ek serial e shuffle"
+// ============================================================
+
+const { stripShadedParasXml } = await import("../src/lib/mcq/color-serial");
+const { parseDocxXml } = await import("../src/lib/mcq/docx-xml");
+
+console.log("\n== ৭) stripShadedParasXml (শাফল মোডে হেডার বাদ) ==");
+{
+  // সিনথেটিক: লিড + হেডার(B1) + প্রশ্ন + সাদা-শেড প্যারা + হেডার(A5) + প্রশ্ন
+  const tableWithShadedCell =
+    `<w:tbl><w:tr><w:tc><w:p xmlns:w="${W}"><w:pPr><w:shd w:val="clear" w:fill="000000"/></w:pPr>` +
+    `<w:r><w:t>টেবিলের ভিতরের শেড</w:t></w:r></w:p></w:tc></w:tr></w:tbl>`;
+  const body =
+    plainP("ভূমিকা — প্রশ্নব্যাংক") +
+    shadedP("অধ্যায়-১", "000000") +
+    q("1.ক-১") + q("2.ক-২") +
+    `<w:p xmlns:w="${W}"><w:pPr><w:shd w:val="clear" w:fill="FFFFFF"/></w:pPr><w:r><w:t xml:space="preserve">সাদা-শেড (হেডার না)</w:t></w:r></w:p>` +
+    shadedP("সাব-১", "A6A6A6") +
+    q("3.ক-৩") +
+    tableWithShadedCell +
+    shadedP("", "000000"); // খালি শেডেড সেপারেটর প্যারা
+  const xml1 = wrapDoc(body);
+
+  const st = stripShadedParasXml(xml1);
+  ok(st.removed === 3, `টপ-লেভেল শেডেড ৩টা প্যারা বাদ (২ হেডার + ১ খালি), বাদ পড়েছে ${st.removed}`);
+  ok(!st.xml.includes("অধ্যায়-১") && !st.xml.includes("সাব-১"), "হেডার-টেক্সট আউটপুটে নেই");
+  ok(st.xml.includes("ক-১") && st.xml.includes("ক-২") && st.xml.includes("ক-৩"), "সব প্রশ্ন অক্ষত");
+  ok(st.xml.includes("ভূমিকা"), "নন-শেড লিড প্যারা অক্ষত");
+  ok(st.xml.includes("সাদা-শেড"), "সাদা (FFFFFF) শেড বাদ পড়ে না");
+  ok(st.xml.includes("টেবিলের ভিতরের শেড"), "টেবিলের ভিতরের শেড কখনো বাদ পড়ে না (depth-1 মাত্র)");
+  ok(st.xml.includes("<w:sectPr/>"), "sectPr অক্ষত");
+
+  // রঙহীন ফাইল → byte-identical
+  const noColor = wrapDoc(q("1.এক") + q("2.দুই"));
+  const st0 = stripShadedParasXml(noColor);
+  ok(st0.removed === 0 && st0.xml === noColor, "রঙহীন ফাইলে removed=0, XML হুবহু এক");
+
+  // স্ট্রিপ-এর পরে পার্স → সব প্রশ্ন এক সিরিয়ালে ধরা পড়ে
+  const parsed1 = parseDocxXml(st.xml);
+  ok(parsed1.questions.length === 3, `স্ট্রিপ-এর পরে পার্সে ৩ প্রশ্ন, পাওয়া গেল ${parsed1.questions.length}`);
+
+  // আসল ফাইল ১: Agri (9 ধূসর অধ্যায় + 126 কালো Type হেডার, ৪৩৫ প্রশ্ন)
+  try {
+    const agriFile = "upload/Agri MCQ Botany 997 mcq - Copy - type serial.docx";
+    const agriZip = await JSZip.loadAsync((await import("node:fs")).readFileSync(agriFile));
+    const agriXml = await agriZip.file("word/document.xml")!.async("string");
+    const anA = analyzeColorDocx(agriXml);
+    const stA = stripShadedParasXml(agriXml);
+    ok(stA.removed === anA.shadedCount, `Agri: বাদ পড়া ${stA.removed} == শেডেড ${anA.shadedCount}`);
+    ok(stA.xml.length < agriXml.length, "স্ট্রিপ-এর পরে XML ছোট");
+    const parsedA = parseDocxXml(stA.xml);
+    ok(
+      parsedA.questions.length === anA.questionCount,
+      `Agri: স্ট্রিপ-পরবর্তী পার্সে ${parsedA.questions.length} প্রশ্ন == রঙ-বিশ্লেষণের ${anA.questionCount} (হেডার ছাড়া এক সিরিয়ালে সব ধরা পড়ে)`
+    );
+    // স্ট্রিপ-এর পরে আর কোনো শেডেড হেডারই অবশিষ্ট নেই — শাফলে হেডার যাবেই না
+    // (নোট: ফাইলে নিজের ১টা নন-শেডেড "Aa¨vq-8" লাইন থাকে — রঙ না দেওয়ায় সেটা
+    //  কনটেন্ট, প্রশ্নের সাথেই থাকে; রঙই হেডারের একমাত্র নির্ভরযোগ্য চিহ্ন)
+    const anA2 = analyzeColorDocx(stA.xml);
+    ok(anA2.shadedCount === 0 && anA2.colors.length === 0, "Agri: স্ট্রিপ-এর পরে শেডেড হেডার শূন্য (সব ১৩৫টা বাদ)");
+  } catch (e) {
+    ok(false, `Agri রিয়েল-ফাইল টেস্ট: ${String(e)}`);
+  }
+
+  // আসল ফাইল ২: HSC'27 নমুনা (৬টা B1 কালো হেডার, ৬০ প্রশ্ন)
+  try {
+    const hscZip = await JSZip.loadAsync((await import("node:fs")).readFileSync("public/sample/hsc27-physics-bijoy.docx"));
+    const hscXml = await hscZip.file("word/document.xml")!.async("string");
+    const anH = analyzeColorDocx(hscXml);
+    const stH = stripShadedParasXml(hscXml);
+    ok(stH.removed === anH.shadedCount, `HSC নমুনা: বাদ ${stH.removed} == শেডেড ${anH.shadedCount}`);
+    const parsedH = parseDocxXml(stH.xml);
+    ok(
+      parsedH.questions.length === anH.questionCount && parsedH.questions.length === 60,
+      `HSC নমুনা: স্ট্রিপ-পরবর্তী ${parsedH.questions.length} প্রশ্ন == ${anH.questionCount} (৬০ প্রত্যাশিত)`
+    );
+    // আউটপুটে আর কোনো B1-শেড প্যারা নেই
+    ok(!stH.xml.includes('w:fill="000000"'), "HSC নমুনা: স্ট্রিপ-এর পরে B1-শেড শূন্য");
+  } catch (e) {
+    ok(false, `HSC নমুনা টেস্ট: ${String(e)}`);
+  }
+}
+
 console.log(`\n===== ফলাফল: ${passed} পাস, ${failed} ফেল =====`);
 process.exit(failed ? 1 : 0);

@@ -1,0 +1,847 @@
+     1→"use client";
+     2→
+     3→import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+     4→import { InputCard } from "@/components/mcq/input-card";
+     5→import { DetectCard } from "@/components/mcq/detect-card";
+     6→import { DocxDetectCard } from "@/components/mcq/docx-detect-card";
+     7→import { ShuffleCard } from "@/components/mcq/shuffle-card";
+     8→import { SetsResult } from "@/components/mcq/sets-result";
+     9→import { DocxSetsResult } from "@/components/mcq/docx-sets-result";
+    10→import { Badge } from "@/components/ui/badge";
+    11→import {
+    12→  autoFixNumbering,
+    13→  parseMcq,
+    14→  type ParseOutput,
+    15→  type McqQuestion,
+    16→} from "@/lib/mcq/parser";
+    17→import { buildSets, shuffled, type Distribution } from "@/lib/mcq/set-engine";
+    18→import { analyzeText, type Enc, type EncodingStats } from "@/lib/mcq/encoding";
+    19→import {
+    20→  allSetsClipboardText,
+    21→  copyToClipboard,
+    22→  exportDocHtml,
+    23→  exportDocx,
+    24→  printSets,
+    25→  DEFAULT_EXPORT_OPTIONS,
+    26→  type ExportOptions,
+    27→} from "@/lib/mcq/exporter";
+    28→import {
+    29→  loadDocxXml,
+    30→  parseDocxXml,
+    31→  type DocxParseResult,
+    32→} from "@/lib/mcq/docx-xml";
+    33→import {
+    34→  analyzeColorDocx,
+    35→  downloadColorSerialDocx,
+    36→  planSerialByColor,
+    37→  type ColorAnalysis,
+    38→  type SerialScheme,
+    39→} from "@/lib/mcq/color-serial";
+    40→import { ColorSerialCard } from "@/components/mcq/color-serial-card";
+    41→import { ModeTabs, type McqMode } from "@/components/mcq/mode-tabs";
+    42→import { SerialInputCard } from "@/components/mcq/serial-input-card";
+    43→import {
+    44→  ColorFileShuffleNotice,
+    45→  NoColorSerialCard,
+    46→} from "@/components/mcq/serial-extra-cards";
+    47→import {
+    48→  downloadSerialFixedDocx,
+    49→  downloadShuffledDocx,
+    50→  englishSetName,
+    51→} from "@/lib/mcq/docx-exporter";
+    52→import { SAMPLE_MCQ } from "@/lib/mcq/sample";
+    53→import { toast } from "@/hooks/use-toast";
+    54→import { Dices, ShieldCheck, Zap } from "lucide-react";
+    55→
+    56→const STORAGE_KEY = "mcq-shuffler-text";
+    57→const MODE_KEY = "mcq-shuffler-mode";
+    58→
+    59→interface DocxState {
+    60→  file: File;
+    61→  baseName: string;
+    62→  xml: string;
+    63→  /** রঙ-স্ট্রাকচার্ড ফাইলে null (ভারী DOM পার্স এড়াতে) — শাফল মোড তখন বন্ধই */
+    64→  parse: DocxParseResult | null;
+    65→  /** রঙ-স্ট্রাকচার্ড হলে বিশ্লেষণ — সিরিয়াল মোডে হাত-অফে পুনঃব্যবহৃত হয় */
+    66→  colorAn: ColorAnalysis | null;
+    67→}
+    68→
+    69→/** সিরিয়াল মোডের আলাদা স্টেট — শাফলের সাথে কোনো মিল নেই */
+    70→interface SerialState {
+    71→  file: File;
+    72→  baseName: string;
+    73→  xml: string;
+    74→  analysis: ColorAnalysis;
+    75→}
+    76→
+    77→export default function Home() {
+    78→  // ---- মোড (শাফল / সিরিয়াল — উপরের দুই বাটন) ----
+    79→  const [mode, setMode] = useState<McqMode>("shuffle");
+    80→
+    81→  // ---- ইনপুট (text mode) ----
+    82→  const [rawText, setRawText] = useState("");
+    83→  const [hydrated, setHydrated] = useState(false);
+    84→  const [detecting, setDetecting] = useState(false);
+    85→  const [parsed, setParsed] = useState<ParseOutput | null>(null);
+    86→
+    87→  // ---- ইনপুট (docx mode — XML হুবহু প্রিজার্ভ) ----
+    88→  const [docx, setDocx] = useState<DocxState | null>(null);
+    89→  const [docxLoading, setDocxLoading] = useState(false);
+    90→
+    91→  // ---- সিলেকশন ----
+    92→  const [selected, setSelected] = useState<Set<number>>(new Set());
+    93→  const [allowBroken, setAllowBroken] = useState(false);
+    94→  const [fixing, setFixing] = useState(false);
+    95→
+    96→  // ---- শাফল কনফিগ ----
+    97→  const [setCount, setSetCount] = useState(4);
+    98→  const [distribution, setDistribution] = useState<Distribution>("interleaved");
+    99→  const [shuffleWithin, setShuffleWithin] = useState(true);
+   100→  const [shuffling, setShuffling] = useState(false);
+   101→
+   102→  // ---- রেজাল্ট ----
+   103→  const [sets, setSets] = useState<McqQuestion[][] | null>(null);
+   104→  const [setsDocx, setSetsDocx] = useState<number[][] | null>(null);
+   105→  const [renumber, setRenumber] = useState(true);
+   106→  const [sortedFlags, setSortedFlags] = useState<boolean[]>([]);
+   107→  const [exportOpts, setExportOpts] = useState<ExportOptions>(DEFAULT_EXPORT_OPTIONS);
+   108→  const [busy, setBusy] = useState<string | null>(null);
+   109→  const [copiedSet, setCopiedSet] = useState<number | null>(null);
+   110→
+   111→  // ---- সিরিয়াল মোডের সম্পূর্ণ আলাদা স্টেট ----
+   112→  const [serialDoc, setSerialDoc] = useState<SerialState | null>(null);
+   113→  const [serialLoading, setSerialLoading] = useState(false);
+   114→  const [serialBusy, setSerialBusy] = useState(false);
+   115→
+   116→  const resultsRef = useRef<HTMLDivElement>(null);
+   117→
+   118→  // শেষ ব্যবহৃত মোড মনে রাখা
+   119→  useEffect(() => {
+   120→    try {
+   121→      const m = localStorage.getItem(MODE_KEY);
+   122→      if (m === "shuffle" || m === "serial") setMode(m);
+   123→    } catch {}
+   124→  }, []);
+   125→
+   126→  const changeMode = (m: McqMode) => {
+   127→    setMode(m);
+   128→    try {
+   129→      localStorage.setItem(MODE_KEY, m);
+   130→    } catch {}
+   131→  };
+   132→
+   133→  // প্রথম লোডে সেভ করা টেক্সট রিস্টোর
+   134→  useEffect(() => {
+   135→    try {
+   136→      const saved = localStorage.getItem(STORAGE_KEY);
+   137→      if (saved) setRawText(saved);
+   138→    } catch {}
+   139→    setHydrated(true);
+   140→  }, []);
+   141→
+   142→  // টেক্সট অটো-সেভ (ডিবাউন্স)
+   143→  useEffect(() => {
+   144→    if (!hydrated) return;
+   145→    const t = setTimeout(() => {
+   146→      try {
+   147→        localStorage.setItem(STORAGE_KEY, rawText);
+   148→      } catch {}
+   149→    }, 600);
+   150→    return () => clearTimeout(t);
+   151→  }, [rawText, hydrated]);
+   152→
+   153→  // হেডার অটো-প্রি-ফিল (text mode-এ প্রথমবার ডিটেক্টে)
+   154→  useEffect(() => {
+   155→    if (parsed && exportOpts.headerText === "" && parsed.preamble.length) {
+   156→      setExportOpts((o) => ({ ...o, headerText: parsed.preamble.join("\n") }));
+   157→    }
+   158→  }, [parsed]);
+   159→
+   160→  const resetResults = () => {
+   161→    setSets(null);
+   162→    setSetsDocx(null);
+   163→    setSortedFlags([]);
+   164→  };
+   165→
+   166→  // ================== TEXT MODE ==================
+   167→
+   168→  const handleTextChange = (t: string) => {
+   169→    setRawText(t);
+   170→    setDocx(null);
+   171→    if (parsed) {
+   172→      setParsed(null);
+   173→      setSelected(new Set());
+   174→      resetResults();
+   175→    }
+   176→  };
+   177→
+   178→  const runTextParse = (source: string) => {
+   179→    const result = parseMcq(source);
+   180→    setParsed(result);
+   181→    setSelected(new Set(result.questions.map((q) => q.id)));
+   182→    setAllowBroken(false);
+   183→    announceDetect(result);
+   184→  };
+   185→
+   186→  const loadAndDetect = (t: string) => {
+   187→    setRawText(t);
+   188→    setDocx(null);
+   189→    resetResults();
+   190→    if (!t.trim()) {
+   191→      setParsed(null);
+   192→      setSelected(new Set());
+   193→      return;
+   194→    }
+   195→    setDetecting(true);
+   196→    try {
+   197→      runTextParse(t);
+   198→    } finally {
+   199→      setDetecting(false);
+   200→    }
+   201→  };
+   202→
+   203→  const handleDetect = () => {
+   204→    if (!rawText.trim()) return;
+   205→    setDetecting(true);
+   206→    setDocx(null);
+   207→    resetResults();
+   208→    try {
+   209→      runTextParse(rawText);
+   210→    } finally {
+   211→      setDetecting(false);
+   212→    }
+   213→  };
+   214→
+   215→  const handleSample = () => {
+   216→    loadAndDetect(SAMPLE_MCQ);
+   217→  };
+   218→
+   219→  const handleAutoFix = () => {
+   220→    if (!rawText.trim()) return;
+   221→    setFixing(true);
+   222→    try {
+   223→      const fixed = autoFixNumbering(rawText, 1);
+   224→      setRawText(fixed);
+   225→      const result = parseMcq(fixed);
+   226→      setParsed(result);
+   227→      setSelected(new Set(result.questions.map((q) => q.id)));
+   228→      setAllowBroken(false);
+   229→      toast({
+   230→        title: "🔧 সিরিয়াল ঠিক করা হয়েছে",
+   231→        description: `${result.questions.length} টি প্রশ্নে ১ থেকে শুরু করে নতুন নম্বর বসানো হয়েছে।`,
+   232→      });
+   233→    } finally {
+   234→      setFixing(false);
+   235→    }
+   236→  };
+   237→
+   238→  const toggleQuestion = (id: number) => {
+   239→    setSelected((prev) => {
+   240→      const next = new Set(prev);
+   241→      if (next.has(id)) next.delete(id);
+   242→      else next.add(id);
+   243→      return next;
+   244→    });
+   245→  };
+   246→
+   247→  const announceDetect = (result: ParseOutput) => {
+   248→    if (result.questions.length === 0) {
+   249→      toast({
+   250→        title: "কোনো প্রশ্ন পাওয়া যায়নি",
+   251→        description: "প্রশ্নগুলো নম্বর দিয়ে শুরু আছে কিনা দেখুন (যেমন: ১. অথবা 1.)",
+   252→      });
+   253→    } else if (result.serial?.status === "ok") {
+   254→      toast({
+   255→        title: `✅ ${result.questions.length} টি প্রশ্ন ডিটেক্ট হয়েছে`,
+   256→        description: "সিরিয়াল ঠিক আছে — শাফল বাটন এখন চালু!",
+   257→      });
+   258→    } else if (result.serial) {
+   259→      toast({
+   260→        title: `⚠️ ${result.questions.length} টি প্রশ্ন পাওয়া গেছে, কিন্তু সিরিয়ালে সমস্যা আছে`,
+   261→        description: "'অটো নম্বরিং ঠিক করুন' চাপলে এক ক্লিকে ঠিক হয়ে যাবে।",
+   262→      });
+   263→    }
+   264→  };
+   265→
+   266→  // ================== DOCX MODE (XML হুবহু প্রিজার্ভ) ==================
+   267→
+   268→  const handleDocxFile = useCallback(async (f: File) => {
+   269→    setDocxLoading(true);
+   270→    try {
+   271→      const xml = await loadDocxXml(f);
+   272→      // রঙ-বিশ্লেষণ আগে (string-level, হালকা) — রঙ থাকলে ভারী DOM পার্স এড়ায়
+   273→      // (বিশাল ফাইলে DOMParser × একাধিকবার চললে মেমোরি ফুলে ফাইল করাপ্ট হতো)
+   274→      let colorAn: ColorAnalysis | null = null;
+   275→      try {
+   276→        colorAn = analyzeColorDocx(xml);
+   277→      } catch {}
+   278→      const hasColors = !!colorAn && colorAn.colors.length > 0;
+   279→      const parse = hasColors ? null : parseDocxXml(xml);
+   280→      setDocx({ file: f, baseName: f.name.replace(/\.docx$/i, ""), xml, parse, colorAn: hasColors ? colorAn : null });
+   281→      setParsed(null);
+   282→      resetResults();
+   283→      setSelected(new Set(parse?.questions.map((q) => q.id) ?? []));
+   284→      setAllowBroken(false);
+   285→
+   286→      if (hasColors && colorAn) {
+   287→        toast({
+   288→          title: "🎨 রঙ-স্ট্রাকচার্ড ফাইল — এটা সিরিয়াল মোডের কাজ",
+   289→          description: `এই ফাইলে রঙ-দেওয়া হেডার আছে — শাফল মোডে করা যায় না। নিচের বাটনে সিরিয়াল মোডে খুলুন।${colorAn.questionCount ? ` (${colorAn.questionCount} টি প্রশ্ন পাওয়া গেছে)` : ""}`,
+   290→        });
+   291→        return;
+   292→      }
+   293→
+   294→      if (!parse) {
+   295→        toast({
+   296→          title: "কোনো প্রশ্ন পাওয়া যায়নি",
+   297→          description: "প্রশ্নগুলো সিরিয়াল দিয়ে শুরু আছে কিনা দেখুন (যেমন: 32. / ১. / 1.)",
+   298→          variant: "destructive",
+   299→        });
+   300→        return;
+   301→      }
+   302→
+   303→      const serialMsg =
+   304→        parse.serial?.status === "ok"
+   305→          ? "সিরিয়াল ঠিক আছে — শাফল রেডি!"
+   306→          : `সিরিয়ালে ${parse.serial?.issues.length ?? 0} টি জায়গায় সমস্যা — শাফলের সময় serial replace ON রাখলে ঠিক হয়ে যাবে।`;
+   307→
+   308→      toast({
+   309→        title: `✅ ${parse.questions.length} টি প্রশ্ন ডিটেক্ট হয়েছে`,
+   310→        description: `${serialMsg}${parse.unicodeQuestionIds.length ? ` ⚠️ ${parse.unicodeQuestionIds.length} টি প্রশ্নে Unicode আছে (ডাউনলোডে অরিজিনালই থাকবে)।` : ""}`,
+   311→      });
+   312→    } catch (e) {
+   313→      toast({
+   314→        title: "ফাইল পড়া যায়নি",
+   315→        description: String(e instanceof Error ? e.message : e),
+   316→        variant: "destructive",
+   317→      });
+   318→    } finally {
+   319→      setDocxLoading(false);
+   320→    }
+   321→  }, []);
+   322→
+   323→  const toggleSerialByClick = (v: boolean) => setRenumber(v);
+   324→
+   325→  // ================== SERIAL MODE (সম্পূর্ণ আলাদা ওয়ার্কফ্লো) ==================
+   326→
+   327→  const handleSerialFile = async (f: File) => {
+   328→    setSerialLoading(true);
+   329→    try {
+   330→      const xml = await loadDocxXml(f);
+   331→      const analysis = analyzeColorDocx(xml);
+   332→      setSerialDoc({ file: f, baseName: f.name.replace(/\.docx$/i, ""), xml, analysis });
+   333→      if (analysis.colors.length > 0) {
+   334→        toast({
+   335→          title: `🎨 ${analysis.colors.length} টি রঙ পাওয়া গেছে`,
+   336→          description: `মোট ${analysis.questionCount} টি প্রশ্ন, ${analysis.shadedCount} টি রঙ-হেডার। নিচে রঙ বাছাই করে সিরিয়াল ডাউনলোড করুন।`,
+   337→        });
+   338→      } else {
+   339→        toast({
+   340→          title: "এই ফাইলে রঙ-হেডার নেই",
+   341→          description: analysis.questionCount
+   342→            ? `তবে ${analysis.questionCount} টি প্রশ্ন পাওয়া গেছে — চাইলে একটানা ১..N সিরিয়াল দেওয়া যাবে।`
+   343→            : "কোনো প্রশ্ন-লাইনও পাওয়া যায়নি — ফাইল চেক করুন।",
+   344→        });
+   345→      }
+   346→    } catch (e) {
+   347→      toast({
+   348→        title: "ফাইল পড়া যায়নি",
+   349→        description: String(e instanceof Error ? e.message : e),
+   350→        variant: "destructive",
+   351→      });
+   352→    } finally {
+   353→      setSerialLoading(false);
+   354→    }
+   355→  };
+   356→
+   357→  const handleColorSerial = async (scheme: SerialScheme, label: string) => {
+   358→    if (!serialDoc) return;
+   359→    setSerialBusy(true);
+   360→    try {
+   361→      const plan = planSerialByColor(serialDoc.analysis, scheme);
+   362→      if (plan.size === 0) {
+   363→        toast({
+   364→          title: "নম্বর দেওয়ার মতো প্রশ্ন পাওয়া যায়নি",
+   365→          description: "এই রঙের সেকশনের ভিতরে সিরিয়াল-দেওয়া প্রশ্ন-লাইন নেই।",
+   366→          variant: "destructive",
+   367→        });
+   368→        return;
+   369→      }
+   370→      await downloadColorSerialDocx({
+   371→        originalFile: serialDoc.file,
+   372→        xml: serialDoc.xml,
+   373→        plan,
+   374→        baseName: serialDoc.baseName,
+   375→        schemeLabel: label,
+   376→      });
+   377→      toast({
+   378→        title: "✅ রঙ-অনুযায়ী সিরিয়াল করা .docx ডাউনলোড হয়েছে",
+   379→        description:
+   380→          scheme.kind === "continuous"
+   381→            ? `${plan.size} টি প্রশ্ন একটানা ১,২,৩… নম্বর পেয়েছে। বাকি সব হুবহু অক্ষত।`
+   382→            : `${plan.size} টি প্রশ্ন রঙ-সেকশন অনুযায়ী ১ থেকে নম্বর পেয়েছে। হেডার/ইকুয়েশন/ছবি অক্ষত।`,
+   383→      });
+   384→    } catch (e) {
+   385→      toast({ title: "সিরিয়াল করা যায়নি", description: String(e), variant: "destructive" });
+   386→    } finally {
+   387→      setSerialBusy(false);
+   388→    }
+   389→  };
+   390→
+   391→  /** শাফল মোডে উঠা রঙ-ফাইল সিরিয়াল মোডে খোলা (ফাইল নিজেই চলে যায়, আবার আপলোড লাগে না) */
+   392→  const openInSerialMode = () => {
+   393→    if (!docx?.colorAn) return;
+   394→    setSerialDoc({
+   395→      file: docx.file,
+   396→      baseName: docx.baseName,
+   397→      xml: docx.xml,
+   398→      analysis: docx.colorAn,
+   399→    });
+   400→    changeMode("serial");
+   401→    toast({
+   402→      title: "🔢 সিরিয়াল মোডে ফাইল খোলা হলো",
+   403→      description: "নিচে রঙ বাছাই করে সিরিয়াল ডাউনলোড করুন।",
+   404→    });
+   405→  };
+   406→
+   407→  const handleDocxShuffle = () => {
+   408→    if (!docx?.parse || !canShuffle) return;
+   409→    setShuffling(true);
+   410→    try {
+   411→      const pool = docx.parse.questions.filter((q) => selected.has(q.id));
+   412→      const isOriginal = distribution === "original";
+   413→      const result = buildSets(pool, {
+   414→        setCount,
+   415→        distribution,
+   416→        shuffleWithin: isOriginal ? true : shuffleWithin,
+   417→      });
+   418→      setSetsDocx(result.map((arr) => arr.map((q) => q.id)));
+   419→      setTimeout(() => {
+   420→        resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+   421→      }, 80);
+   422→      toast({
+   423→        title: isOriginal
+   424→          ? `🔀 ${setCount} টি সেট তৈরি — প্রতিটিতে সব ${pool.length} টি প্রশ্ন!`
+   425→          : `🔀 ${setCount} টি সেট তৈরি হয়েছে!`,
+   426→        description: isOriginal
+   427→          ? "প্রতি সেটের সিরিয়াল ক্রম আলাদা — এক সেটের ক্রম আরেক সেটের সাথে মিলবে না।"
+   428→          : "এখন Word ফাইল ডাউনলোড করতে পারেন — প্রতি সেট আলাদা পেজে।",
+   429→      });
+   430→    } finally {
+   431→      setShuffling(false);
+   432→    }
+   433→  };
+   434→
+   435→  const handleDocxDownload = async (doRenumber: boolean) => {
+   436→    if (!docx?.parse || !setsDocx) return;
+   437→    setBusy(doRenumber ? "docx-r" : "docx-o");
+   438→    try {
+   439→      await downloadShuffledDocx({
+   440→        originalFile: docx.file,
+   441→        xml: docx.xml,
+   442→        questions: docx.parse.questions,
+   443→        sets: setsDocx,
+   444→        baseName: docx.baseName,
+   445→        suffix: doRenumber ? " (shuffled, renumbered)" : " (shuffled, original serial)",
+   446→        opts: { renumber: doRenumber, includeSetHeader: true },
+   447→      });
+   448→      toast({
+   449→        title: "✅ Word ফাইল ডাউনলোড হয়েছে",
+   450→        description: doRenumber
+   451→          ? "প্রতি সেট আলাদা পেজে, সিরিয়াল ১,২,৩… করা। ফরম্যাট হুবহু অক্ষত।"
+   452→          : "প্রতি সেট আলাদা পেজে, প্রশ্নের আসল নম্বরসহ। ফরম্যাট হুবহু অক্ষত।",
+   453→      });
+   454→    } catch (e) {
+   455→      toast({ title: "ডাউনলোডে সমস্যা", description: String(e), variant: "destructive" });
+   456→    } finally {
+   457→      setBusy(null);
+   458→    }
+   459→  };
+   460→
+   461→  const handleDocxSerialFix = async () => {
+   462→    if (!docx?.parse) return;
+   463→    setFixing(true);
+   464→    try {
+   465→      await downloadSerialFixedDocx({
+   466→        originalFile: docx.file,
+   467→        xml: docx.xml,
+   468→        questions: docx.parse.questions,
+   469→        baseName: docx.baseName,
+   470→      });
+   471→      toast({
+   472→        title: "🔧 সিরিয়াল ঠিক করা .docx ডাউনলোড হয়েছে",
+   473→        description: "অরিজিনাল অর্ডারেই প্রশ্নগুলো, সিরিয়াল ১..N বসানো — ফরম্যাট হুবহু অক্ষত।",
+   474→      });
+   475→    } catch (e) {
+   476→      toast({ title: "ডাউনলোডে সমস্যা", description: String(e), variant: "destructive" });
+   477→    } finally {
+   478→      setFixing(false);
+   479→    }
+   480→  };
+   481→
+   482→  const handleDocxCopySet = async (si: number) => {
+   483→    if (!docx?.parse || !setsDocx) return;
+   484→    try {
+   485→      const byId = new Map(docx.parse.questions.map((q) => [q.id, q]));
+   486→      const lines: string[] = [englishSetName(si), ""];
+   487→      for (const id of setsDocx[si]) {
+   488→        const q = byId.get(id);
+   489→        if (q) lines.push(q.text.replace(/\t/g, "    "), "");
+   490→      }
+   491→      await copyToClipboard(lines.join("\n").trimEnd());
+   492→      setCopiedSet(si);
+   493→      setTimeout(() => setCopiedSet(null), 1800);
+   494→    } catch (e) {
+   495→      toast({ title: "কপি করা যায়নি", description: String(e), variant: "destructive" });
+   496→    }
+   497→  };
+   498→
+   499→  // ================== SHARED ==================
+   500→
+   501→  // শব্দ-ধরে এনকোডিং ডিটেক্টর (ডিটেক্ট হলেই চলে)
+   502→  const encData = useMemo(() => {
+   503→    if (docx?.parse) {
+   504→      const s = analyzeText(docx.parse.fullText);
+   505→      return { stats: s, dominant: s.dominant };
+   506→    }
+   507→    if (parsed) {
+   508→      const s = analyzeText(rawText);
+   509→      return { stats: s, dominant: s.dominant };
+   510→    }
+   511→    return { stats: null as EncodingStats | null, dominant: null as Enc | null };
+   512→  }, [docx, parsed, rawText]);
+   513→
+   514→  const selectAll = () => {
+   515→    const questions = docx?.parse ? docx.parse.questions : parsed?.questions ?? [];
+   516→    setSelected(new Set(questions.map((q) => q.id)));
+   517→  };
+   518→
+   519→  const selectNone = () => setSelected(new Set());
+   520→
+   521→  const selectRange = (fromPos: number, toPos: number) => {
+   522→    const questions = docx?.parse ? docx.parse.questions : parsed?.questions ?? [];
+   523→    const next = new Set<number>();
+   524→    for (let i = fromPos; i <= toPos && i < questions.length; i++) next.add(questions[i].id);
+   525→    setSelected(next);
+   526→  };
+   527→
+   528→  // ---- শাফল গেট ----
+   529→  const activeSerial = docx?.parse ? docx.parse.serial : parsed?.serial ?? null;
+   530→  const activeCount = docx?.parse ? docx.parse.questions.length : parsed?.questions.length ?? 0;
+   531→  const serialOk = activeSerial?.status === "ok";
+   532→
+   533→  const gateReason = useMemo(() => {
+   534→    if (!docx && !parsed) return "প্রথমে প্রশ্ন ডিটেক্ট করুন";
+   535→    if (activeCount === 0) return "কোনো প্রশ্ন পাওয়া যায়নি";
+   536→    // docx মোডে সিরিয়াল gate নেই — serial replace ON থাকলে পজিশন-ভিত্তিক নম্বরেই সব ঠিক হয়ে যায়
+   537→    if (!docx && !serialOk && !allowBroken) return "সিরিয়াল ঠিক নেই — অটো নম্বরিং ঠিক করুন অথবা 'যেভাবে আছে তেভাবে চালান' চালু করুন";
+   538→    if (selected.size === 0) return "অন্তত একটি প্রশ্ন সিলেক্ট করুন";
+   539→    if (selected.size < 2) return "অন্তত ২ টি প্রশ্ন সিলেক্ট করুন";
+   540→    return null;
+   541→  }, [docx, parsed, activeCount, serialOk, allowBroken, selected.size]);
+   542→
+   543→  const canShuffle = gateReason === null;
+   544→
+   545→  // ---- TEXT mode শাফল ----
+   546→  const handleTextShuffle = () => {
+   547→    if (!parsed || !canShuffle) return;
+   548→    setShuffling(true);
+   549→    try {
+   550→      const pool = parsed.questions.filter((q) => selected.has(q.id));
+   551→      const isOriginal = distribution === "original";
+   552→      const result = buildSets(pool, {
+   553→        setCount,
+   554→        distribution,
+   555→        shuffleWithin: isOriginal ? true : shuffleWithin,
+   556→      });
+   557→      setSets(result);
+   558→      setSortedFlags(result.map(() => false));
+   559→      setTimeout(() => {
+   560→        resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+   561→      }, 80);
+   562→      toast({
+   563→        title: isOriginal
+   564→          ? `🔀 ${setCount} টি সেট তৈরি — প্রতিটিতে সব ${pool.length} টি প্রশ্ন!`
+   565→          : `🔀 ${setCount} টি সেট তৈরি হয়েছে!`,
+   566→        description: isOriginal
+   567→          ? "প্রতি সেটের সিরিয়াল ক্রম আলাদা — এক সেটের ক্রম আরেক সেটের সাথে মিলবে না।"
+   568→          : `${pool.length} টি প্রশ্ন ভাগ হয়েছে। এখন Word ফাইল ডাউনলোড করতে পারেন।`,
+   569→      });
+   570→    } finally {
+   571→      setShuffling(false);
+   572→    }
+   573→  };
+   574→
+   575→  const handleShuffle = () => {
+   576→    if (docx) handleDocxShuffle();
+   577→    else handleTextShuffle();
+   578→  };
+   579→
+   580→  // ---- TEXT mode সেট অ্যাকশন ----
+   581→  const toggleSort = (si: number) => {
+   582→    if (!sets) return;
+   583→    const wasSorted = sortedFlags[si];
+   584→    setSets((prev) => {
+   585→      if (!prev) return prev;
+   586→      const copy = prev.map((s) => s.slice());
+   587→      copy[si] = wasSorted ? shuffled(copy[si]) : copy[si].slice().sort((a, b) => a.id - b.id);
+   588→      return copy;
+   589→    });
+   590→    setSortedFlags((prev) => {
+   591→      const copy = prev.slice();
+   592→      copy[si] = !wasSorted;
+   593→      return copy;
+   594→    });
+   595→  };
+   596→
+   597→  // ---- TEXT mode এক্সপোর্ট ----
+   598→  const handleExportDocx = async () => {
+   599→    if (!sets) return;
+   600→    setBusy("docx");
+   601→    try {
+   602→      await exportDocx(sets, exportOpts);
+   603→      toast({ title: "✅ Word ফাইল ডাউনলোড হয়েছে", description: "প্রতিটি সেট আলাদা পেজে আছে।" });
+   604→    } catch (e) {
+   605→      toast({ title: "ডাউনলোডে সমস্যা", description: String(e), variant: "destructive" });
+   606→    } finally {
+   607→      setBusy(null);
+   608→    }
+   609→  };
+   610→
+   611→  const handleExportDoc = () => {
+   612→    if (!sets) return;
+   613→    try {
+   614→      exportDocHtml(sets, exportOpts);
+   615→      toast({ title: "✅ .doc ফাইল ডাউনলোড হয়েছে" });
+   616→    } catch (e) {
+   617→      toast({ title: "ডাউনলোডে সমস্যা", description: String(e), variant: "destructive" });
+   618→    }
+   619→  };
+   620→
+   621→  const handlePrint = () => {
+   622→    if (!sets) return;
+   623→    try {
+   624→      printSets(sets, exportOpts);
+   625→    } catch (e) {
+   626→      toast({ title: "প্রিন্ট খোলা যায়নি", description: String(e), variant: "destructive" });
+   627→    }
+   628→  };
+   629→
+   630→  const handleCopySet = async (si: number) => {
+   631→    if (!sets) return;
+   632→    try {
+   633→      const { setClipboardText } = await import("@/lib/mcq/exporter");
+   634→      await copyToClipboard(setClipboardText(si, sets[si], exportOpts));
+   635→      setCopiedSet(si);
+   636→      setTimeout(() => setCopiedSet(null), 1800);
+   637→    } catch (e) {
+   638→      toast({ title: "কপি করা যায়নি", description: String(e), variant: "destructive" });
+   639→    }
+   640→  };
+   641→
+   642→  const handleCopyAll = async () => {
+   643→    if (!sets) return;
+   644→    setBusy("copyall");
+   645→    try {
+   646→      await copyToClipboard(allSetsClipboardText(sets, exportOpts));
+   647→      toast({ title: "📋 সব সেট কপি হয়েছে", description: "Word-এ পেস্ট করলেই পাবেন। পেজ ব্রেক চাইলে .docx ডাউনলোড করুন।" });
+   648→    } catch (e) {
+   649→      toast({ title: "কপি করা যায়নি", description: String(e), variant: "destructive" });
+   650→    } finally {
+   651→      setBusy(null);
+   652→    }
+   653→  };
+   654→
+   655→  return (
+   656→    <div className="min-h-screen flex flex-col bg-gradient-to-b from-emerald-50/60 via-background to-background">
+   657→      {/* হেডার */}
+   658→      <header className="border-b bg-white/80 backdrop-blur dark:bg-background/80">
+   659→        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-4">
+   660→          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
+   661→            <Dices className="h-6 w-6" />
+   662→          </div>
+   663→          <div className="min-w-0 flex-1">
+   664→            <h1 className="text-xl font-bold tracking-tight md:text-2xl">MCQ Shuffler Pro</h1>
+   665→            <p className="text-xs text-muted-foreground md:text-sm">
+   666→              দুই আলাদা মোড — 🔀 শাফল+সেট তৈরি ও 🔢 রঙ-অনুযায়ী সিরিয়াল • .docx ফরম্যাট হুবহু প্রিজার্ভ (ট্যাব, ইকুয়েশন, Bijoy)
+   667→            </p>
+   668→          </div>
+   669→          <div className="flex flex-wrap items-center gap-2">
+   670→            <Badge className="gap-1 bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+   671→              <Zap className="h-3 w-3" /> ১০০% ফ্রি
+   672→            </Badge>
+   673→            <Badge variant="secondary" className="gap-1">
+   674→              <ShieldCheck className="h-3 w-3" /> ডেটা ব্রাউজারেই থাকে
+   675→            </Badge>
+   676→          </div>
+   677→        </div>
+   678→      </header>
+   679→
+   680→      {/* মেইন */}
+   681→      <main className="mx-auto w-full max-w-5xl flex-1 space-y-5 px-3 py-6 sm:px-4">
+   682→        {/* মোড-বাটন — শাফল আর সিরিয়ালের কাজ সম্পূর্ণ আলাদা */}
+   683→        <ModeTabs mode={mode} onChange={changeMode} />
+   684→
+   685→        {mode === "serial" ? (
+   686→          <>
+   687→            <SerialInputCard
+   688→              onFile={handleSerialFile}
+   689→              loading={serialLoading}
+   690→              loadedName={serialDoc?.file.name ?? null}
+   691→            />
+   692→
+   693→            {serialDoc &&
+   694→              (serialDoc.analysis.colors.length > 0 ? (
+   695→                <ColorSerialCard
+   696→                  analysis={serialDoc.analysis}
+   697→                  fileName={serialDoc.file.name}
+   698→                  busy={serialBusy}
+   699→                  onSerial={handleColorSerial}
+   700→                />
+   701→              ) : (
+   702→                <NoColorSerialCard
+   703→                  questionCount={serialDoc.analysis.questionCount}
+   704→                  busy={serialBusy}
+   705→                  onContinuous={() => handleColorSerial({ kind: "continuous" }, "continuous")}
+   706→                />
+   707→              ))}
+   708→          </>
+   709→        ) : (
+   710→          <>
+   711→            <InputCard
+   712→              rawText={rawText}
+   713→              onTextChange={handleTextChange}
+   714→              onDetect={handleDetect}
+   715→              onSample={handleSample}
+   716→              onDocxFile={handleDocxFile}
+   717→              onTextFileLoaded={loadAndDetect}
+   718→              detecting={detecting}
+   719→              detected={parsed !== null && parsed.questions.length > 0}
+   720→              docxLoading={docxLoading}
+   721→            />
+   722→
+   723→            {docx ? (
+   724→              docx.colorAn ? (
+   725→                <ColorFileShuffleNotice
+   726→                  analysis={docx.colorAn}
+   727→                  fileName={docx.file.name}
+   728→                  onOpenSerial={openInSerialMode}
+   729→                />
+   730→              ) : (
+   731→                <>
+   732→                  {docx.parse && (
+   733→                    <DocxDetectCard
+   734→                      parse={docx.parse}
+   735→                      fileName={docx.file.name}
+   736→                      selected={selected}
+   737→                      onToggle={toggleQuestion}
+   738→                      onSelectAll={selectAll}
+   739→                      onSelectNone={selectNone}
+   740→                      onSelectRange={selectRange}
+   741→                      onSerialFix={handleDocxSerialFix}
+   742→                      fixing={fixing}
+   743→                      allowBroken={allowBroken}
+   744→                      onAllowBrokenChange={setAllowBroken}
+   745→                      encStats={encData.stats}
+   746→                      dominant={encData.dominant}
+   747→                    />
+   748→                  )}
+   749→
+   750→                  <ShuffleCard
+   751→                    enabled={canShuffle}
+   752→                    lockReason={gateReason ?? null}
+   753→                    selectedCount={selected.size}
+   754→                    setCount={setCount}
+   755→                    onSetCountChange={setSetCount}
+   756→                    distribution={distribution}
+   757→                    onDistributionChange={setDistribution}
+   758→                    shuffleWithin={shuffleWithin}
+   759→                    onShuffleWithinChange={setShuffleWithin}
+   760→                    onShuffle={handleShuffle}
+   761→                    shuffling={shuffling}
+   762→                  />
+   763→
+   764→                  <div ref={resultsRef} className="scroll-mt-4">
+   765→                    {setsDocx && docx.parse && (
+   766→                      <DocxSetsResult
+   767→                        sets={setsDocx}
+   768→                        questions={docx.parse.questions}
+   769→                        renumber={renumber}
+   770→                        onRenumberChange={toggleSerialByClick}
+   771→                        busy={busy}
+   772→                        copiedSet={copiedSet}
+   773→                        onDownload={handleDocxDownload}
+   774→                        onCopySet={handleDocxCopySet}
+   775→                        dominant={encData.dominant}
+   776→                      />
+   777→                    )}
+   778→                  </div>
+   779→                </>
+   780→              )
+   781→            ) : (
+   782→              <>
+   783→                <DetectCard
+   784→                  parsed={parsed}
+   785→                  selected={selected}
+   786→                  onToggle={toggleQuestion}
+   787→                  onSelectAll={selectAll}
+   788→                  onSelectNone={selectNone}
+   789→                  onSelectRange={selectRange}
+   790→                  onAutoFix={handleAutoFix}
+   791→                  allowBroken={allowBroken}
+   792→                  onAllowBrokenChange={setAllowBroken}
+   793→                  fixing={fixing}
+   794→                  encStats={encData.stats}
+   795→                  dominant={encData.dominant}
+   796→                />
+   797→
+   798→                <ShuffleCard
+   799→                  enabled={canShuffle}
+   800→                  lockReason={parsed ? gateReason : "প্রথমে প্রশ্ন ডিটেক্ট করুন"}
+   801→                  selectedCount={selected.size}
+   802→                  setCount={setCount}
+   803→                  onSetCountChange={setSetCount}
+   804→                  distribution={distribution}
+   805→                  onDistributionChange={setDistribution}
+   806→                  shuffleWithin={shuffleWithin}
+   807→                  onShuffleWithinChange={setShuffleWithin}
+   808→                  onShuffle={handleShuffle}
+   809→                  shuffling={shuffling}
+   810→                />
+   811→
+   812→                <div ref={resultsRef} className="scroll-mt-4">
+   813→                  {sets && (
+   814→                    <SetsResult
+   815→                      sets={sets}
+   816→                      sortedFlags={sortedFlags}
+   817→                      onToggleSort={toggleSort}
+   818→                      onReshuffleSet={toggleSort}
+   819→                      exportOpts={exportOpts}
+   820→                      onExportOptsChange={setExportOpts}
+   821→                      onExportDocx={handleExportDocx}
+   822→                      onExportDoc={handleExportDoc}
+   823→                      onPrint={handlePrint}
+   824→                      onCopySet={handleCopySet}
+   825→                      onCopyAll={handleCopyAll}
+   826→                      busy={busy}
+   827→                      copiedSet={copiedSet}
+   828→                      dominant={encData.dominant}
+   829→                    />
+   830→                  )}
+   831→                </div>
+   832→              </>
+   833→            )}
+   834→          </>
+   835→        )}
+   836→      </main>
+   837→
+   838→      {/* ফুটার */}
+   839→      <footer className="mt-auto border-t bg-white/60 py-4 dark:bg-background/60">
+   840→        <div className="mx-auto max-w-5xl px-4 text-center text-xs text-muted-foreground">
+   841→          MCQ Shuffler Pro — অফিস, স্কুল, কোচিং সেন্টার ও ভার্সিটির জন্য ফ্রি টুল। সব প্রসেসিং আপনার ব্রাউজারেই হয়, কোনো প্রশ্ন সার্ভারে যায় না।
+   842→        </div>
+   843→      </footer>
+   844→    </div>
+   845→  );
+   846→}
+   847→

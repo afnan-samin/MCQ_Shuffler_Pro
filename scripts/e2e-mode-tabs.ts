@@ -42,15 +42,17 @@ await page.waitForSelector("text=রঙ-অনুযায়ী সিরিয
 if (!dl1.suggestedFilename().includes("color serial - B1")) throw new Error("B1 ফাইলনাম ভুল: " + dl1.suggestedFilename());
 console.log("✓ সিরিয়াল মোড B1 ডাউনলোড OK:", dl1.suggestedFilename());
 
-// ---- ৩. শাফল মোডে রঙ-ফাইল → নোটিস + হাত-অফ ----
+// ---- ৩. শাফল মোডে রঙ-ফাইল → ইনফো-কার্ড (ব্লক নেই) + হাত-অফ ----
 await page.click('button[role="tab"]:has-text("MCQ শাফল")');
 await page.waitForSelector("text=প্রশ্ন দিন — ফাইল আপলোড বা পেস্ট", { timeout: 15000 });
-await page.setInputFiles('input[type="file"]', CHEM);
-await page.waitForSelector("text=সিরিয়াল মোডে এই ফাইল খুলুন", { timeout: 120000 });
-await page.waitForSelector("text=এই ফাইল রঙ-স্ট্রাকচার্ড — শাফল মোডে করা যাবে না", { timeout: 15000 });
-console.log("✓ শাফল মোডে রঙ-ফাইল → শাফল বন্ধ-নোটিস + হাত-অফ বাটন");
+await page.setInputFiles('input[type="file"]', HSC);
+await page.waitForSelector("text=শাফলে হেডার বাদ যাবে", { timeout: 120000 });
+const blockedCnt = await page.locator("text=শাফল মোডে করা যাবে না").count();
+if (blockedCnt !== 0) throw new Error("পুরনো ব্লকিং-নোটিস এখনো আসছে!");
+await page.waitForSelector('button:has-text("শাফল করুন ও সেট তৈরি করুন")', { timeout: 60000 });
+console.log("✓ শাফল মোডে রঙ-ফাইল → ইনফো-কার্ড, শাফল-ফ্লো চালু (ব্লক নেই)");
 
-await page.click('button:has-text("সিরিয়াল মোডে এই ফাইল খুলুন")');
+await page.click('button:has-text("সিরিয়াল মোডে খুলুন")');
 await page.waitForSelector("text=রঙ-ভিত্তিক সিরিয়াল", { timeout: 15000 });
 const serialSel2 = await page.getAttribute('button[role="tab"]:has-text("MCQ সিরিয়াল")', "aria-selected");
 if (serialSel2 !== "true") throw new Error("হাত-অফে সিরিয়াল মোডে যায়নি");
@@ -77,7 +79,7 @@ console.log("✓ reload-এর পরেও সিরিয়াল মোড �
 await page.click('button[role="tab"]:has-text("MCQ শাফল")');
 await page.setInputFiles('input[type="file"]', NOCOLOR);
 await page.waitForSelector("text=টি প্রশ্ন", { timeout: 60000 });
-const noticeCount = await page.locator("text=সিরিয়াল মোডে এই ফাইল খুলুন").count();
+const noticeCount = await page.locator("text=সিরিয়াল মোডে খুলুন").count();
 if (noticeCount !== 0) throw new Error("রঙহীন ফাইলে নোটিস এসেছে?");
 console.log("✓ শাফল মোডে রঙহীন docx → সাধারণ শাফল ফ্লো (নোটিস নেই)");
 
