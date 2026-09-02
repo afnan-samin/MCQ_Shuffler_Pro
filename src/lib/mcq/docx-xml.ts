@@ -476,7 +476,8 @@ function replaceSpans(stream: Element[], spans: Array<{ start: number; end: numb
   }
 }
 
-function serialMatchSpans(joined: string): { digitsStart: number; digitsEnd: number; sepStart: number; sepEnd: number; enc: DigitEnc } | null {
+/** joined w:t-টেক্সটে সিরিয়ালের ডিজিট+সেপারেটরের decoded-স্প্যান বের করে */
+export function serialMatchSpans(joined: string): { digitsStart: number; digitsEnd: number; sepStart: number; sepEnd: number; enc: DigitEnc } | null {
   const m = SERIAL_RE.exec(joined);
   if (!m) return null;
   const conv = digitsToNumber(m[1]);
@@ -522,8 +523,16 @@ export function renumberSerialParaTo(p: Element, newNum: number, targetSep = "."
   const spans = serialMatchSpans(joined);
   if (!spans) return;
 
+  // জিরো-প্যাডিং সংরক্ষণ: "01." স্টাইলের ফাইলে ১ → "01." (ফাইলের নিজের স্টাইল)
+  let digitsText = numberToDigits(newNum, spans.enc);
+  const origDigits = joined.slice(spans.digitsStart, spans.digitsEnd);
+  const zeroChar = spans.enc === "en" ? "0" : spans.enc === "bn" ? "০" : "ø";
+  if (origDigits.startsWith(zeroChar) && digitsText.length < origDigits.length) {
+    digitsText = zeroChar.repeat(origDigits.length - digitsText.length) + digitsText;
+  }
+
   const edits: Array<{ start: number; end: number; text: string }> = [
-    { start: spans.digitsStart, end: spans.digitsEnd, text: numberToDigits(newNum, spans.enc) },
+    { start: spans.digitsStart, end: spans.digitsEnd, text: digitsText },
   ];
   if (spans.sepEnd > spans.sepStart) {
     edits.push({ start: spans.sepStart, end: spans.sepEnd, text: targetSep });

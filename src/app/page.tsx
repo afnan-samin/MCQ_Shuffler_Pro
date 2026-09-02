@@ -53,7 +53,8 @@ interface DocxState {
   file: File;
   baseName: string;
   xml: string;
-  parse: DocxParseResult;
+  /** রঙ-স্ট্রাকচার্ড ফাইলে null (ভারী DOM পার্স এড়াতে) — শাফল মোড তখন বন্ধই */
+  parse: DocxParseResult | null;
 }
 
 export default function Home() {
@@ -229,26 +230,29 @@ export default function Home() {
     setDocxLoading(true);
     try {
       const xml = await loadDocxXml(f);
-      const parse = parseDocxXml(xml);
-      let hasColors = false;
+      // রঙ-বিশ্লেষণ আগে (string-level, হালকা) — রঙ থাকলে ভারী DOM পার্স এড়ায়
+      // (বিশাল ফাইলে DOMParser × একাধিকবার চললে মেমোরি ফুলে ফাইল করাপ্ট হতো)
+      let colorAn: ColorAnalysis | null = null;
       try {
-        hasColors = analyzeColorDocx(xml).colors.length > 0;
+        colorAn = analyzeColorDocx(xml);
       } catch {}
+      const hasColors = !!colorAn && colorAn.colors.length > 0;
+      const parse = hasColors ? null : parseDocxXml(xml);
       setDocx({ file: f, baseName: f.name.replace(/\.docx$/i, ""), xml, parse });
       setParsed(null);
       resetResults();
-      setSelected(new Set(parse.questions.map((q) => q.id)));
+      setSelected(new Set(parse?.questions.map((q) => q.id) ?? []));
       setAllowBroken(false);
 
-      if (hasColors) {
+      if (hasColors && colorAn) {
         toast({
           title: "🎨 রঙ-স্ট্রাকচার্ড ফাইল ডিটেক্ট হয়েছে",
-          description: `এই ফাইলে রঙ-দেওয়া হেডার আছে — শাফল বন্ধ। নিচে রঙ বাছাই করে সিরিয়াল করুন।${parse.questions.length ? ` (${parse.questions.length} টি প্রশ্ন পাওয়া গেছে)` : ""}`,
+          description: `এই ফাইলে রঙ-দেওয়া হেডার আছে — শাফল বন্ধ। নিচে রঙ বাছাই করে সিরিয়াল করুন।${colorAn.questionCount ? ` (${colorAn.questionCount} টি প্রশ্ন পাওয়া গেছে)` : ""}`,
         });
         return;
       }
 
-      if (parse.questions.length === 0 && !hasColors) {
+      if (!parse) {
         toast({
           title: "কোনো প্রশ্ন পাওয়া যায়নি",
           description: "প্রশ্নগুলো সিরিয়াল দিয়ে শুরু আছে কিনা দেখুন (যেমন: 32. / ১. / 1.)",
@@ -326,7 +330,7 @@ export default function Home() {
   };
 
   const handleDocxShuffle = () => {
-    if (!docx || !canShuffle) return;
+    if (!docx?.parse || !canShuffle) return;
     setShuffling(true);
     try {
       const pool = docx.parse.questions.filter((q) => selected.has(q.id));
@@ -354,7 +358,7 @@ export default function Home() {
   };
 
   const handleDocxDownload = async (doRenumber: boolean) => {
-    if (!docx || !setsDocx) return;
+    if (!docx?.parse || !setsDocx) return;
     setBusy(doRenumber ? "docx-r" : "docx-o");
     try {
       await downloadShuffledDocx({
@@ -380,7 +384,7 @@ export default function Home() {
   };
 
   const handleDocxSerialFix = async () => {
-    if (!docx) return;
+    if (!docx?.parse) return;
     setFixing(true);
     try {
       await downloadSerialFixedDocx({
@@ -401,7 +405,7 @@ export default function Home() {
   };
 
   const handleDocxCopySet = async (si: number) => {
-    if (!docx || !setsDocx) return;
+    if (!docx?.parse || !setsDocx) return;
     try {
       const byId = new Map(docx.parse.questions.map((q) => [q.id, q]));
       const lines: string[] = [englishSetName(si), ""];
@@ -421,7 +425,7 @@ export default function Home() {
 
   // শব্দ-ধরে এনকোডিং ডিটেক্টর (ডিটেক্ট হলেই চলে)
   const encData = useMemo(() => {
-    if (docx) {
+    if (docx?.parse) {
       const s = analyzeText(docx.parse.fullText);
       return { stats: s, dominant: s.dominant };
     }
@@ -433,22 +437,22 @@ export default function Home() {
   }, [docx, parsed, rawText]);
 
   const selectAll = () => {
-    const questions = docx ? docx.parse.questions : parsed?.questions ?? [];
+    const questions = docx?.parse ? docx.parse.questions : parsed?.questions ?? [];
     setSelected(new Set(questions.map((q) => q.id)));
   };
 
   const selectNone = () => setSelected(new Set());
 
   const selectRange = (fromPos: number, toPos: number) => {
-    const questions = docx ? docx.parse.questions : parsed?.questions ?? [];
+    const questions = docx?.parse ? docx.parse.questions : parsed?.questions ?? [];
     const next = new Set<number>();
     for (let i = fromPos; i <= toPos && i < questions.length; i++) next.add(questions[i].id);
     setSelected(next);
   };
 
   // ---- শাফল গেট ----
-  const activeSerial = docx ? docx.parse.serial : parsed?.serial ?? null;
-  const activeCount = docx ? docx.parse.questions.length : parsed?.questions.length ?? 0;
+  const activeSerial = docx?.parse ? docx.parse.serial : parsed?.serial ?? null;
+  const activeCount = docx?.parse ? docx.parse.questions.length : parsed?.questions.length ?? 0;
   const serialOk = activeSerial?.status === "ok";
 
   const gateReason = useMemo(() => {
@@ -614,21 +618,23 @@ export default function Home() {
 
         {docx ? (
           <>
-            <DocxDetectCard
-              parse={docx.parse}
-              fileName={docx.file.name}
-              selected={selected}
-              onToggle={toggleQuestion}
-              onSelectAll={selectAll}
-              onSelectNone={selectNone}
-              onSelectRange={selectRange}
-              onSerialFix={handleDocxSerialFix}
-              fixing={fixing}
-              allowBroken={allowBroken}
-              onAllowBrokenChange={setAllowBroken}
-              encStats={encData.stats}
-              dominant={encData.dominant}
-            />
+            {docx.parse && (
+              <DocxDetectCard
+                parse={docx.parse}
+                fileName={docx.file.name}
+                selected={selected}
+                onToggle={toggleQuestion}
+                onSelectAll={selectAll}
+                onSelectNone={selectNone}
+                onSelectRange={selectRange}
+                onSerialFix={handleDocxSerialFix}
+                fixing={fixing}
+                allowBroken={allowBroken}
+                onAllowBrokenChange={setAllowBroken}
+                encStats={encData.stats}
+                dominant={encData.dominant}
+              />
+            )}
 
             {colorMode && colorAnalysis ? (
               <ColorSerialCard
@@ -654,7 +660,7 @@ export default function Home() {
                 />
 
                 <div ref={resultsRef} className="scroll-mt-4">
-                  {setsDocx && (
+                  {setsDocx && docx.parse && (
                     <DocxSetsResult
                       sets={setsDocx}
                       questions={docx.parse.questions}

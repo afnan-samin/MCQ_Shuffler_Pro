@@ -101,3 +101,27 @@ Stage Summary:
 - নতুন ফিচার: রঙ-স্ট্রাকচার্ড .docx আপলোড হলে শাফল অটো-বন্ধ; ফাইলের রঙগুলো চিপ আকারে দেখায়; ইউজার রঙ বাছলে প্রতিটা ওই-রঙ-সেকশনের প্রশ্ন ১ থেকে নম্বর পায় (নেস্টিং-সচেতন — অভিভাবক রঙের সীমানায় ক্রম থেমে যায়, দুই জায়গার প্রশ্ন কখনো মেশে না); সেপারেটর সব "1." ডট-স্টাইলে নরমালাইজ; math/ছবি/ফন্ট/হেডার হুবহু অক্ষত (docx→docx)
 - ডেলিভারেবল স্যাম্পল: download/Agri MCQ Botany (color serial - B1).docx (৪৩৫ প্রশ্ন, ১২৬ Type-সেকশনে ১ থেকে)
 - সব প্রসেসিং client-side, ০ কস্ট
+
+---
+Task ID: 12
+Agent: main
+Task: Chemistry ফাইলে রঙ-সিরিয়াল ২টা বাগ ফিক্স — (১) B1 সিলেক্টে "নম্বর দেওয়ার মতো প্রশ্ন পাওয়া যায়নি" টোস্ট (plan=0), (২) ডাউনলোড করা .docx Word-এ করাপ্ট
+
+Work Log:
+- রোগনির্ণয়: upload/Final Chemistry 1st paper only varsity Question (1-5).docx — 16.5MB document.xml, ৯২৫২ প্যারা (টেবিলহীন), রঙ: A3(D9D9D9)×২৫৭ varsity, A4(BFBFBF)×২৭ Type, B1(000000)×৪ অধ্যায়-২..৫, B6(0D0D0D)×১ অধ্যায়-১; সিরিয়াল zero-padded "01." স্টাইল + রান-ট্যাব
+- বাগ-১-এর কারণ: অধ্যায়ের রঙ ফাইলজুড়ে বদলায় (অধ্যায়-১=B6, অধ্যায়-২..৫=B1) — স্ট্যাকে আগের অধ্যায়ের স্টেল A4/A3 পুঁজে থাকায় নতুন অধ্যায়ের প্রথম Type হেডার lastIndexOf-পপে B1-সেকশন মেরে ফেলত → inX=false → plan=0
+- বাগ-১ ফিক্স (planSerialByColor): X-প্রোটেকশন — C রি-অ্যারাইভ করে pop করতে গেলে যদি স্ট্যাকে C-এর ওপরে খোলা X-এন্ট্রি থাকে এবং C-এর সেকশন-সংখ্যা ≥ ২×X-এর সংখ্যা (ঘনত্ব=নিচু লেভেল অনুমান: Type×২৭ অধ্যায়×৪-এর ভিতরে), তবে X ধরে রেখে stack.length=xAt+1; নাহলে পুরনো ভাই-রিস্টার্ট। ১৫টা কেস-বিশ্লেষণে যাচাইকৃত (user-example/Agri/সিনথেটিক সব অপরিবর্তিত)
+- বাগ-২-এর কারণ: 16.5MB XML-এ DOMParser ×২-৩ (parseDocxXml + analyzeColorDocx + applyColorSerialXml) + XMLSerializer — মেমোরি-চাপে আউটপুট ভাঙা (bun-এ নিশ্চিত: ২য় parse-এই OOM SIGKILL)
+- বাগ-২ ফিক্স: color-serial.ts সম্পূর্ণ string-level রিরাইট — scanBodyChildren (depth-স্ক্যানার, self-closing w:p সহ), analyzeColorDocx (regex w:t/m:t + <w:tab/> + pPr>shd), applyColorSerialXml (para-range splice — বাকি বাইট byte-identical, ডিজিট-স্প্যান entity-safe র-ম্যাপিং, replaceDecodedSpan DOM-সেমান্টিক্স); DOMParser/XMLSerializer কালার-পাইপলাইনে আর নেই
+- page.tsx: রঙ-ফাইলে parseDocxXml স্কিপ (DocxState.parse nullable, DocxDetectCard শুধু parse থাকলে) — রঙ-মোডে DOM পার্স শূন্য
+- docx-xml.ts: serialMatchSpans এক্সপোর্ট; renumberSerialParaTo-তে জিরো-প্যাডিং সংরক্ষণ ("01." স্টাইলের ফাইলে ১→"01.")
+- ডাউনলোড বিল্ডার: fresh JSZip-এ নন-dir এন্ট্রি কপি (JSZip-এর "word/" dir-entry ও remove()-এর রিকার্সিভ আচরণ এড়াতে; প্রথম চেষ্টায় remove() পুরো word/ মেরে 3KB ফাইল বানিয়েছিল — ধরা পড়ে ঠিক)
+- টেস্ট: test-color-serial.ts এখন ৬৩/৬৩ (+১০ নতুন: Chemistry রিগ্রেশন B1/A3/A4/continuous, জিরো-প্যাডিং); test-docx ৪৩/৪৩, test-mcq ৬১/৬১; tsc src-ক্লিন
+- E2E: scripts/e2e-color-chem.ts — B1 প্ল্যান ২৩৭১ (হুবহু ২৪৯৪−১২৩ অধ্যায়-১), ৪ রিসেট-পয়েন্ট সব "01.", A3=২৪৯৪/২৫৭ সেকশন, continuous=২৪৯৪; python lxml কঠোর পার্স + serial-only diff (২০৯৬ পরিবর্তিত, অনাকাংক্ষিত ০) + zip ইন্টিগ্রিটি + নন-document এন্ট্রি byte-identical; LibreOffice → ১৫৮ পৃষ্ঠা PDF, পেজ-ইমেজে math/isotope/varsity-হেডার অক্ষত
+- ব্রাউজার E2E: scripts/e2e-browser-chem.ts — আপলোড→টোস্ট→৪ চিপ→B1→ডাউনলোড→সাফল্য-টোস্ট, error-টোস্ট নেই, JS-error শূন্য
+- নোট: continuous মোডে ১০০০+ নন-ট্যাব সিরিয়াল tier-3 (num≤999) গার্ডে re-detect হয় না — ডাউনলোড-ফাইল সঠিক, শুধু re-upload-এ প্রভাব; e2e চেক fixpoint-ভিত্তিক
+
+Stage Summary:
+- দুটোই ফিক্সড ও যাচাইকৃত: B1 (এবং যেকোনো রঙ) সিলেক্টে ২৩৭১ প্রশ্ন ১-থেকে নম্বর পায়; ডাউনলোড Word/LibreOffice-উদ্দেশ্যে কঠোরভাবে বৈধ
+- আর্কিটেকচার আপগ্রেড: কালার-পাইপলাইন এখন পুরো string-level — বড় ফাইলে মেমোরি-নিরাপদ (analyze ১৫৩ms, apply ১৪৮ms @16.5MB)
+- ডেলিভারেবল: download/Chemistry (color serial - B1).docx (+A3/B6/continuous ভ্যারিয়েন্ট)

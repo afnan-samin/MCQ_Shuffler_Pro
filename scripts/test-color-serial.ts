@@ -288,5 +288,80 @@ ok(anA.questionCount === 435, "৪৩৫ প্রশ্ন ডিটেক্�
 // ফাইল সাইজ স্যানিটি: XML দৈর্ঘ্য প্রায় সমান (শুধু ডিজিট/সেপ বদলায়)
 console.log(`\n  (XML সাইজ: আসল ${agriXml.length} → আউটপুট ${applyColorSerialXml(agriXml, planSerialByColor(anA, { kind: "color", key: "000000" })).length})`);
 
+// ============================================================
+console.log("\n== ৫) রিগ্রেশন: অধ্যায়ের রঙ বদলানো ফাইল (আসল Chemistry-ফাইল সিনারিও) ==");
+// অধ্যায়-১ = B6 (0D0D0D), অধ্যায়-২…৩ = B1 (000000); Type = A4, Varsity = A3
+// আগের বাগ: অধ্যায়-১-এর পুরনো A4/A3 স্ট্যাকে পুঁজে থাকায় অধ্যায়-২-এর প্রথম
+// Type হেডারই B1-সেকশন বন্ধ করে দিত → B1 প্ল্যানে ০ প্রশ্ন
+{
+  const chem: Array<[kind: "h" | "q", color: string | null, text: string]> = [
+    ["h", "0D0D0D", "অধ্যায়-১"],
+    ["h", "BFBFBF", "Type-১"],
+    ["q", null, "1.প্রশ্ন-১"],
+    ["q", null, "2.প্রশ্ন-২"],
+    ["h", "D9D9D9", "ঢাকা বিশ্ববিদ্যালয়"],
+    ["q", null, "3.প্রশ্ন-৩"],
+    ["q", null, "4.প্রশ্ন-৪"],
+    ["h", "BFBFBF", "Type-২"],
+    ["q", null, "5.প্রশ্ন-৫"],
+    ["h", "000000", "অধ্যায়-২"], // নতুন অধ্যায়ের রঙ — B6 থেকে B1
+    ["h", "BFBFBF", "Type-৩"],   // ← এই হেডারই আগে B1 মেরে ফেলত
+    ["h", "D9D9D9", "ঢাকা বিশ্ববিদ্যালয়"],
+    ["q", null, "1.প্রশ্ন-৬"],
+    ["q", null, "2.প্রশ্ন-৭"],
+    ["h", "D9D9D9", "রাজশাহী বিশ্ববিদ্যালয়"],
+    ["q", null, "3.প্রশ্ন-৮"],
+    ["h", "BFBFBF", "Type-৪"],
+    ["q", null, "4.প্রশ্ন-৯"],
+    ["h", "000000", "অধ্যায়-৩"],
+    ["h", "BFBFBF", "Type-৫"],
+    ["q", null, "1.প্রশ্ন-১০"],
+    ["q", null, "2.প্রশ্ন-১১"],
+  ];
+  const chemXml = wrapDoc(chem.map(([k, c, t]) => (k === "h" ? shadedP(t, c!) : q(t))).join(""));
+  const anC = analyzeColorDocx(chemXml);
+
+  const planB1 = planSerialByColor(anC, { kind: "color", key: "000000" });
+  ok(planB1.size === 6, "B1 প্ল্যানে অধ্যায়-২+৩ এর ৬টা প্রশ্ন (আগে ছিল ০ — বাগ)");
+  const nums: number[] = [];
+  anC.paras.filter((p) => planB1.has(p.idx)).forEach((p) => nums.push(planB1.get(p.idx)!));
+  ok(
+    JSON.stringify(nums) === JSON.stringify([1, 2, 3, 4, 1, 2]),
+    `B1-সেকশনগুলো প্রতিটা ১ থেকে শুরু, অধ্যায়-১ বাদ (${nums.join(",")})`
+  );
+
+  const planA3 = planSerialByColor(anC, { kind: "color", key: "D9D9D9" });
+  ok(planA3.size === 5, "A3 প্ল্যানে শুধু varsity-সেকশনের প্রশ্ন (Type-ব্লকের বাড়তি q5 বাদ)");
+  const numsA3: number[] = [];
+  anC.paras.filter((p) => planA3.has(p.idx)).forEach((p) => numsA3.push(planA3.get(p.idx)!));
+  ok(
+    JSON.stringify(numsA3) === JSON.stringify([1, 2, 1, 2, 1]),
+    `প্রতিটা A3-হেডারে কাউন্টার ১ থেকে রিসেট (${numsA3.join(",")})`
+  );
+
+  const planA4 = planSerialByColor(anC, { kind: "color", key: "BFBFBF" });
+  ok(planA4.size === 11, "A4/Type প্ল্যানে সব ১১টা প্রশ্ন (ভিতরের varsity-সীমায় থামে না)");
+
+  // অধ্যায়-১ প্রশ্নগুলো B1-প্ল্যানে নেই কিন্তু continuous-এ আছে
+  const planCont = planSerialByColor(anC, { kind: "continuous" });
+  ok(planCont.size === 11, "continuous-এ সব ১১টা প্রশ্ন একটানা");
+}
+
+// জিরো-প্যাডিং সংরক্ষণ: "01." স্টাইলের ফাইলে ১ → "01."
+console.log("\n== ৬) জিরো-প্যাডিং ==");
+{
+  const qs = ["01.", "02.", "03.", "04.", "05.", "06.", "07.", "08.", "09.", "10."]
+    .map((s, i) => q(`${s}\tপ্রশ্ন-${i + 1}`))
+    .join("");
+  const padXml = wrapDoc(shadedP("Type", "000000") + qs);
+  const anP = analyzeColorDocx(padXml);
+  ok(anP.questionCount === 10, "প্যাডেড সিরিয়ালেও ১০ প্রশ্ন");
+  const outP = applyColorSerialXml(padXml, planSerialByColor(anP, { kind: "color", key: "000000" }));
+  ok(outP.includes(">01.\t") && outP.includes(">07.\t") && outP.includes(">09.\t"),
+    "১-অঙ্কের নম্বরে প্যাডিং থাকে: 01. 07. 09.");
+  ok(outP.includes(">10.\t"), "১০ অপরিবর্তিত (প্যাড-উইডথ ছাড়িয়ে গেলে স্বাভাবিক)");
+  ok(!outP.includes(">1.\t") && !outP.includes(">7.\t"), "প্যাড-হারানো নম্বর (1./7.) নেই");
+}
+
 console.log(`\n===== ফলাফল: ${passed} পাস, ${failed} ফেল =====`);
 process.exit(failed ? 1 : 0);
