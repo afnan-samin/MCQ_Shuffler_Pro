@@ -113,6 +113,27 @@ await page.waitForSelector("text=রঙ-অনুযায়ী সিরিয
 if (!dl2.suggestedFilename().includes("continuous")) throw new Error("continuous ফাইলনাম ভুল: " + dl2.suggestedFilename());
 console.log("✓ সিরিয়াল মোডে রঙহীন ফাইল → অটো একটানা ১..N ডাউনলোড:", dl2.suggestedFilename());
 
+// ---- ৭. নন-MCQ টেক্সট-প্যাটার্ন ফিচার (Agri ফাইল: ১৩৫ রঙ-হেডার + রঙহীন "Aa¨vq-8") ----
+// ইউজারের নিয়ম: "jeta mcq noi seta jate bad dey" + বাদ-পড়া লাইনের আলাদা লিস্ট
+const AGRI = "/home/z/my-project/upload/Agri MCQ Botany 997 mcq - Copy - type serial.docx";
+await page.click('button[role="tab"]:has-text("MCQ শাফল")');
+await page.setInputFiles('input[type="file"]', AGRI);
+await page.waitForSelector("text=বাদ পড়া লাইনসমূহ", { timeout: 120000 });
+await page.waitForSelector("text=136 টি (শাফলে যাবে না)", { timeout: 20000 });
+await page.waitForSelector("text=135 রঙ-হেডার", { timeout: 15000 });
+await page.waitForSelector("text=1 নন-MCQ (টেক্সট-প্যাটার্ন)", { timeout: 15000 });
+console.log("✓ Agri: ব্লকড-লিস্ট কার্ড — ১৩৬ লাইন (১৩৫ রঙ-হেডার + ১ নন-MCQ)");
+
+// রঙহীন "Aa¨vq-8" লাইনটা লিস্টে দেখা যায় (প্রথম ৮টার প্রিভিউতে নেই → expand লাগবে)
+await page.click('button:has-text("আরও 128 টি লাইন দেখুন")');
+await page.waitForSelector("text=Aa¨vq-8", { timeout: 15000 });
+console.log("✓ রঙহীন 'Aa¨vq-8' লাইন ব্লকড-লিস্টে দেখা যাচ্ছে (expand করে)");
+
+// 435 প্রশ্ন শাফল হবে (info-কার্ড ব্যাজ)
+await page.waitForSelector("text=435 প্রশ্ন শাফল হবে", { timeout: 15000 });
+await page.waitForSelector('button:has-text("শাফল করুন ও সেট তৈরি করুন")', { timeout: 60000 });
+console.log("✓ Agri: ৪৩৫ প্রশ্ন এক সিরিয়ালে — শাফল-ফ্লো চালু");
+
 await page.screenshot({ path: "scripts/e2e-shuffle-headers.png", fullPage: false });
 console.log("\nJS errors:", errors.length ? errors : "শূন্য ✓");
 await browser.close();

@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Download, Info, ListOrdered, PaintBucket } from "lucide-react";
-import type { ColorAnalysis } from "@/lib/mcq/color-serial";
+import { ChevronDown, ChevronUp, Download, Info, ListOrdered, PaintBucket, ShieldX } from "lucide-react";
+import type { BlockedLine, ColorAnalysis } from "@/lib/mcq/color-serial";
+import { lineDominantOf } from "@/lib/mcq/encoding";
 
 interface ColorShuffleInfoCardProps {
   analysis: ColorAnalysis;
@@ -95,6 +97,95 @@ export function NoColorSerialCard({ questionCount, busy, onContinuous }: NoColor
             কোনো প্রশ্ন-লাইনও পাওয়া যায়নি — ফাইলটা সঠিক .docx কিনা আর প্রশ্নগুলো সিরিয়াল দিয়ে শুরু কিনা
             (যেমন: 1. / ১. / 01.) দেখে নিন।
           </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------- বাদ-পড়া লাইনের আলাদা লিস্ট-কার্ড (ইউজারের অনুরোধ: "kon kon line block hyce show kro") ----------
+
+const PREVIEW_COUNT = 8;
+
+/** Bijoy (ANSI লিগ্যাসি) টেক্সট হলে SutonnyMJ ফন্টে দেখাতে হয় — নাহলে অর্থহীন অক্ষর */
+function isBijoyText(t: string): boolean {
+  return lineDominantOf(t) === "bijoy";
+}
+
+interface BlockedLinesCardProps {
+  blocked: BlockedLine[];
+}
+
+/** শাফল-পাইপলাইন থেকে বাদ পড়া সব লাইন — রঙ-হেডার ও নন-MCQ (টেক্সট-প্যাটার্ন), কারণসহ কলাপ্সিবল লিস্ট */
+export function BlockedLinesCard({ blocked }: BlockedLinesCardProps) {
+  const [expanded, setExpanded] = useState(false);
+  const colorCount = blocked.reduce((n, b) => (b.reason === "color" ? n + 1 : n), 0);
+  const patternCount = blocked.length - colorCount;
+  const visible = expanded ? blocked : blocked.slice(0, PREVIEW_COUNT);
+
+  return (
+    <Card className="border-amber-300/70 dark:border-amber-500/30">
+      <CardHeader className="pb-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400">
+            <ShieldX className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <CardTitle className="text-base md:text-lg">
+              বাদ পড়া লাইনসমূহ — {blocked.length} টি (শাফলে যাবে না)
+            </CardTitle>
+            <CardDescription>
+              এই লাইনগুলো MCQ নয় (হেডার/শিরোনাম) — তাই শাফলের আগেই বাদ দেওয়া হয়েছে
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {colorCount > 0 && (
+            <Badge variant="secondary" className="gap-1">
+              <PaintBucket className="h-3 w-3" /> {colorCount} রঙ-হেডার
+            </Badge>
+          )}
+          {patternCount > 0 && (
+            <Badge variant="secondary" className="gap-1">
+              <ShieldX className="h-3 w-3" /> {patternCount} নন-MCQ (টেক্সট-প্যাটার্ন)
+            </Badge>
+          )}
+        </div>
+
+        <ul className="max-h-72 space-y-1 overflow-y-auto rounded-lg border bg-muted/40 p-2 text-sm">
+          {visible.map((b, i) => (
+            <li key={i} className="flex min-w-0 items-start gap-2">
+              <span
+                className={
+                  "mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium leading-4 " +
+                  (b.reason === "color"
+                    ? "bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300"
+                    : "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300")
+                }
+              >
+                {b.reason === "color" ? "রঙ-হেডার" : "নন-MCQ"}
+              </span>
+              <span className={"min-w-0 break-all " + (isBijoyText(b.text) ? "tokfont-bijoy" : "")}>
+                {b.text || "(খালি লাইন)"}
+              </span>
+            </li>
+          ))}
+        </ul>
+
+        {blocked.length > PREVIEW_COUNT && (
+          <Button variant="ghost" size="sm" className="w-full" onClick={() => setExpanded((v) => !v)}>
+            {expanded ? (
+              <>
+                <ChevronUp className="mr-1 h-4 w-4" /> গুটিয়ে নিন
+              </>
+            ) : (
+              <>
+                <ChevronDown className="mr-1 h-4 w-4" /> আরও {blocked.length - PREVIEW_COUNT} টি লাইন দেখুন
+              </>
+            )}
+          </Button>
         )}
       </CardContent>
     </Card>

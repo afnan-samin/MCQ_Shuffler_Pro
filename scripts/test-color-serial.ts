@@ -475,8 +475,8 @@ console.log("\n== ৭) stripShadedParasXml (শাফল মোডে হেড�
       `Agri: স্ট্রিপ-পরবর্তী পার্সে ${parsedA.questions.length} প্রশ্ন == রঙ-বিশ্লেষণের ${anA.questionCount} (হেডার ছাড়া এক সিরিয়ালে সব ধরা পড়ে)`
     );
     // স্ট্রিপ-এর পরে আর কোনো শেডেড হেডারই অবশিষ্ট নেই — শাফলে হেডার যাবেই না
-    // (নোট: ফাইলে নিজের ১টা নন-শেডেড "Aa¨vq-8" লাইন থাকে — রঙ না দেওয়ায় সেটা
-    //  কনটেন্ট, প্রশ্নের সাথেই থাকে; রঙই হেডারের একমাত্র নির্ভরযোগ্য চিহ্ন)
+    // (নোট: ফাইলে নিজের ১টা নন-শেডেড "Aa¨vq-8" লাইন থাকে — সেটা রঙ-স্ট্রিপে যায় না,
+    //  সেটা ধরে নন-MCQ টেক্সট-প্যাটার্ন-স্ট্রিপ (সেকশন ৮))
     const anA2 = analyzeColorDocx(stA.xml);
     ok(anA2.shadedCount === 0 && anA2.colors.length === 0, "Agri: স্ট্রিপ-এর পরে শেডেড হেডার শূন্য (সব ১৩৫টা বাদ)");
   } catch (e) {
@@ -500,6 +500,122 @@ console.log("\n== ৭) stripShadedParasXml (শাফল মোডে হেড�
   } catch (e) {
     ok(false, `HSC নমুনা টেস্ট: ${String(e)}`);
   }
+}
+
+// ============================================================
+// নন-MCQ লাইন ডিটেক্টর + স্ট্রিপ: "jeta mcq noi seta jate bad dey"
+// (রঙ-নেই হেডার/শিরোনাম লাইন — যেমন Agri-র রঙহীন "Aa¨vq-8")
+// ============================================================
+
+const { isNonMcqText, stripNonMcqLinesXml } = await import("../src/lib/mcq/color-serial");
+
+console.log("\n== ৮) নন-MCQ টেক্সট-প্যাটার্ন (রঙহীন হেডার লাইন বাদ) ==");
+
+// ---- isNonMcqText: পজিটিভ ----
+ok(isNonMcqText("Aa¨vq-8"), "Bijoy 'Aa¨vq-8' → নন-MCQ (Agri-র আসল কেস)");
+ok(isNonMcqText("Aa¨vq 7"), "Bijoy 'Aa¨vq 7' (হাইফেন ছাড়া)");
+ok(isNonMcqText("  Aa¨vq-3 "), "লিডিং/ট্রেইলিং স্পেসসহ Aa¨vq");
+ok(isNonMcqText("অধ্যায়-১"), "Unicode 'অধ্যায়-১'");
+ok(isNonMcqText("অধ্যায় ১২: কোষ বিভাজন"), "Unicode অধ্যায় + শিরোনাম");
+ok(isNonMcqText("Chapter 3"), "English 'Chapter 3'");
+ok(isNonMcqText("chapter-4: Cell Division"), "English 'chapter-4: ...'");
+ok(isNonMcqText("Type-1"), "সেকশন 'Type-1'");
+ok(isNonMcqText("type 2 (বটনি)"), "সেকশন 'type 2 (...)'");
+
+// ---- isNonMcqText: নেগেটিভ (প্রশ্ন/অপশন/বডি লাইন কখনো নয়) ----
+ok(!isNonMcqText("1. প্রশ্ন-লাইন"), "সিরিয়াল-লেড লাইন নন-MCQ নয়");
+ok(!isNonMcqText("K. type-1 এর উদাহরণ"), "অপশন-লেড লাইন নন-MCQ নয়");
+ok(!isNonMcqText("type of nutrition in fungi"), "ডিজিট ছাড়া 'type of...' নয়");
+ok(!isNonMcqText("typology-2 সম্পর্কে"), "'typology' প্রিফিক্স ধরা পড়ে না");
+ok(!isNonMcqText(""), "খালি স্ট্রিং নয়");
+ok(!isNonMcqText("   "), "শুধু-স্পেস নয়");
+ok(
+  !isNonMcqText("অধ্যায়-" + "ক".repeat(80)),
+  "৮১+ অক্ষরের লম্বা লাইন হেডার নয় (দৈর্ঘ্য-গার্ড)"
+);
+ok(isNonMcqText("অধ্যায়-" + "ক".repeat(60)), "৬৭ অক্ষরের লাইনে প্যাটার্ন থাকলে ধরা পড়ে");
+
+// ---- stripNonMcqLinesXml: সিনথেটিক ----
+{
+  const body =
+    plainP("কৃষি বিশ্ববিদ্যালয় ভর্তি পরীক্ষা") + // প্রথম প্রশ্নের আগে — কাটা হয় না (প্রশ্ন-ব্লকের অংশ না হলেও প্যাটার্ন-ম্যাচ নেই)
+    q("1.ক-১") +
+    plainP("K. অপশন-১") + // অপশন লাইন — কাটা হয় না
+    plainP("Aa¨vq-2") + // রঙহীন অধ্যায়-হেডার — কাটা হবে
+    q("2.ক-২") +
+    plainP("অধ্যায়-৩") + // Unicode — কাটা হবে
+    q("3.ক-৩") +
+    plainP("Chapter 4") + // English — কাটা হবে
+    q("4.ক-৪") +
+    plainP("type 2 ডায়াবেটিস হলো একটা রোগ"); // বডি-লাইন কিন্তু প্যাটার্ন-ম্যাচ — কাটা হবে (ডকুমেন্টেড আচরণ)
+  const sXml = wrapDoc(body);
+  const st = stripNonMcqLinesXml(sXml);
+  ok(st.removed.length === 4, `সিনথেটিক: ৪টা নন-MCQ লাইন বাদ, বাদ পড়েছে ${st.removed.length}`);
+  ok(
+    JSON.stringify(st.removed.map((b) => b.text)) ===
+      JSON.stringify(["Aa¨vq-2", "অধ্যায়-৩", "Chapter 4", "type 2 ডায়াবেটিস হলো একটা রোগ"]),
+    "বাদ-পড়া ৪ লাইনের টেক্সট ঠিক আছে (লিস্টে দেখানোর জন্য)"
+  );
+  ok(st.removed.every((b) => b.reason === "pattern"), "সবগুলোর কারণ = 'pattern'");
+  ok(st.xml.includes("ক-১") && st.xml.includes("ক-২") && st.xml.includes("ক-৩") && st.xml.includes("ক-৪"), "সব প্রশ্ন অক্ষত");
+  ok(st.xml.includes("অপশন-১"), "অপশন লাইন অক্ষত");
+  ok(st.xml.includes("কৃষি বিশ্ববিদ্যালয়"), "প্যাটার্ন-বিহীন লিড লাইন অক্ষত");
+  ok(!st.xml.includes("Aa¨vq") && !st.xml.includes("অধ্যায়-৩") && !st.xml.includes("Chapter 4"), "হেডার-টেক্সটগুলো আউটপুটে নেই");
+  const parsed = parseDocxXml(st.xml);
+  ok(parsed.questions.length === 4, `স্ট্রিপ-পরবর্তী পার্সে ৪ প্রশ্ন, পাওয়া গেল ${parsed.questions.length}`);
+
+  // প্রশ্ন-শুরু লাইনে প্যাটার্ন-শব্দ থাকলেও কাটা হয় না
+  const guardXml = wrapDoc(
+    q("1.type 1 প্রশ্ন কি?") + q("2.সাধারণ") + plainP("Aa¨vq-2") + q("3.শেষ")
+  );
+  const stG = stripNonMcqLinesXml(guardXml);
+  ok(stG.removed.length === 1 && stG.removed[0].text === "Aa¨vq-2", "প্রশ্ন-শুরু লাইন ('1.type 1...') কখনো বাদ পড়ে না");
+  ok(stG.xml.includes("type 1 প্রশ্ন"), "প্রশ্নের টেক্সট অক্ষত");
+
+  // idempotent: দ্বিতীয়বার স্ট্রিপে কিছু বাকি থাকে না
+  const st2 = stripNonMcqLinesXml(st.xml);
+  ok(st2.removed.length === 0 && st2.xml === st.xml, "দ্বিতীয়বার স্ট্রিপ = no-op (idempotent)");
+}
+
+// ---- আসল ফাইল: Agri (রঙ-স্ট্রিপের পরে ঠিক ১টা "Aa¨vq-8" থাকে) ----
+try {
+  const stShade = stripShadedParasXml(agriXml);
+  ok(stShade.texts.length === stShade.removed && stShade.removed === 135, `Agri: রঙ-স্ট্রিপ ১৩৫টা (texts অ্যারেও ${stShade.texts.length})`);
+  const stPat = stripNonMcqLinesXml(stShade.xml);
+  ok(stPat.removed.length === 1, `Agri: প্যাটার্ন-স্ট্রিপে ঠিক ১টা লাইন, পাওয়া গেল ${stPat.removed.length}`);
+  ok(stPat.removed[0]?.text === "Aa¨vq-8", `Agri: বাদ-পড়া লাইনটা হলো "Aa¨vq-8", পাওয়া গেল ${JSON.stringify(stPat.removed[0]?.text)}`);
+  ok(!stPat.xml.includes("Aa¨vq"), "Agri: স্ট্রিপ-এর পরে কোনো Aa¨vq-লাইনই নেই");
+
+  // পুরো শাফল-পাইপলাইন (রঙ-স্ট্রিপ + প্যাটার্ন-স্ট্রিপ) — ইউজারের ব্লকড-লিস্টের হুবহু ডেটা
+  const blockedAll = [
+    ...stShade.texts.map((t) => ({ text: t, reason: "color" as const })),
+    ...stPat.removed,
+  ];
+  ok(blockedAll.length === 136, `Agri: মোট ব্লকড ১৩৬ (১৩৫ রঙ-হেডার + ১ নন-MCQ), পাওয়া গেল ${blockedAll.length}`);
+  ok(blockedAll.filter((b) => b.reason === "color").length === 135, "ব্লকড-লিস্টে ১৩৫টা রঙ-হেডার");
+  ok(blockedAll.filter((b) => b.reason === "pattern").length === 1, "ব্লকড-লিস্টে ১টা নন-MCQ (টেক্সট-প্যাটার্ন)");
+
+  // স্ট্রিপ-এর পরে প্রশ্ন-সংখ্যা অক্ষত (৪৩৫) — প্রশ্ন কোনোটাই হারায়নি
+  const parsedAgri = parseDocxXml(stPat.xml);
+  ok(parsedAgri.questions.length === 435, `Agri: ফুল-স্ট্রিপ পরবর্তী পার্সে ৪৩৫ প্রশ্ন, পাওয়া গেল ${parsedAgri.questions.length}`);
+  const anAfter = analyzeColorDocx(stPat.xml);
+  ok(anAfter.questionCount === 435, "Agri: রঙ-বিশ্লেষণেও ৪৩৫ প্রশ্ন (অক্ষত)");
+
+  // ব্লকড লাইনগুলো (খালিগুলো বাদে) আর ফাইনাল XML-এ নেই
+  const stillThere = blockedAll.filter((b) => b.text && stPat.xml.includes(b.text));
+  ok(stillThere.length === 0, `ব্লকড লাইনগুলোর কোনোটাই ফাইনাল XML-এ নেই${stillThere.length ? ` (${stillThere.length} টা রয়ে গেছে)` : ""}`);
+} catch (e) {
+  ok(false, `Agri নন-MCQ টেস্ট: ${String(e)}`);
+}
+
+// ---- আসল ফাইল: HSC নমুনা — প্যাটার্ন-ম্যাচ শূন্য (কোনো ভুল কাটা হয় না) ----
+try {
+  const hscZip2 = await JSZip.loadAsync((await import("node:fs")).readFileSync("public/sample/hsc27-physics-bijoy.docx"));
+  const hscXml2 = await hscZip2.file("word/document.xml")!.async("string");
+  const stH2 = stripNonMcqLinesXml(hscXml2);
+  ok(stH2.removed.length === 0 && stH2.xml === hscXml2, "HSC নমুনা: প্যাটার্ন-ম্যাচ শূন্য — XML হুবহু অক্ষত");
+} catch (e) {
+  ok(false, `HSC নন-MCQ টেস্ট: ${String(e)}`);
 }
 
 console.log(`\n===== ফলাফল: ${passed} পাস, ${failed} ফেল =====`);

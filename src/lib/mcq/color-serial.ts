@@ -20,6 +20,7 @@ import JSZip from "jszip";
 import {
   detectSerialPrefix,
   isQuestionStart,
+  looksOptionLed,
   serialMatchSpans,
   numberToDigits,
   type DigitEnc,
@@ -310,14 +311,15 @@ export function colorKeyName(key: string): string {
  * • ডিটেকশন হুবহু analyzeColorDocx-এর paraShadingKey নিয়মে (সাদা/auto বাদ)
  * • string-level splice — বাকি বাইট byte-identical, বিশাল ফাইলেও মেমোরি-নিরাপদ
  */
-export function stripShadedParasXml(xml: string): { xml: string; removed: number } {
+export function stripShadedParasXml(xml: string): { xml: string; removed: number; texts: string[] } {
   const children = scanBodyChildren(xml);
-  const cuts: Array<{ start: number; end: number }> = [];
+  const cuts: Array<{ start: number; end: number; text: string }> = [];
   for (const ch of children) {
     if (ch.kind !== "w:p" || ch.selfClosing) continue;
-    if (paraShadingKeyOf(xml.slice(ch.start, ch.end))) cuts.push({ start: ch.start, end: ch.end });
+    const sub = xml.slice(ch.start, ch.end);
+    if (paraShadingKeyOf(sub)) cuts.push({ start: ch.start, end: ch.end, text: paraTextOf(sub).trim() });
   }
-  if (!cuts.length) return { xml, removed: 0 };
+  if (!cuts.length) return { xml, removed: 0, texts: [] };
   const parts: string[] = [];
   let pos = 0;
   for (const c of cuts) {
@@ -325,7 +327,111 @@ export function stripShadedParasXml(xml: string): { xml: string; removed: number
     pos = c.end;
   }
   parts.push(xml.slice(pos));
-  return { xml: parts.join(""), removed: cuts.length };
+  return { xml: parts.join(""), removed: cuts.length, texts: cuts.map((c) => c.text) };
+}
+
+// ---------- নন-MCQ লাইন ডিটেক্টর (রঙহীন হেডার/শিরোনাম) ----------
+
+/** শাফল-পাইপলাইন থেকে বাদ পড়া লাইন — কারণসহ (UI-তে আলাদা লিস্টে দেখানো হয়) */
+export interface BlockedLine {
+  /** বাদ পড়া লাইনের টেক্সট */
+  text: string;
+  /** "color" = রঙ-হেডার (শেডিং ছিল), "pattern" = রঙ নেই কিন্তু টেক্সট-প্যাটার্নে হেডার/নন-MCQ */
+  reason: "color" | "pattern";
+}
+
+/**
+ * রঙহীন হেডার/শিরোনাম-টাইপ লাইনের প্যাটার্ন — ইউজারের নিয়ম: "jeta mcq noi
+ * seta jate bad dey"। প্যাটার্ন ইচ্ছাকৃতভাবে টাইট (লাইনের শুরুতে হেডার-শব্দ),
+ * যেন অপশন/প্রশ্ন-বডি লাইন কখনো ধরা না পড়ে — আর যা ধরা পড়ে সব UI-র
+ * ব্লকড-লিস্টে দেখা যায়, তাই ভুল হলে ইউজার সাথে সাথে বুঝতে পারেন।
+ */
+const NON_MCQ_RES: RegExp[] = [
+  /^Aa¨vq/, // Bijoy (SutonnyMJ): "অধ্যায়" — যেমন "Aa¨vq-8", "Aa¨vq 7"
+  /^অধ্যায়/, // Unicode: "অধ্যায়-১"
+  /^chapter\s*[-–—:.]?\s*\d/i, // English: "Chapter 1", "chapter-2:"
+  /^type\s*[-–—:.]?\s*\d/i, // সেকশন হেডার: "Type-1", "type 2" (রঙ-নেই ভ্যারিয়েন্ট)
+];
+
+/**
+ * টেক্সট দেখে নন-MCQ হেডার/শিরোনাম লাইন কি না।
+ * ⚠️ শুধু এমন লাইনে ডাকতে হবে যারা প্রশ্ন-শুরু নয়, অপশন-লেড নয় —
+ * স্ট্রিপ-ফাংশন সেই গার্ডগুলো নিজেই দেয়। হেডার লাইন ছোট হয় (≤৮০ অক্ষর)।
+ */
+export function isNonMcqText(text: string): boolean {
+  const t = text.trim();
+  if (!t || t.length > 80) return false;
+  return NON_MCQ_RES.some((re) => re.test(t));
+}
+
+/**
+ * রঙ নেই এমন নন-MCQ হেডার/শিরোনাম লাইন (যেমন Agri ফাইলের রঙহীন "Aa¨vq-8")
+ * document.xml থেকে সরিয়ে দেয় — যাতে কোনো প্রশ্ন-ব্লকের সাথে জড়িয়ে
+ * শাফলে এলোমেলো না যায়।
+ *
+ * গার্ড (শুধু এগুলোই কাটা হয়):
+ *  • টপ-লেভেল (depth-1) w:p, টেবিল/টেক্সটবক্সের ভিতরের প্যারা স্পর্শ হয় না
+ *  • রঙ-দেওয়া প্যারা কখনো নয় (ওগুলো stripShadedParasXml-এর কাজ)
+ *  • প্রশ্ন-শুরু (সিরিয়াল + ট্যাব/অপশন-লেড/টিয়ার-৩) কখনো নয়
+ *  • অপশন-লেড লাইন (K./ক./\t…) কখনো নয় — অপশন প্রশ্নের অংশ
+ *  • খালি/শুধু-স্পেস প্যারা নয়
+ *
+ * রিটার্নে বাদ পড়া লাইনের টেক্সটগুলো — UI-র ব্লকড-লিস্টের জন্য।
+ * string-level splice — বাকি বাইট byte-identical, বিশাল ফাইলেও মেমোরি-নিরাপদ।
+ */
+export function stripNonMcqLinesXml(xml: string): { xml: string; removed: BlockedLine[] } {
+  const children = scanBodyChildren(xml);
+
+  // প্রথম পাস: w:p-গুলোর টেক্সট + ট্যাব + শেড (প্রশ্ন-শুরু ডিটেকশনের জন্য)
+  const paraIdx: number[] = []; // children-ইনডেক্স
+  const texts: string[] = [];
+  const hasTabs: boolean[] = [];
+  const shaded: boolean[] = [];
+  for (let i = 0; i < children.length; i++) {
+    const ch = children[i];
+    if (ch.kind !== "w:p") continue;
+    if (ch.selfClosing) {
+      texts.push("");
+      hasTabs.push(false);
+      shaded.push(false);
+    } else {
+      const sub = xml.slice(ch.start, ch.end);
+      texts.push(paraTextOf(sub));
+      hasTabs.push(sub.includes("<w:tab/>"));
+      shaded.push(!!paraShadingKeyOf(sub));
+    }
+    paraIdx.push(i);
+  }
+
+  const nextNonEmpty = (from: number): string | null => {
+    for (let j = from; j < texts.length; j++) {
+      if (texts[j].trim()) return texts[j];
+    }
+    return null;
+  };
+
+  // দ্বিতীয় পাস: কোনগুলো কাটা হবে
+  const cuts: Array<{ start: number; end: number; text: string }> = [];
+  for (let k = 0; k < paraIdx.length; k++) {
+    const t = texts[k];
+    if (!t.trim() || shaded[k]) continue;
+    const si = detectSerialPrefix(t);
+    if (si && isQuestionStart(si, hasTabs[k], nextNonEmpty(k + 1))) continue;
+    if (looksOptionLed(t)) continue;
+    if (!isNonMcqText(t)) continue;
+    const ch = children[paraIdx[k]];
+    cuts.push({ start: ch.start, end: ch.end, text: t.trim() });
+  }
+
+  if (!cuts.length) return { xml, removed: [] };
+  const parts: string[] = [];
+  let pos = 0;
+  for (const c of cuts) {
+    parts.push(xml.slice(pos, c.start));
+    pos = c.end;
+  }
+  parts.push(xml.slice(pos));
+  return { xml: parts.join(""), removed: cuts.map((c) => ({ text: c.text, reason: "pattern" as const })) };
 }
 
 // ---------- নম্বর-প্ল্যান (স্ট্যাক/নেস্টিং অ্যালগরিদম) ----------

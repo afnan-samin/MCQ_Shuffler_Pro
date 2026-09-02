@@ -34,7 +34,9 @@ import {
   analyzeColorDocx,
   downloadColorSerialDocx,
   planSerialByColor,
+  stripNonMcqLinesXml,
   stripShadedParasXml,
+  type BlockedLine,
   type ColorAnalysis,
   type SerialScheme,
 } from "@/lib/mcq/color-serial";
@@ -42,6 +44,7 @@ import { ColorSerialCard } from "@/components/mcq/color-serial-card";
 import { ModeTabs, type McqMode } from "@/components/mcq/mode-tabs";
 import { SerialInputCard } from "@/components/mcq/serial-input-card";
 import {
+  BlockedLinesCard,
   ColorShuffleInfoCard,
   NoColorSerialCard,
 } from "@/components/mcq/serial-extra-cards";
@@ -70,6 +73,8 @@ interface DocxState {
   colorAn: ColorAnalysis | null;
   /** শাফলের জন্য বাদ পড়া রঙ-হেডার সংখ্যা (0 = রঙ-ফাইল না) */
   headersStripped: number;
+  /** বাদ পড়া সব লাইন (রঙ-হেডার + টেক্সট-প্যাটার্নে ধরা নন-MCQ) — UI-র আলাদা লিস্টে দেখায় */
+  blocked: BlockedLine[];
 }
 
 /** সিরিয়াল মোডের আলাদা স্টেট — শাফলের সাথে কোনো মিল নেই */
@@ -285,13 +290,20 @@ export default function Home() {
       // ইউজারের নিয়ম: শাফল মোডে হেডার থাকলে হেডার বাদ দিয়ে সবগুলো প্রশ্ন
       // এক সিরিয়ালে নিয়ে শাফল — তাই রঙ-হেডারগুলো আগে সরিয়ে নিই,
       // যাতে হেডার কোনো প্রশ্ন-ব্লকের সাথে জড়িয়ে শাফলে এলোমেলো না যায়
+      // + রঙ-নেই হেডার/শিরোনাম লাইনও (যেমন "Aa¨vq-8") টেক্সট-প্যাটার্নে বাদ
       let xml = originalXml;
       let headersStripped = 0;
+      const blocked: BlockedLine[] = [];
       if (hasColors && colorAn) {
         const st = stripShadedParasXml(originalXml);
         xml = st.xml;
         headersStripped = st.removed;
+        for (const t of st.texts) blocked.push({ text: t, reason: "color" });
       }
+      const st2 = stripNonMcqLinesXml(xml);
+      xml = st2.xml;
+      blocked.push(...st2.removed);
+      const patternStripped = blocked.length - headersStripped;
 
       const parse = parseDocxXml(xml);
       setDocx({
@@ -302,6 +314,7 @@ export default function Home() {
         parse,
         colorAn: hasColors ? colorAn : null,
         headersStripped,
+        blocked,
       });
       setParsed(null);
       resetResults();
@@ -310,8 +323,8 @@ export default function Home() {
 
       if (hasColors && colorAn) {
         toast({
-          title: `🎨 রঙ-হেডার ${headersStripped} টি বাদ দিয়ে ${parse.questions.length} টি প্রশ্ন এক সিরিয়ালে ডিটেক্ট হয়েছে`,
-          description: "শাফলে হেডারগুলো যাবে না — সব প্রশ্ন আপনার সেট-সেটিং অনুযায়ী শাফল হবে।",
+          title: `🎨 রঙ-হেডার ${headersStripped} টি${patternStripped ? ` + নন-MCQ লাইন ${patternStripped} টি` : ""} বাদ দিয়ে ${parse.questions.length} টি প্রশ্ন এক সিরিয়ালে ডিটেক্ট হয়েছে`,
+          description: "শাফলে হেডার/নন-MCQ লাইনগুলো যাবে না — নিচে বাদ-পড়া লাইনের পুরো লিস্ট দেখা যায়।",
         });
       } else if (parse.questions.length === 0) {
         toast({
@@ -327,8 +340,10 @@ export default function Home() {
             : `সিরিয়ালে ${parse.serial?.issues.length ?? 0} টি জায়গায় সমস্যা — শাফলের সময় serial replace ON রাখলে ঠিক হয়ে যাবে।`;
 
         toast({
-          title: `✅ ${parse.questions.length} টি প্রশ্ন ডিটেক্ট হয়েছে`,
-          description: `${serialMsg}${parse.unicodeQuestionIds.length ? ` ⚠️ ${parse.unicodeQuestionIds.length} টি প্রশ্নে Unicode আছে (ডাউনলোডে অরিজিনালই থাকবে)।` : ""}`,
+          title: `✅ ${parse.questions.length} টি প্রশ্ন ডিটেক্ট হয়েছে${patternStripped ? ` (নন-MCQ লাইন ${patternStripped} টি বাদ)` : ""}`,
+          description: patternStripped
+            ? `${patternStripped} টি হেডার/শিরোনাম লাইন MCQ না — শাফলে যাবে না (নিচে লিস্ট)। ${serialMsg}`
+            : `${serialMsg}${parse.unicodeQuestionIds.length ? ` ⚠️ ${parse.unicodeQuestionIds.length} টি প্রশ্নে Unicode আছে (ডাউনলোডে অরিজিনালই থাকবে)।` : ""}`,
         });
       }
 
@@ -760,6 +775,8 @@ export default function Home() {
                     onOpenSerial={openInSerialMode}
                   />
                 )}
+
+                {docx.blocked.length > 0 && <BlockedLinesCard blocked={docx.blocked} />}
 
                 {docx.parse && (
                   <DocxDetectCard
