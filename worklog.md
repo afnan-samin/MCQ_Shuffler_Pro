@@ -65,3 +65,19 @@ Stage Summary:
 - মূল আর্কিটেকচার বদল: mammoth-টেক্সট-রিজেনারেশন → সরাসরি docx XML manipulation — তাই আপলোড করা ফাইলের tab, ইকুয়েশন (OMML), sub/superscript, সিম্বল, ছবি, SutonnyMJ ফন্ট-রান হুবহু অক্ষত থাকে; আউটপুটে নতুন Unicode ঢোকে না (নতুন সিরিয়ালও ফাইলের নিজের ডিজিট-স্টাইলে)
 - ইউজারের চাহিদা পূরণ: উদাহরণের tab-ফরম্যাট ডাউনলোডে অটল, serial replace = পজিশন-ভিত্তিক ১,২,৩… (ক্লিক টগল + রিনাম্বারড/আসল-নম্বর দুই ডাউনলোড), সিরিয়াল-ফিক্স .docx (Start), মোবাইল-ফার্স্ট UI
 - সব টেস্ট: ৪৩ (docx) + ৬১ (টেক্সট) + ৭ (এক্সপোর্ট) পাস, E2E ব্রাউজার-ভেরিফাইড, ০ কস্ট, client-side
+
+---
+Task ID: 10
+Agent: main
+Task: Verify if MS Word paragraph shading (Home > Paragraph > Shading) is detectable programmatically in the real Agri MCQ docx
+
+Work Log:
+- Created scripts/inspect-agri-shading.py (zipfile + lxml: w:pPr/w:shd, w:rPr/w:shd, w:highlight, w:tcPr/w:shd, themeFill, styles.xml)
+- Ran on upload/Agri MCQ Botany 997 mcq - Copy - type serial.docx
+- Listed all shaded paragraph texts to map color->role
+
+Stage Summary:
+- Paragraph shading IS reliably detectable: w:pPr/w:shd @w:fill hex color
+- File shading map: D0CECE (light gray) = 9 chapter headers (Aa¨vq-1..7, incl. 2 empty shaded separator paras at 1121/1195; note 'Aa¨vq 7' has NO hyphen - text matching would miss it, color catches it); 000000 (black) = exactly 126 Type headers (Type-1 x43, Type-2 x51, Type-3 x25, Type-4 x7)
+- Questions/options/answers: zero shading; no run-level/highlight/table shading anywhere; styles.xml has none
+- Design impact: shading color becomes the PRIMARY header detector (text patterns = fallback for unshaded files). Black-shaded para = serial restart point; gray-shaded = chapter boundary. Fully compatible with planned docx->docx surgical serial-fix pipeline (same XML we edit).
