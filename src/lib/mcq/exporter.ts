@@ -25,6 +25,10 @@ export interface ExportOptions {
   /** প্রতি সেটের শুরুতে হেডার (ইনস্টিটিউট নাম ইত্যাদি) বসবে কিনা */
   includeHeader: boolean;
   headerText: string;
+  /** সেট-টাইটেল প্যারা ("সেট A") বসবে কিনা — ডিফল্ট true; একক-সেট এক্সপোর্টে (যেমন সিরিয়াল-পেস্ট) false */
+  includeSetHeader?: boolean;
+  /** ডাউনলোড ফাইলনেম — না দিলে MCQ-Sets-<টাইমস্ট্যাম্প>.docx */
+  fileName?: string;
 }
 
 export const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
@@ -107,23 +111,27 @@ function buildDocxParagraphs(sets: McqQuestion[][], opts: ExportOptions): Paragr
 
   sets.forEach((questions, si) => {
     const name = getSetName(si, opts.nameStyle);
+    // সেট-টাইটেল বন্ধ থাকলে প্রথম প্রশ্ন-প্যারাতেই পেজ-ব্রেক যায় (মাল্টি-সেট হলে)
+    const showSetTitle = opts.includeSetHeader !== false;
 
     // সেট হেডার — প্রতিটি সেট নতুন পেজে শুরু হয়
-    paras.push(
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        pageBreakBefore: si > 0,
-        spacing: { after: 120 },
-        children: [
-          new TextRun({
-            text: name,
-            bold: true,
-            size: halfPoints + 4,
-            font: fontObj(opts.unicodeFont),
-          }),
-        ],
-      })
-    );
+    if (showSetTitle) {
+      paras.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          pageBreakBefore: si > 0,
+          spacing: { after: 120 },
+          children: [
+            new TextRun({
+              text: name,
+              bold: true,
+              size: halfPoints + 4,
+              font: fontObj(opts.unicodeFont),
+            }),
+          ],
+        })
+      );
+    }
 
     // প্রশ্নের হেডার লাইন (ইনস্টিটিউট, সময় ইত্যাদি)
     for (const h of getHeaderLines(opts)) {
@@ -146,11 +154,12 @@ function buildDocxParagraphs(sets: McqQuestion[][], opts: ExportOptions): Paragr
 
     // প্রশ্নগুলো — সিরিয়ালসহ প্রতিটি লাইন প্লেইন টেক্সট রানে (কোনো বুলেট/
     // অটো নম্বরিং নেই), শব্দ ধরে ধরে সঠিক ফন্ট বসে
-    for (const q of questions) {
+    for (const [qi, q] of questions.entries()) {
       for (const line of q.lines) {
         paras.push(
           new Paragraph({
             spacing: { after: 40 },
+            pageBreakBefore: !showSetTitle && si > 0 && qi === 0,
             children: runsForLine(line, opts).map(
               (r) =>
                 new TextRun({
@@ -193,7 +202,7 @@ export async function exportDocx(sets: McqQuestion[][], opts: ExportOptions): Pr
   });
 
   const blob = await Packer.toBlob(doc);
-  downloadBlob(blob, `MCQ-Sets-${fileNameStamp()}.docx`);
+  downloadBlob(blob, opts.fileName ?? `MCQ-Sets-${fileNameStamp()}.docx`);
 }
 
 // ---------- .doc (HTML ভিত্তিক — পুরনো Word-ও খুলতে পারে) ----------

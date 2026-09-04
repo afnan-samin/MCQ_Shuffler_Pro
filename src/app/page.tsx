@@ -53,9 +53,11 @@ import {
 import { ColorSerialCard } from "@/components/mcq/color-serial-card";
 import { ModeTabs, type McqMode } from "@/components/mcq/mode-tabs";
 import { SerialInputCard } from "@/components/mcq/serial-input-card";
+import { SerialPasteCard } from "@/components/mcq/serial-paste-card";
 import {
   BlockedLinesCard,
   ColorShuffleInfoCard,
+  MultiSerialSchemeCard,
   NoColorSerialCard,
 } from "@/components/mcq/serial-extra-cards";
 import {
@@ -66,6 +68,7 @@ import {
 } from "@/lib/mcq/docx-exporter";
 import { downloadBlob } from "@/lib/mcq/exporter";
 import { SAMPLE_MCQ } from "@/lib/mcq/sample";
+import { renumberQuestionsByPosition } from "@/lib/mcq/serial-paste";
 import { toast } from "@/hooks/use-toast";
 import { Dices, ShieldCheck, Zap } from "lucide-react";
 
@@ -155,6 +158,14 @@ export default function Home() {
   const [serialMergedBusy, setSerialMergedBusy] = useState(false);
   const [serialZipBusy, setSerialZipBusy] = useState(false);
   const [serialStrategy, setSerialStrategy] = useState<SerialStrategy>("per-file");
+  // প্রতি ফাইলের সিরিয়াল-স্কিম (কী = SerialState.id; ডিফল্ট একটানা — আগের আচরণ হুবহু)
+  const [serialSchemes, setSerialSchemes] = useState<Record<string, SerialScheme>>({});
+  // সিরিয়াল মোডের পেস্ট-ইনপুট — ফাইল-ফ্লোর সাথে পারস্পরিক একচেটিয়া (দুটো একসাথে অ্যাক্টিভ থাকে না)
+  const [serialPasteText, setSerialPasteText] = useState("");
+  const [serialPaste, setSerialPaste] = useState<ParseOutput | null>(null);
+  const [serialPasteBusy, setSerialPasteBusy] = useState(false);
+  const [serialPasteFixing, setSerialPasteFixing] = useState(false);
+  const [serialPasteDlBusy, setSerialPasteDlBusy] = useState(false);
   // ঠিক ১ টা ফাইল হলে পুরনো একক-ফাইল কার্ড (রঙ-চিপসহ) — ≥২ হলে মাল্টি ডাউনলোড কার্ড
   const serialDoc = serialDocs.length === 1 ? serialDocs[0] : null;
 
@@ -437,6 +448,13 @@ export default function Home() {
     setSerialDocs((prev) => (append ? [...prev, ...added] : added));
     setSerialLoading(false);
     if (added.length) {
+      // ফাইল আপলোড হলে পেস্ট-রেজাল্ট ক্লিয়ার — দুটো একসাথে অ্যাক্টিভ থাকবে না
+      setSerialPaste(null);
+      setSerialSchemes((prev) => {
+        const next = append ? { ...prev } : {};
+        for (const d of added) next[d.id] = { kind: "continuous" };
+        return next;
+      });
       toast({
         title: `✅ ${added.length} টি ফাইল ${append ? "যোগ" : "লোড"} হয়েছে`,
         description: `মোট ${questions} টি প্রশ্ন${colors ? `, ${colors} টি রঙ-হেডার` : ""}।${added.length > 1 ? " লিস্ট থেকে ক্রম বদলাতে পারবেন — নিচে মার্জ/ZIP ডাউনলোড।" : ""}`,
@@ -456,7 +474,15 @@ export default function Home() {
     });
   };
 
-  const removeSerialDoc = (id: string) => setSerialDocs((prev) => prev.filter((d) => d.id !== id));
+  const removeSerialDoc = (id: string) => {
+    setSerialDocs((prev) => prev.filter((d) => d.id !== id));
+    setSerialSchemes((prev) => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  };
 
   const handleColorSerial = async (scheme: SerialScheme, label: string) => {
     if (!serialDoc) return;
@@ -502,7 +528,8 @@ export default function Home() {
       const items: Array<{ xml: string; file: Blob }> = [];
       let offset = 0;
       for (const d of serialDocs) {
-        const base = planSerialByColor(d.analysis, { kind: "continuous" });
+        // প্রতি ফাইলের নিজের স্কিম (ডিফল্ট একটানা — আগের আচরণ হুবহু)
+        const base = planSerialByColor(d.analysis, serialSchemes[d.id] ?? { kind: "continuous" });
         // file-by-file হলে প্রতি ফাইল ১ থেকে; global হলে আগের ফাইলের শেষ নম্বরের পর থেকে
         const plan = serialStrategy === "global" ? offsetSerialPlan(base, offset) : base;
         offset += base.size;
@@ -532,7 +559,8 @@ export default function Home() {
     try {
       const out: Array<{ name: string; blob: Blob }> = [];
       for (const d of serialDocs) {
-        const plan = planSerialByColor(d.analysis, { kind: "continuous" });
+        // প্রতি ফাইলের নিজের স্কিম (ডিফল্ট একটানা — আগের আচরণ হুবহু)
+        const plan = planSerialByColor(d.analysis, serialSchemes[d.id] ?? { kind: "continuous" });
         const xml = applyColorSerialXml(d.xml, plan);
         out.push({ name: `${d.baseName} (serial).docx`, blob: await replaceDocumentXml(d.file, xml) });
       }
@@ -549,12 +577,88 @@ export default function Home() {
     }
   };
 
+  // ---- সিরিয়াল মোড পেস্ট-ইনপুট (ফাইল-ফ্লোর সাথে পারস্পরিক একচেটিয়া) ----
+
+  /** পেস্ট-টেক্সটে parseMcq — রেজাল্ট সেভ + ফাইল-লিস্ট/কার্ড ক্লিয়ার (দুটো একসাথে থাকবে না) */
+  const handleSerialPasteDetect = () => {
+    if (!serialPasteText.trim()) return;
+    setSerialPasteBusy(true);
+    try {
+      const result = parseMcq(serialPasteText);
+      setSerialDocs([]);
+      setSerialSchemes({});
+      setSerialPaste(result);
+      if (result.questions.length === 0) {
+        toast({
+          title: "কোনো প্রশ্ন পাওয়া যায়নি",
+          description: "প্রশ্নগুলো নম্বর দিয়ে শুরু আছে কিনা দেখুন (যেমন: ১. অথবা 1.)",
+          variant: "destructive",
+        });
+      } else if (result.serial?.status === "ok") {
+        toast({
+          title: `✅ ${result.questions.length} টি প্রশ্ন ডিটেক্ট হয়েছে`,
+          description: "সিরিয়াল ঠিক আছে — নিচে সিরিয়াল ডাউনলোড বাটন চালু!",
+        });
+      } else {
+        toast({
+          title: `⚠️ ${result.questions.length} টি প্রশ্ন পাওয়া গেছে, কিন্তু সিরিয়ালে সমস্যা আছে`,
+          description: "'অটো নম্বরিং ঠিক করুন' চাপলে এক ক্লিকে ঠিক হয়ে যাবে।",
+        });
+      }
+    } finally {
+      setSerialPasteBusy(false);
+    }
+  };
+
+  /** পেস্ট-টেক্সটে autoFixNumbering — টেক্সট ও রেজাল্ট দুটোই আপডেট */
+  const handleSerialPasteFix = () => {
+    if (!serialPasteText.trim()) return;
+    setSerialPasteFixing(true);
+    try {
+      const fixed = autoFixNumbering(serialPasteText, 1);
+      const result = parseMcq(fixed);
+      setSerialPasteText(fixed);
+      setSerialPaste(result);
+      toast({
+        title: "🔧 সিরিয়াল ঠিক করা হয়েছে",
+        description: `${result.questions.length} টি প্রশ্নে ১ থেকে শুরু করে নতুন নম্বর বসানো হয়েছে।`,
+      });
+    } finally {
+      setSerialPasteFixing(false);
+    }
+  };
+
+  /** পেস্টের প্রশ্নগুলো পজিশন-অনুযায়ী ১..N রিনাম্বার করে এক সেট .docx এক্সপোর্ট */
+  const handleSerialPasteDownload = async () => {
+    if (!serialPaste || serialPaste.questions.length === 0) return;
+    setSerialPasteDlBusy(true);
+    try {
+      const renumbered = renumberQuestionsByPosition(serialPaste.questions, 1);
+      // একক সেট → পেজ-হেডার ও সেট-টাইটেল ("সেট A") দুটোই অফ — খালি সিরিয়াল ফাইল
+      await exportDocx([renumbered], {
+        ...DEFAULT_EXPORT_OPTIONS,
+        includeHeader: false,
+        includeSetHeader: false,
+        fileName: `MCQ-Serial-${renumbered.length}q.docx`,
+      });
+      toast({
+        title: "✅ সিরিয়াল করা .docx ডাউনলোড হয়েছে",
+        description: `${renumbered.length} টি প্রশ্ন পজিশন-অনুযায়ী ১..N নম্বর পেয়েছে — ক্রম ও অপশন হুবহু অক্ষত।`,
+      });
+    } catch (e) {
+      toast({ title: "ডাউনলোডে সমস্যা", description: String(e), variant: "destructive" });
+    } finally {
+      setSerialPasteDlBusy(false);
+    }
+  };
+
   /** শাফল মোডে উঠা রঙ-ফাইল সিরিয়াল মোডে খোলা (ফাইল নিজেই চলে যায়, আবার আপলোড লাগে না) */
   const openInSerialMode = () => {
     if (!docx?.colorAn) return;
+    const id = nextMultiId();
     setSerialDocs([
       {
-        id: nextMultiId(),
+        id,
         file: docx.file,
         baseName: docx.baseName,
         // সিরিয়াল মোডে অরিজিনাল xml লাগে — রঙ-ইনডেক্স অরিজিনাল ফাইলের সাথে মেলে
@@ -562,6 +666,8 @@ export default function Home() {
         analysis: docx.colorAn,
       },
     ]);
+    setSerialSchemes({ [id]: { kind: "continuous" } });
+    setSerialPaste(null);
     changeMode("serial");
     toast({
       title: "🔢 সিরিয়াল মোডে ফাইল খোলা হলো",
@@ -1033,7 +1139,22 @@ export default function Home() {
               }))}
               onReorder={reorderSerialDocs}
               onRemove={removeSerialDoc}
+              pasteText={serialPasteText}
+              onPasteTextChange={setSerialPasteText}
+              onPasteDetect={handleSerialPasteDetect}
+              pasteBusy={serialPasteBusy}
             />
+
+            {/* পেস্ট-ডিটেকশন রেজাল্ট — ফাইল লোড থাকলে রেন্ডার নয় (পারস্পরিক একচেটিয়া) */}
+            {serialDocs.length === 0 && serialPaste && serialPaste.questions.length > 0 && (
+              <SerialPasteCard
+                result={serialPaste}
+                fixing={serialPasteFixing}
+                downloading={serialPasteDlBusy}
+                onFix={handleSerialPasteFix}
+                onDownload={handleSerialPasteDownload}
+              />
+            )}
 
             {/* ঠিক ১ টা ফাইল — পুরনো রঙ-চিপ কার্ড */}
             {serialDocs.length === 1 && serialDoc ? (
@@ -1053,20 +1174,27 @@ export default function Home() {
               )
             ) : null}
 
-            {/* ≥২ ফাইল — মার্জ (.docx, দুই ধরনের সিরিয়াল) বা ZIP */}
+            {/* ≥২ ফাইল — প্রতি ফাইলের সিরিয়াল-স্কিম + মার্জ (.docx) / ZIP ডাউনলোড */}
             {serialDocs.length >= 2 && (
-              <MultiDownloadCard
-                title="সব ফাইল একসাথে সিরিয়াল করুন"
-                description="প্রতিটা ফাইলের সব প্রশ্ন পরপর নম্বর পাবে — রঙ-হেডার, ইকুয়েশন, ছবি সব অক্ষত থাকবে। রঙ-অনুযায়ী সিরিয়াল লাগলে ওই ফাইলটা একা আপলোড করুন।"
-                stats={`${serialDocs.length} টি ফাইল • মোট ${serialDocs.reduce((a, d) => a + d.analysis.questionCount, 0)} টি প্রশ্ন`}
-                showSerialChoice
-                serialStrategy={serialStrategy}
-                onSerialStrategyChange={setSerialStrategy}
-                onDownloadMerged={handleSerialMultiMerged}
-                onDownloadZip={handleSerialMultiZip}
-                mergedBusy={serialMergedBusy}
-                zipBusy={serialZipBusy}
-              />
+              <>
+                <MultiSerialSchemeCard
+                  docs={serialDocs.map((d) => ({ id: d.id, name: d.file.name, analysis: d.analysis }))}
+                  schemes={serialSchemes}
+                  onSchemeChange={(id, scheme) => setSerialSchemes((prev) => ({ ...prev, [id]: scheme }))}
+                />
+                <MultiDownloadCard
+                  title="সব ফাইল একসাথে সিরিয়াল করুন"
+                  description="প্রতিটা ফাইলের সব প্রশ্ন পরপর নম্বর পাবে — রঙ-হেডার, ইকুয়েশন, ছবি সব অক্ষত থাকবে। রঙ-অনুযায়ী সিরিয়াল লাগলে ওই ফাইলটা একা আপলোড করুন।"
+                  stats={`${serialDocs.length} টি ফাইল • মোট ${serialDocs.reduce((a, d) => a + d.analysis.questionCount, 0)} টি প্রশ্ন`}
+                  showSerialChoice
+                  serialStrategy={serialStrategy}
+                  onSerialStrategyChange={setSerialStrategy}
+                  onDownloadMerged={handleSerialMultiMerged}
+                  onDownloadZip={handleSerialMultiZip}
+                  mergedBusy={serialMergedBusy}
+                  zipBusy={serialZipBusy}
+                />
+              </>
             )}
           </>
         ) : (

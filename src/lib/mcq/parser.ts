@@ -3,6 +3,8 @@
 // বাংলা (১২৩ / ০-৯) এবং English (1,2,3) উভয় নম্বরিং সাপোর্ট করে
 // ============================================================
 
+import { MAX_SERIAL_NUMBER } from "./limits";
+
 export interface McqQuestion {
   /** অরিজিনাল ডকুমেন্ট অর্ডারে ইউনিক আইডি (0-based) */
   id: number;
@@ -105,11 +107,22 @@ function classifyLine(
   if (!m) return { kind: "continuation" };
 
   const num = bnToNumber(m[1]);
-  if (num == null || num <= 0 || num > 2000) return { kind: "continuation" };
+  // সিলিং = MAX_SERIAL_NUMBER (৪-ডিজিট, Q_RE-এর {1,4}-এর সাথে সামঞ্জস্য) —
+  // docx-পাইপলাইনের (docx-xml.ts isQuestionStart) সাথে ইউনিফাইড (Task 21-a)
+  if (num == null || num <= 0 || num > MAX_SERIAL_NUMBER) return { kind: "continuation" };
 
   const hasSep = m[2] !== "";
   const textAfter = line.slice(m[0].length);
   if (!textAfter.trim()) return { kind: "continuation" };
+
+  // বছর-গার্ড (Task 21-a): 1900..2100-র মত সংখ্যা + সেপারেটরের পরের টেক্সটের
+  // প্রথম ~১০ অক্ষরে "সাল"/"year" থাকলে এটা সিরিয়াল নয়, বছর-টোকেন
+  // (যেমন "2024. সালের ফলাফল…" / "২০২৫ সালে…") → কনটিনিউয়েশন।
+  // টাইট গার্ড: শুধু এই সংকীর্ণ রেঞ্জ + শুরুর ১০ অক্ষর — বাকি আচরণ অপরিবর্তিত।
+  if (num >= 1900 && num <= 2100) {
+    const head = textAfter.trimStart().slice(0, 10).toLowerCase();
+    if (head.includes("সাল") || head.includes("year")) return { kind: "continuation" };
+  }
 
   if (hasSep) return { kind: "question", match: m };
 

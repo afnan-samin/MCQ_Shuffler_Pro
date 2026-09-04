@@ -149,5 +149,35 @@ check("লাইনে নম্বর টেক্সট থাকে (প্�
 check("rawPrefix সাধারণ টেক্সট", p14.questions[0].rawPrefix.trim() === "১.", JSON.stringify(p14.questions[0].rawPrefix));
 check("সেট টেক্সটে বুলেট চিহ্ন যোগ হয় না", !"•‣◦·-–".split("").some(b => getSetName(0, "letter").startsWith(b)));
 
+console.log("— টেস্ট ১৫: সিরিয়াল-সিলিং ইউনিফাই (MAX_SERIAL_NUMBER=9999) —");
+// আগে টেক্সট-পার্সে সিলিং 2000 ছিল — ২৫০০/৬০০০-জাতীয় সিরিয়ালের প্রশ্ন ধরা পড়ত না (Task 21-a)
+const big15 = parseMcq(
+  "2500. সিরিয়াল ২৫০০-এর প্রশ্ন?\nক) উত্তর-১\nখ) উত্তর-২\n6000. সিরিয়াল ৬০০০-এর প্রশ্ন?\na) X\nb) Y"
+);
+check("সিরিয়াল 2500 প্রশ্ন ডিটেক্ট", big15.questions.length === 2 && big15.questions[0].originalNumber === 2500, `got ${JSON.stringify(big15.questions.map(q => q.originalNumber))}`);
+check("সিরিয়াল 6000 প্রশ্ন ডিটেক্ট", big15.questions[1]?.originalNumber === 6000);
+check("দুই প্রশ্নেই ২টা করে অপশন অক্ষত", big15.questions.every(q => q.options.length === 2));
+// সিলিং-বাউন্ডারি: ৪-ডিজিট রেঞ্জের শেষ মান 9999-ও প্রশ্ন হয়
+const b9999 = parseMcq("9999. শেষ সিরিয়ালের প্রশ্ন?\nক) উত্তর");
+check("সিলিং-বাউন্ডারি 9999 প্রশ্ন ডিটেক্ট", b9999.questions.length === 1 && b9999.questions[0].originalNumber === 9999, `got ${JSON.stringify(b9999.questions.map(q => q.originalNumber))}`);
+
+console.log("— টেস্ট ১৬: বছর-গার্ড (1900..2100 + 'সাল'/'year' = প্রশ্ন নয়) —");
+// "2024. সালের ফলাফল…" — সেপারেটর-সহ লাইন; গার্ড ছাড়া ভুল করে প্রশ্ন-শুরু হত (Task 21-a)
+const yg1 = parseMcq("5. আসল প্রশ্ন?\nক) উত্তর\n2024. সালের ফলাফল প্রকাশিত হয়েছে।");
+check("'2024. সালের ফলাফল…' প্রশ্ন নয় (কনটিনিউয়েশন)", yg1.questions.length === 1 && yg1.questions[0].originalNumber === 5, `got ${JSON.stringify(yg1.questions.map(q => q.originalNumber))}`);
+check("বছর-লাইন প্রশ্ন-৫-এর কনটিনিউয়েশন হিসেবে সংরক্ষিত", yg1.questions[0].lines.some(l => l.startsWith("2024.")));
+// বাংলা ডিজিট + সেপারেটর ছাড়া লাইনও প্রশ্ন নয়
+const yg2 = parseMcq("৩. ইতিহাসের প্রশ্ন?\nক) উত্তর\n২০২৫ সালে কী ঘটেছিল?");
+check("'২০২৫ সালে…' প্রশ্ন নয়", yg2.questions.length === 1 && yg2.questions[0].originalNumber === 3, `got ${JSON.stringify(yg2.questions.map(q => q.originalNumber))}`);
+// English "year" (case-insensitive)
+const yg3 = parseMcq("4. Real question?\na) ans\n2024. Year of the war?");
+check("'2024. Year of…' প্রশ্ন নয় (case-insensitive)", yg3.questions.length === 1 && yg3.questions[0].originalNumber === 4, `got ${JSON.stringify(yg3.questions.map(q => q.originalNumber))}`);
+// গার্ড টাইট: 1900..2100 রেঞ্জের নম্বর হলেও "সাল"/"year" ছাড়া টেক্সট = আসল প্রশ্ন
+const yg4 = parseMcq("2024. বাংলাদেশের প্রথম রাজধানী?\nক) সোনারগাঁও\n2025. বর্তমান রাজধানী?\nক) ঢাকা");
+check("গার্ড-রেঞ্জের নম্বর হলেও 'সাল/year' ছাড়া প্রশ্ন হয়", yg4.questions.length === 2 && yg4.questions[0].originalNumber === 2024 && yg4.questions[1].originalNumber === 2025, `got ${JSON.stringify(yg4.questions.map(q => q.originalNumber))}`);
+// প্রথম-প্রশ্ন num ≤ 50 নিয়ম অপরিবর্তিত (সেপারেটর-হীন প্রথম লাইনে বড় সংখ্যা প্রশ্ন নয়)
+const firstBig = parseMcq("2024 সালের সারসংক্ষেপ\nআরও লাইন");
+check("প্রথম-প্রশ্ন num ≤ 50 নিয়ম অক্ষত", firstBig.questions.length === 0, `got ${firstBig.questions.length}`);
+
 console.log(`\n==== রেজাল্ট: ${pass} পাস, ${fail} ফেল ====`);
 process.exit(fail ? 1 : 0);

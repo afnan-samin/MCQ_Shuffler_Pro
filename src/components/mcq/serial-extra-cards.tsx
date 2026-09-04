@@ -4,9 +4,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronDown, ChevronUp, Download, Info, ListOrdered, PaintBucket, ShieldX } from "lucide-react";
-import type { BlockedLine, ColorAnalysis } from "@/lib/mcq/color-serial";
+import { CheckCircle2, ChevronDown, ChevronUp, Download, FileText, Info, ListOrdered, PaintBucket, ShieldX } from "lucide-react";
+import { colorKeyHex, colorKeyName, type BlockedLine, type ColorAnalysis, type SerialScheme } from "@/lib/mcq/color-serial";
 import { lineDominantOf } from "@/lib/mcq/encoding";
+import { cn } from "@/lib/utils";
 
 interface ColorShuffleInfoCardProps {
   analysis: ColorAnalysis;
@@ -187,6 +188,137 @@ export function BlockedLinesCard({ blocked }: BlockedLinesCardProps) {
             )}
           </Button>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------- প্রতি ফাইলের সিরিয়াল-স্কিম (মাল্টি-ফাইল সিরিয়াল মোড) ----------
+
+interface MultiSchemeDoc {
+  id: string;
+  name: string;
+  analysis: ColorAnalysis;
+}
+
+interface MultiSerialSchemeCardProps {
+  docs: MultiSchemeDoc[];
+  /** কী = doc.id — বাছাই করা স্কিম; না থাকলে { kind: "continuous" } ধরা হয় */
+  schemes: Record<string, SerialScheme>;
+  onSchemeChange: (id: string, scheme: SerialScheme) => void;
+}
+
+/** সোয়াচ — color-serial-card-এর হুবহু স্টাইল (থিম-কী হলে নিরপেক্ষ গ্রেডিয়েন্ট) */
+function SchemeSwatch({ hex, size = "h-4 w-4" }: { hex: string | null; size?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "inline-block shrink-0 rounded-md border border-border shadow-sm",
+        size,
+        !hex && "bg-gradient-to-br from-slate-200 to-slate-400 dark:from-slate-600 dark:to-slate-800"
+      )}
+      style={hex ? { backgroundColor: `#${hex}` } : undefined}
+    />
+  );
+}
+
+/**
+ * মাল্টি-ফাইল সিরিয়ালে প্রতি ফাইলের সিরিয়াল-স্কিম বাছাই — ডিফল্ট একটানা
+ * (আগের আচরণ হুবহু); রঙ-হেডারওয়ালা ফাইলে রঙ বেছে নিলে ওই ফাইলের প্রতি
+ * সেকশনে নম্বর ১ থেকে রিস্টার্ট হয়। চিপ-টগল স্টাইল color-serial-card অনুযায়ী।
+ */
+export function MultiSerialSchemeCard({ docs, schemes, onSchemeChange }: MultiSerialSchemeCardProps) {
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <PaintBucket className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <CardTitle className="text-base md:text-lg">প্রতি ফাইলের সিরিয়াল-স্কিম</CardTitle>
+            <CardDescription>
+              ডিফল্ট একটানা — রঙ-হেডারওয়ালা ফাইলে রঙ বেছে নিলে প্রতি সেকশনে নম্বর ১ থেকে রিস্টার্ট হবে
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {docs.map((d) => {
+          const scheme = schemes[d.id] ?? { kind: "continuous" as const };
+          const hasColors = d.analysis.colors.length > 0;
+          return (
+            <div key={d.id} className="space-y-2 rounded-xl border p-3">
+              {/* ফাইল-রো — নাম + প্রশ্ন-সংখ্যা (span.flex-1.truncate নয়: মাল্টি-লিস্ট কাউন্টার ভাঙে না) */}
+              <div className="flex min-w-0 items-center gap-2">
+                <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">{d.name}</span>
+                </div>
+                <Badge variant="secondary" className="shrink-0">
+                  {d.analysis.questionCount} প্রশ্ন
+                </Badge>
+              </div>
+
+              {hasColors ? (
+                <div className="flex flex-wrap gap-2">
+                  {/* একটানা চিপ */}
+                  <button
+                    type="button"
+                    onClick={() => onSchemeChange(d.id, { kind: "continuous" })}
+                    className={cn(
+                      "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors",
+                      scheme.kind === "continuous"
+                        ? "border-primary bg-primary/10 font-semibold ring-1 ring-primary"
+                        : "bg-background hover:bg-muted/60"
+                    )}
+                  >
+                    <span className="inline-block h-4 w-4 shrink-0 rounded-md border border-border bg-gradient-to-r from-emerald-400 to-sky-500 shadow-sm" />
+                    একটানা
+                    {scheme.kind === "continuous" && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                  </button>
+
+                  {/* প্রতি রঙের চিপ — সোয়াচ + নাম + সেকশন-ব্যাজ */}
+                  {d.analysis.colors.map((c) => {
+                    const active = scheme.kind === "color" && scheme.key === c.key;
+                    const hex = colorKeyHex(c.key);
+                    return (
+                      <button
+                        key={c.key}
+                        type="button"
+                        onClick={() => onSchemeChange(d.id, { kind: "color", key: c.key })}
+                        className={cn(
+                          "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors",
+                          active
+                            ? "border-primary bg-primary/10 font-semibold ring-1 ring-primary"
+                            : "bg-background hover:bg-muted/60"
+                        )}
+                      >
+                        <SchemeSwatch hex={hex} />
+                        <span className={cn("font-mono font-semibold", !hex && "font-sans")}>{colorKeyName(c.key)}</span>
+                        <Badge variant="secondary" className="px-1.5 py-0 text-[11px]">
+                          {c.sections} সেকশন
+                        </Badge>
+                        {active && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">রঙ নেই — একটানা হবে</p>
+              )}
+            </div>
+          );
+        })}
+
+        <div className="flex items-start gap-2 rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <p>
+            <b>একটানা</b> = পুরো ফাইলে ১,২,৩… ; <b>রঙ</b> = ওই রঙের প্রতি হেডার-সেকশনে ১ থেকে শুরু। বাছাই মার্জ (.docx)
+            ও ZIP — দুই ডাউনলোডেই প্রয়োগ হয়।
+          </p>
+        </div>
       </CardContent>
     </Card>
   );

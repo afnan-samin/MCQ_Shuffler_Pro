@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { FileText, FileUp, Loader2, Search, Sparkles, ClipboardPaste } from "lucide-react";
+import { withBase } from "@/lib/base-path";
 
 interface InputCardProps {
   rawText: string;
@@ -25,7 +26,7 @@ interface InputCardProps {
   docxLoading: boolean;
 }
 
-const SAMPLE_DOCX_URL = "/sample/hsc27-physics-bijoy.docx";
+const SAMPLE_DOCX_URL = withBase("/sample/hsc27-physics-bijoy.docx");
 
 export function InputCard({
   rawText,

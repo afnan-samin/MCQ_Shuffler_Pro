@@ -11,6 +11,8 @@
 
 import JSZip from "jszip";
 
+import { MAX_SERIAL_NUMBER } from "./limits";
+
 export const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 export const M_NS = "http://schemas.openxmlformats.org/officeDocument/2006/math";
 const XML_NS = "http://www.w3.org/XML/1998/namespace";
@@ -204,7 +206,9 @@ function isSectionSeparator(text: string): boolean {
 }
 
 export function isQuestionStart(si: SerialPrefix, hasRunTab: boolean, nextText: string | null): boolean {
-  if (si.num > 5000) return false;
+  // সিলিং = MAX_SERIAL_NUMBER (৪-ডিজিট, SERIAL_RE-এর {1,4}-এর সাথে সামঞ্জস্য) —
+  // টেক্সট-পার্সারের (parser.ts) সাথে ইউনিফাইড; আগে এখানে 5000 ছিল (Task 21-a)
+  if (si.num > MAX_SERIAL_NUMBER) return false;
   // টিয়ার ১: সিরিয়ালের পরে ট্যাব আছে (ইউজারের ফরম্যাট: "32.<tab>প্রশ্ন")
   if (hasRunTab) return true;
   // টিয়ার ২: পরের নন-এম্পটি প্যারা অপশন-লেড (ট্যাব/ক খ গ ঘ মার্কার)

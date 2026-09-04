@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Noto_Sans_Bengali } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 
@@ -16,6 +17,20 @@ const geistMono = Geist_Mono({
 const notoBengali = Noto_Sans_Bengali({
   variable: "--font-bengali",
   subsets: ["bengali"],
+});
+
+/* Kalpurush — সাইটের মূল ফন্ট (next/font/local দিয়ে এমবেড; GitHub Pages সাবপাথেও কাজ করে) */
+const kalpurush = localFont({
+  src: "../../public/fonts/kalpurush.woff2",
+  variable: "--font-kalpurush",
+  display: "swap",
+});
+
+/* SutonnyMJ — Bijoy (ANSI লিগ্যাসি) টেক্সট ওয়েবে দেখানোর ওয়েব-ফন্ট */
+const sutonny = localFont({
+  src: "../../public/fonts/SutonnyMJ.woff",
+  variable: "--font-sutonny",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -39,7 +54,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="bn" suppressHydrationWarning>
+    <html
+      lang="bn"
+      suppressHydrationWarning
+      className={`${kalpurush.variable} ${sutonny.variable}`}
+    >
       <body
         className={`${geistSans.variable} ${notoBengali.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >

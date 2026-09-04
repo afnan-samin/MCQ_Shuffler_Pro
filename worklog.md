@@ -359,3 +359,94 @@ Stage Summary:
 - প্রজেক্ট এখন ১০০% ক্লায়েন্ট-সাইড — src/app-এ API রুট নেই, ভবিষ্যতের স্ট্যাটিক এক্সপোর্ট/cPanel হোস্টিং-এর পথ প্রস্তুত
 - রিভিউ থেকে চিহ্নিত গ্যাপ: parser.ts:108 সিরিয়াল-ভ্যালু সিলিং 2000 বনাম docx-xml.ts:207-এ 5000 (অসামঞ্জস্য), ~৩৫টা অব্যবহৃত টেমপ্লেট ডিপেন্ডেন্সি + মরা db:* স্ক্রিপ্ট (prisma/ ফোল্ডার নেই), playwright devDependency-তে ডিক্লেয়ারড নেই (E2E তবু চলে), সিরিয়াল-মাল্টিতে রঙ-স্কিম UI নেই (ইচ্ছাকৃত, continuous), সিরিয়াল মোডে paste ইনপুট নেই
 - ইউজারকে দুই মোডের সম্পূর্ণ ইউজার-জার্নি, সব অপশন/ডাউনলোড, core/optional ফিচার-শ্রেণিবিভাগসহ বিস্তারিত রিভিউ চ্যাটে দেওয়া হয়েছে
+
+---
+Task ID: 21-a
+Agent: General (ceiling unify)
+Task: 2000/5000 সিরিয়াল-সিলিং → MAX_SERIAL_NUMBER=9999 ইউনিফাই + year-গার্ড
+
+Work Log:
+- প্রাক-পাঠ: worklog (Task 18–20) + parser.ts, docx-xml.ts, test-mcq.ts, test-docx.ts, test-color-serial.ts (সিনথেটিক-XML প্যাটার্ন); baseline টেস্ট ২৯০ (৬১+৪৩+১২৯+৫৭), isQuestionStart গ্রেপ — color-serial.ts-ও docx-xml-এর শেয়ার্ড সিলিং ব্যবহার করে (relaxation ওখানেও ধারাবাহিকভাবে প্রযোজ্য)
+- src/lib/mcq/limits.ts (নতুন): export const MAX_SERIAL_NUMBER = 9999 — বাংলা কমেন্টে ৪-ডিজিট লিমিটের ব্যাখ্যা (Q_RE/SERIAL_RE উভয়েই ডিজিট-ক্লাস {1,4}, তাই ভ্যালু-সিলিং ঠিক সেই রেঞ্জের শেষ মান — বেশি দিলে মৃত-কোড, কম দিলে বৈধ সিরিয়াল হারায়)
+- parser.ts: classifyLine-এ `num > 2000` → `num > MAX_SERIAL_NUMBER` (import limits); টাইট year-গার্ড যোগ — num ∈ [1900..2100] এবং সেপারেটরের পরের টেক্সটের প্রথম ~১০ অক্ষরে "সাল" বা "year" (toLowerCase, case-insensitive) হলে continuation (কারণ: "2024. সালের ফলাফল…" hasSep-পথে আগে ভুল প্রশ্ন হত; no-sep-পথে চেইন-রুল আগেই আটকাত); প্রথম-প্রশ্ন num ≤ 50 নিয়ম, চেইন-রুল, অপশন-ডিটেকশন — সব অপরিবর্তিত
+- docx-xml.ts: isQuestionStart-এ `si.num > 5000` → `si.num > MAX_SERIAL_NUMBER` (import limits); tier-১ (রান-ট্যাব), tier-২ (অপশন-লেড), tier-৩ ডেসিমাল-গার্ড (num ≤ 999) — সব অপরিবর্তিত
+- সেমান্টিক্স-আপডেটের যৌক্তিকতা: কোনো পুরনো টেস্ট 2000/5000-সিলিংয়ের উপর দাঁড়িয়ে ছিল না (grep দ্বারা নিশ্চিত — একমাত্র test-mcq-এর "২০০০ প্রশ্ন" টেস্টটা প্রশ্ন-কাউন্ট, সিরিয়াল-ভ্যালু নয়) — তাই কোনো পুরনো দাবি বদলাতে হয়নি, শুধু নতুন কেস যোগ হয়েছে
+- test-mcq.ts (+১০, ৬১→৭১): টেস্ট ১৫ সিলিং-ইউনিফাই (সিরিয়াল 2500/6000 প্রশ্ন ডিটেক্ট, অপশন অক্ষত, বাউন্ডারি 9999) + টেস্ট ১৬ year-গার্ড ("2024. সালের ফলাফল…" কনটিনিউয়েশন+সংরক্ষিত, "২০২৫ সালে…" প্রশ্ন নয়, "2024. Year of…" case-insensitive প্রশ্ন নয়, গার্ড-রেঞ্জে 'সাল/year'-ছাড়া প্রশ্ন হয়, প্রথম-প্রশ্ন ≤50 অক্ষত)
+- test-docx.ts (+৫, ৪৩→৪৮): নতুন সেকশন ৮ — সিনথেটিক XML ফিক্সচারে (test-color-serial-এর wrapDoc-প্যাটার্নে) সিরিয়াল 6000 টিয়ার-২ প্রশ্ন-স্টার্ট + অপশন, বাউন্ডারি 9999, টিয়ার-১ রান-ট্যাবে 6001, টিয়ার-৩ ডেসিমাল-গার্ড অপরিবর্তিত (2000 > 999 → প্রশ্ন নয়)
+- ভেরিফিকেশন: npx tsc --noEmit → exit 0 (শূন্য এরর); bun test-mcq/test-docx/test-color-serial/test-multi-docx → ৭১ + ৪৮ + ১২৯ + ৫৭ = ৩০৫/৩০৫ পাস; dev server HTTP 200 (localhost:3000, bun run dev)
+
+Stage Summary:
+- টেক্সট ও docx দুই পাইপলাইনেই সিরিয়াল-সিলিং এখন এক — MAX_SERIAL_NUMBER = 9999 (limits.ts); ২০০১–৯৯৯৯ সিরিয়ালের প্রশ্ন টেক্সট-পার্সে আর হারায় না, docx-পার্সে ৫০০১–৯৯৯৯ নতুন ধরা পায় (tier-গার্ডগুলো আগের মতই ভুল-পজিটিভ আটকায়)
+- নতুন year-গার্ড: 1900–2100-জাতীয় বছর-টোকেন ("2024 সালের ফলাফল", "2024. Year of…") লাইন-শুরুতে এলে আর ভুল প্রশ্ন হয় না — গার্ড টাইট (১৯০০–২১০০ রেঞ্জ + প্রথম ১০ অক্ষরে সাল/year), অন্য আচরণ অপরিবর্তিত
+- টেস্ট ২৯০ → ৩০৫ (test-mcq ৭১, test-docx ৪৮, test-color-serial ১২৯, test-multi-docx ৫৭) — সব পাস; tsc শূন্য এরর; dev HTTP 200
+
+---
+Task ID: 21-c
+Agent: General (static export + GH Pages)
+Task: স্ট্যাটিক-এক্সপোর্ট, basePath, next/font ফন্ট, GitHub Actions ডিপ্লয়, README
+
+Work Log:
+- next.config.ts: STATIC_EXPORT=1 হলে output:"export" + images.unoptimized + distDir:".next-static", নাহলে আগের output:"standalone"; basePath = NEXT_PUBLIC_BASE_PATH ?? "" সব মোডে; typescript.ignoreBuildErrors/reactStrictMode অক্ষত
+- নতুন src/lib/base-path.ts (BASE_PATH + withBase); input-card.tsx: SAMPLE_DOCX_URL = withBase("/sample/hsc27-physics-bijoy.docx") (import যোগ, setUploadName ফাইলনেম অপরিবর্তিত)
+- src grep: পাবলিক-অ্যাসেট absolute-path ছিল শুধু input-card.tsx (/sample/) ও globals.css (/fonts/) — দুটোই নিচে ঠিক করা হয়েছে; অন্য কোথাও নেই
+- layout.tsx: next/font/local দিয়ে Kalpurush (kalpurush.woff2) + SutonnyMJ (SutonnyMJ.woff), variable --font-kalpurush/--font-sutonny <html> className-এ; আগের Geist/Noto_Sans_Bengali ভ্যারিয়েবল (body-তে) অক্ষত। নোট: src/app/layout.tsx থেকে public-এ আপেক্ষিক পাথ "../../public/fonts/…" (টাস্ক-লেখার ../… হলে src/app বাদে ফাইল পাওয়া যেত না)
+- globals.css: Kalpurush/SutonnyMJ @font-face ব্লক সরানো; --font-sans ও body font-family এখন var(--font-kalpurush) দিয়ে শুরু (আগের ফলব্যাক-স্ট্যাক অক্ষত); .tok-bijoy স্ট্যাক = "SutonnyMJ", var(--font-sutonny), "Bijoy", monospace, sans-serif; tw-animate-css @import ও বাকি সব অক্ষত
+- package.json: scripts-এ "build:static": "STATIC_EXPORT=1 next build" যোগ (অন্য কিছু বদলায়নি, bun.lock অক্ষত)
+- নতুন .github/workflows/deploy.yml: push(main)+workflow_dispatch, permissions (contents:read/pages:write/id-token:write), concurrency group pages, build job (checkout@v4 → setup-bun@v2 → bun install --frozen-lockfile → Compute base path: repo *.github.io হলে খালি নাহলে /$R → GITHUB_ENV → bun run build:static (NEXT_PUBLIC_BASE_PATH) → .nojekyll → upload-pages-artifact@v3) + deploy job (deploy-pages@v4, environment github-pages)। অ্যাডাপ্টেশন: Next.js 16-তে output=export + কাস্টম distDir দিলে এক্সপোর্ট সাইট distDir-ই লেখে (node_modules/next/dist/build/index.js-এ hasCustomExportOutput → configOutDir=config.distDir) — তাই স্টেপটি `rm -rf out && mv .next-static out && touch out/.nojekyll` (প্রমাণসহ কমেন্টেড)
+- .gitignore: /.next-static/ যোগ (/out/ আগেই ছিল)
+- লোকাল স্ট্যাটিক-বিল্ড: STATIC_EXPORT=1 NEXT_PUBLIC_BASE_PATH=/mcq-shuffler-pro npx next build → ✓ Compiled successfully in 7.9s, 3/3 static pages, Route: ○ / + ○ /_not-found (সব Static)
+- out/ যাচাই: index.html ✓, .nojekyll ✓; HTML/JS অ্যাসেট সব /mcq-shuffler-pro/-প্রিফিক্সড; CSS-এ absolute "/fonts/" = 0 (সব url(../media/…)); JS চাংকে "/mcq-shuffler-pro/sample/hsc27-physics-bijoy.docx" (withBase ইনলাইন) ✓; media-তে kalpurush + SutonnyMJ ফন্ট
+- ভেরিফিকেশন: tsc --noEmit → src/lib/base-path.ts/layout/input-card/globals ক্লিন; একটাই এরর src/app/page.tsx(1055) SerialInputCardProps প্রপস — অন্য এজেন্টের চলমান এডিট (স্পর্শ নিষিদ্ধ), আমার ফাইলে কোনো এরর নেই; ৪ ইউনিট-টেস্ট পাস (test-mcq 71 + test-docx 48 + test-color-serial 129 + test-multi-docx 57 = 305, 0 ফেল)
+- dev (localhost:3000) → HTTP 200; <html>-এ দুই ফন্ট-ভ্যারিয়েবল ক্লাস; body computed font "kalpurush, …" দিয়ে শুরু; document.fonts.check → kalpurush:true, sutonny:true; স্যাম্পল-লোড+ডিটেক্টের পর .tok-bijoy computed font = "SutonnyMJ", sutonny, "sutonny Fallback", Bijoy, monospace, sans-serif; dev.log-এ 404/500 = 0; স্ক্রিনশট প্রমাণ tool-results/font-render-check.png
+- নতুন README.md (বাংলা): পরিচিতি, ফিচার, লোকাল ডেভ, GitHub Pages ধাপে ধাপে (repo → push → Settings→Pages→GitHub Actions → লাইভ URL; username.github.io রুট-ডোমেইন নোট; কাস্টম ডোমেইন), স্ট্যাটিক-বিল্ড যাচাই কমান্ড
+
+Stage Summary:
+- স্ট্যাটিক-এক্সপোর্ট সম্পূর্ণ রেডি: STATIC_EXPORT=1 বিল্ড সফল, out/ (Next 16-তে .next-static হিসেবে জেনারেট হয়ে ওয়ার্কফ্লোতে mv হয়) পুরোপুরি সাবপাথ-প্রিফিক্সড — GitHub Pages প্রজেক্ট-সাইট ও username.github.io দুই কেসেই চলবে
+- ফন্ট এখন next/font/local — CSS-এ কোনো url("/fonts/…") নেই; সাবপাথে ফন্ট 404-এর ঝুঁকি শেষ; PC-ইনস্টলড SutonnyMJ প্রায়োরিটি অক্ষত
+- dev/স্যান্ডবক্স-প্রিভিউ (standalone) পাথ অক্ষত; সীমাবদ্ধতা: Next 16-এ export-মোডে বিল্ড-ইন্টারনাল .next-এই লেখে (distDir নির্বিশেষে) — dev তবু 200, Next নিজে .next/dev আলাদা রাখে; page.tsx-এর tsc এরর অন্য এজেন্টের ইন-ফ্লাইট কাজ, আমার স্কোপে নয়
+
+---
+Task ID: 21-b
+Agent: Full-stack (serial paste + per-file scheme)
+Task: সিরিয়াল মোড পেস্ট-ইনপুট + মাল্টি-ফাইল per-file রঙ-স্কিম
+
+Work Log:
+- প্রাক-পাঠ: worklog.md (Task 19-এর মাল্টি-ফাইল সিদ্ধান্তসহ) + page.tsx, serial-input-card, serial-extra-cards, multi-download-card, input-card (পেস্ট-ট্যাব প্যাটার্ন), parser.ts (parseMcq/ParseOutput/autoFixNumbering/formatNumberByScript), color-serial.ts (planSerialByColor/SerialScheme/ColorAnalysis/colorKeyHex/colorKeyName), exporter.ts (exportDocx — সেট-টাইটেল প্যারা অবাধ্য, নিচে নোট), set-engine.ts (getSetName), e2e দুটো স্ক্রিপ্ট (strict-selector সংঘর্ষ এড়ানোর প্ল্যানসহ)
+- ফিচার ১ (পেস্ট): নতুন `src/lib/mcq/serial-paste.ts` — renumberQuestionsByPosition(): autoFixNumbering-এর হুবহু প্যাটার্নে (rawPrefix বাদ → formatNumberByScript + separator-fallback "." + স্পেস) প্রথম লাইনের লিডিং নম্বর পজিশন-অনুযায়ী ১..N; প্রতি প্রশ্ন নিজের numberScript-এ (bn/en), অরিজিনাল অ্যারে mutate-না
+- serial-input-card.tsx: ইনার Tabs (defaultValue="upload") — "ফাইল আপলোড" (FileUp) / "পেস্ট করুন" (ClipboardPaste); পেস্ট ট্যাবে Textarea (min-h-[220px], font-mono, input-card-এর placeholder-স্টাইল) + বাটন "🔍 প্রশ্ন ডিটেক্ট করুন" (busy: "ডিটেক্ট হচ্ছে..."); বিদ্যমান props/ফাইল-ফ্লো হুবহু অক্ষত; লুকানো দুই file-input Tabs-এর বাইরে সরানো (paste-ট্যাবে থাকলেও আপলোড ও "আরও ফাইল যোগ করুন" কাজ করে — Radix inactive-ট্যাব unmount ব্যতিক্রম); কার্ড-টাইটেল "MCQ সিরিয়াল — ফাইল আপলোড" অক্ষত (e2e নির্ভরতা)
+- নতুন `src/components/mcq/serial-paste-card.tsx` (SerialPasteCard): স্টেপ-ব্যাজ "২", টাইটেল "ডিটেকশন রেজাল্ট (পেস্ট)"; স্ট্যাট-গ্রিড মোট প্রশ্ন / অপশনসহ প্রশ্ন / নম্বরের ধরন; সিরিয়াল-স্ট্যাটাস (ok=সবুজ, broken=অ্যাম্বার + issues-প্রিভিউ + "🔧 অটো নম্বরিং ঠিক করুন"); অ্যাম্বার নোট "পেস্ট মোডে রঙ-ডিটেকশন হয় না — রঙ-ভিত্তিক সিরিয়ালের জন্য .docx ফাইল আপলোড করুন"; বড় বাটন "সিরিয়াল করে .docx ডাউনলোড (১..N)" (busy "তৈরি হচ্ছে...")
+- page.tsx: serialPasteText/serialPaste/serialPasteBusy/serialPasteFixing/serialPasteDlBusy স্টেট; handleSerialPasteDetect (parseMcq → ফাইল-লিস্ট+স্কিম ক্লিয়ার → ডিটেক্ট-স্টাইল বাংলা toast: 0-প্রশ্ন/ok/broken তিন শাখা), handleSerialPasteFix (autoFixNumbering → টেক্সট+রেজাল্ট আপডেট), handleSerialPasteDownload (renumberQuestionsByPosition → exportDocx([এক সেট], {...DEFAULT_EXPORT_OPTIONS, includeHeader:false})); পারস্পরিক একচেটিয়া: ফাইল-লোড সাফল্যে serialPaste=null, পেস্ট-ডিটেক্টে serialDocs=[]+serialSchemes={}, serialDocs.length>0 হলে পেস্ট-কার্ড রেন্ডার নয়
+- ফিচার ২ (per-file স্কিম): page.tsx-এ serialSchemes: Record<string, SerialScheme> (কী=SerialState.id); loadSerialFiles-এ প্রতি নতুন id-তে {kind:"continuous"} (replace-এ পুরনো ম্যাপ বদল, append-এ মার্জ), removeSerialDoc-এ কী-ডিলিট, openInSerialMode-এ ১-এন্ট্রি ম্যাপ; handleSerialMultiMerged/handleSerialMultiZip-এ plan = planSerialByColor(d.analysis, serialSchemes[d.id] ?? {kind:"continuous"}) — offsetSerialPlan-অফসেট লজিক হুবহু অক্ষত (offset += base.size)
+- serial-extra-cards.tsx-এ নতুন MultiSerialSchemeCard: serialDocs.length ≥ 2 হলে MultiDownloadCard-এর ঠিক উপরে; টাইটেল "প্রতি ফাইলের সিরিয়াল-স্কিম"; প্রতি ফাইল-রোতে নাম+প্রশ্ন-ব্যাজ; রঙ থাকলে "একটানা" চিপ + প্রতি রঙের চিপ (SchemeSwatch = colorKeyHex, নাম = colorKeyName, ব্যাজ = sections) — color-serial-card-এর হুবহু চিপ-স্টাইল (border-primary bg-primary/10 ring-1 + CheckCircle2); রঙ না থাকলে "রঙ নেই — একটানা হবে"; ফাইলনাম span-এ flex-1+truncate ইচ্ছাকৃত এড়ানো (e2e-র span.flex-1.truncate===3 কাউন্টার রক্ষা)
+- ভেরিফিকেশন: npx tsc --noEmit ০ এরর; bun run lint ক্লিন; ইউনিট ৭১+৪৮+১২৯+৫৭ = ৩০৫/৩০৫ পাস (অন্য এজেন্টের বাড়তি টেস্টসহ অপরিবর্তিত পাস); dev HTTP 200; e2e-multi-file.ts সব-স্টেপ পাস (ডিফল্ট continuous রিগ্রেশন-প্রুফ), e2e-mode-tabs.ts সব-স্টেপ পাস (JS-error শূন্য); নিজে playwright দিয়ে ম্যানুয়াল চেক (টেম্প-স্ক্রিপ্ট, পরে ডিলিট): পেস্ট-ট্যাব দৃশ্যমান → SAMPLE_MCQ প্রি-ফিল → ডিটেক্ট → ১২ প্রশ্ন/সিরিয়াল-ok → ডাউনলোড = বৈধ docx-এ ১..১২ bn-রিনাম্বার; একচেটিয়া দুই দিকেই যাচাই; ≥২ ফাইলে স্কিম-কার্ড + B1-টগল + ZIP; গভীর-প্রুফ: একই CHEM-এর continuous বনাম B1-স্কিম ZIP-আউটপুটের document.xml ভিন্ন (স্কিম সত্যিই প্রয়োগ হয়); কনসোল-এরর শূন্য
+
+Stage Summary:
+- সিরিয়াল মোডে এখন পেস্ট-ইনপুটও চলে: টেক্সট → ডিটেক্ট → (ভাঙা হলে অটো-ফিক্স) → পজিশন-অনুযায়ী ১..N সিরিয়াল বসানো এক-সেট .docx; ফাইল-ফ্লো ও পেস্ট-ফ্লো পারস্পরিক একচেটিয়া — একটার সাফল্য আরেকটার কার্ড মুছে দেয়
+- মাল্টি-ফাইল সিরিয়ালে প্রতি ফাইলের নিজের সিরিয়াল-স্কিম: ডিফল্ট একটানা (আগের আচরণ byte-লেভেলেও অপরিবর্তিত — e2e সবুজ), রঙ-হেডারওয়ালা ফাইলে রঙ বাছলে প্রতি সেকশনে ১ থেকে রিস্টার্ট; মার্জ (.docx) ও ZIP দুই আউটপুটেই প্রযোজ্য
+- exporter-সীমা নোট: exportDocx-এ প্রতি সেটের শুরুতে সেট-টাইটেল প্যারা ("সেট A") অবাধ্যভাবে আসে — ExportOptions-এ এড়ানোর কোনো বিদ্যমান উপায় নেই (includeHeader=false শুধু ইনস্টিটিউট-হেডার লাইন বাদ দেয়); তাই নির্দেশনামাফিক এক সেট + includeHeader:false-এ এক্সপোর্ট করা হয়েছে — আউটপুটের একদম শুরুতে একটাই "সেট A" লাইন থাকবে; আর ফাইলনেমও exporter-অন্তর্নিহিত ("MCQ-Sets-<টাইমস্ট্যাম্প>.docx") — "serial-pasted.docx" নাম দেওয়ার হুক ওখানে নেই; দুটোই ঠিক করতে exporter.ts-এ ছোট পরিবর্তন লাগবে (এই টাস্কে নিষিদ্ধ)
+- রিটার্ন (structured):
+  - নতুন ফাইল: src/lib/mcq/serial-paste.ts, src/components/mcq/serial-paste-card.tsx
+  - বদলানো ফাইল: src/app/page.tsx, src/components/mcq/serial-input-card.tsx, src/components/mcq/serial-extra-cards.tsx (multi-download-card.tsx বদলানো হয়নি — দরকার হয়নি)
+  - নতুন UI-লেবেল: ট্যাব "ফাইল আপলোড"/"পেস্ট করুন"; বাটন "🔍 প্রশ্ন ডিটেক্ট করুন" (busy "ডিটেক্ট হচ্ছে..."); কার্ড "ডিটেকশন রেজাল্ট (পেস্ট)"; স্ট্যাট "মোট প্রশ্ন"/"অপশনসহ প্রশ্ন"/"নম্বরের ধরন"; "🔧 অটো নম্বরিং ঠিক করুন"; নোট "পেস্ট মোডে রঙ-ডিটেকশন হয় না — রঙ-ভিত্তিক সিরিয়ালের জন্য .docx ফাইল আপলোড করুন"; বাটন "সিরিয়াল করে .docx ডাউনলোড (১..N)"; কার্ড "প্রতি ফাইলের সিরিয়াল-স্কিম"; চিপ "একটানা"; টেক্সট "রঙ নেই — একটানা হবে"; রঙ-চিপে "N সেকশন"
+  - ভেরিফিকেশন: tsc ০-এরর, lint ক্লিন, টেস্ট ৩০৫/৩০৫, dev 200, e2e-multi-file ✓, e2e-mode-tabs ✓, ম্যানুয়াল playwright ✓ (কনসোল-এরর শূন্য)
+  - সীমাবদ্ধতা: পেস্ট-এক্সপোর্টে exporter-এর "সেট A" টাইটেল-প্যারা + "MCQ-Sets-*" ফাইলনেম (exporter.ts স্পর্শ-নিষিদ্ধ বলে অপরিবর্তিত); পেস্ট-মোডে রঙ-ডিটেকশন প্রযোজ্য নয় (টেক্সট-পাইপলাইন, কার্ডে স্পষ্ট লেখা)
+
+---
+Task ID: 21
+Agent: Main Agent (Super Z) + 21-a, 21-b, 21-c (parallel)
+Task: "Sobgolo phase by phase complete + GitHub free hosting ready" — ডিপ-প্রুন, সিলিং-ইউনিফাই, সিরিয়াল paste ইনপুট, per-file রঙ-স্কিম, স্ট্যাটিক এক্সপোর্ট + GitHub Pages ডিপ্লয়
+
+Work Log:
+- Phase 1 (main): ৫৪টা অব্যবহৃত টেমপ্লেট ডিপ বাদ (bun remove) + মরা db:* স্ক্রিপ্ট সরানো; tsconfig-এ skills/ exclude; tailwind.config.ts থেকে tailwindcss-animate plugin বাদ (v4-তে tw-animate-css); commit 8c6c9eb + 2987a1c
+- Phase 2 (21-a): src/lib/mcq/limits.ts নতুন — MAX_SERIAL_NUMBER=9999; parser.ts 2000→9999 + year-গার্ড (1900-2100 + "সাল/year" হলে continuation); docx-xml.ts 5000→9999; test-mcq ৬১→৭১, test-docx ৪৩→৪৮
+- Phase 3 (21-b): সিরিয়াল মোডে পেস্ট ইনপুট — serial-input-card-এ ইনার ট্যাব (ফাইল/পেস্ট), serial-paste.ts (renumberQuestionsByPosition), serial-paste-card.tsx (স্ট্যাট+অটো-ফিক্স+ডাউনলোড), page.tsx হ্যান্ডলার+একচেটিয়া-ওয়্যারিং
+- Phase 4 (21-b): মাল্টি-ফাইল সিরিয়ালে per-file রঙ-স্কিম — MultiSerialSchemeCard (চিপ-টগল, ডিফল্ট continuous), serialSchemes স্টেট, handleSerialMultiMerged/Zip প্রতি-ফাইল planSerialByColor
+- Phase 5 (21-c): next.config — STATIC_EXPORT=1 হলে output:export + distDir:.next-static, নাহলে standalone; basePath=NEXT_PUBLIC_BASE_PATH; src/lib/base-path.ts (withBase); input-card SAMPLE_DOCX_URL withBase-যুক্ত; ফন্ট → next/font/local (Kalpurush/SutonnyMJ, globals.css-এর @font-face সরানো — Pages সাবপাথে 404-প্রুফ); .github/workflows/deploy.yml (bun build → rm -rf out && mv .next-static out → .nojekyll → Pages deploy; *.github.io হলে basePath খালি); package.json "build:static"; README.md (বাংলা হোস্টিং গাইড)
+- Integration (main): exporter.ts-এ includeSetHeader + fileName অপশন যোগ (পেস্ট-সিরিয়াল এক্সপোর্টে জবরদস্তি "সেট A" টাইটেল বাদ, ফাইলনেম MCQ-Serial-Nq.docx); page.tsx পেস্ট-ডাউনলোড আপডেট
+- ভেরিফিকেশন: tsc ০ error; টেস্ট ৩০৫/৩০৫ (৭১+৪৮+১২৯+৫৭); dev 200; e2e-multi-file + e2e-mode-tabs পাস (JS-error শূন্য); STATIC_EXPORT build সফল — out-এ basePath প্রিফিক্স, CSS-এ absolute /fonts/ শূন্য, .nojekyll আছে; CI-র mv .next-static→out লজিক যাচাইকৃত
+
+Stage Summary:
+- সাইট GitHub Pages-এ ফ্রি হোস্ট-রেডি: repo push + Settings→Pages→GitHub Actions = লাইভ
+- ব্যবহৃত ফিচার-সেট সম্পূর্ণ: সিরিয়াল মোডে এখন paste ইনপুটও আছে; মাল্টি-ফাইল সিরিয়ালে প্রতি ফাইলে রঙ-স্কিম বাছা যায়; ৯৯৯৯ পর্যন্ত সিরিয়াল দুই পাইপলাইনেই ধরে
+- node_modules 1.2G→997M, lockfile ৫৪ ডিপ হালকা — CI ইনস্টল দ্রুত
+- অবশিষ্ট (ইচ্ছাকৃত-বাদ): .doc বাইনারি ইনপুট (ব্রাউজারে বাস্তবসম্মত নয়), পেস্টে রঙ-স্কিম (রঙের উৎসই নেই — নোট UI-তে)

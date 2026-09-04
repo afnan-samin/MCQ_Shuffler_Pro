@@ -150,6 +150,37 @@ function countRunTabsIn(x: string): number {
   ok(typeof englishSetName(0) === "string" && englishSetName(0) === "Set A", "সেট নেমিং: Set A");
 }
 
+console.log("\n== ৮) সিরিয়াল-সিলিং ইউনিফাই (MAX_SERIAL_NUMBER=9999) — সিনথেটিক XML ==");
+{
+  // সিনথেটিক docx XML ফিক্সচার (test-color-serial.ts-এর প্যাটার্নে) —
+  // আগে isQuestionStart num > 5000 হলে প্রশ্ন-স্টার্ট হত না; এখন 9999 পর্যন্ত (Task 21-a)
+  const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  const p = (text: string) =>
+    `<w:p xmlns:w="${W}"><w:r><w:t xml:space="preserve">${text}</w:t></w:r></w:p>`;
+  const docXml = (body: string) =>
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${W}"><w:body>${body}<w:sectPr/></w:body></w:document>`;
+
+  // টিয়ার-২ (পরের প্যারা অপশন-লেড): সিরিয়াল ৬০০০ এখন প্রশ্ন-স্টার্ট
+  const r6000 = parseDocxXml(docXml(p("6000. সিরিয়াল ৬০০০-এর প্রশ্ন") + p("ক. উত্তর-এক") + p("খ. উত্তর-দুই")));
+  ok(r6000.questions.length === 1 && r6000.questions[0].serial === 6000, `সিরিয়াল 6000 প্রশ্ন-স্টার্ট ধরা হয়েছে (আগে 5000-সিলিং আটকাত) [পেয়েছি ${r6000.questions.length}]`);
+  ok(r6000.questions[0].options.length === 2, "সিরিয়াল-৬০০০ প্রশ্নের অপশনও ডিটেক্ট");
+
+  // সিলিং-বাউন্ডারি: ৪-ডিজিট রেঞ্জের শেষ মান 9999
+  const r9999 = parseDocxXml(docXml(p("9999. শেষ সিরিয়ালের প্রশ্ন") + p("ক. উত্তর")));
+  ok(r9999.questions.length === 1 && r9999.questions[0].serial === 9999, "সিলিং-বাউন্ডারি 9999 প্রশ্ন-স্টার্ট");
+
+  // টিয়ার-১ (রান-ট্যাব): "6001.<tab>প্রশ্ন" — বড় সিরিয়ালেও ট্যাব-ফরম্যাট কাজ করে
+  const tabP =
+    `<w:p xmlns:w="${W}"><w:r><w:t xml:space="preserve">6001.</w:t></w:r>` +
+    `<w:r><w:tab/></w:r><w:r><w:t xml:space="preserve">ট্যাব-সহ প্রশ্ন</w:t></w:r></w:p>`;
+  const rTab = parseDocxXml(docXml(tabP));
+  ok(rTab.questions.length === 1 && rTab.questions[0].serial === 6001, "টিয়ার-১ (রান-ট্যাব): সিরিয়াল 6001 প্রশ্ন-স্টার্ট");
+
+  // টিয়ার-৩ ডেসিমাল-গার্ড অপরিবর্তিত (num ≤ 999): ট্যাব/অপশন-লেড ছাড়া 2000 প্রশ্ন নয়
+  const rTier3 = parseDocxXml(docXml(p("2000. ডেসিমাল-গার্ডের শিকার") + p("সাধারণ কনটিনিউয়েশন লাইন")));
+  ok(rTier3.questions.length === 0, "টিয়ার-৩ ডেসিমাল-গার্ড অপরিবর্তিত: 2000 (ট্যাব/অপশন-লেড ছাড়া, >999) প্রশ্ন নয়");
+}
+
 console.log(`\n========================================`);
 console.log(`ফলাফল: ${passed} পাস, ${failed} ফেল`);
 console.log(`========================================\n`);
