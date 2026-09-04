@@ -301,3 +301,61 @@ Stage Summary:
 - শাফল মোড: একসাথে একাধিক .docx → প্রতি ফাইল নিজের ভিতরে শাফল (একই সেট-কনফিগ) → মার্জ .docx বা ZIP
 - ১ ফাইলের পুরনো ফ্লো (রঙ-চিপ সিরিয়াল, একক শাফল UI) অক্ষত; drag&drop আপলোড এখন দুই কার্ডেই কাজ করে; .txt আর সার্ভারে যায় না
 - সিদ্ধান্ত: মাল্টি-ফাইল সিরিয়ালে রঙ-ভিত্তিক স্কিম UI দেওয়া হয়নি (continuous ধরা হয়েছে) — রঙ লাগলে একক-ফাইল মোড; ইউজার চাইলে পরে যোগ হবে
+
+---
+Task ID: 20-a
+Agent: Explore (UI inventory)
+Task: UI ফিচার-ইনভেন্টরি রিসার্চ (RESEARCH ONLY — কোনো কোড পরিবর্তন হয়নি)
+
+Work Log:
+- page.tsx সম্পূর্ণ পড়া (১২৭৩ লাইন — হেডার/মোড-ট্যাব/৩ শাখা-রেন্ডার/গেট/টোস্ট/ফুটার ম্যাপ করা)
+- layout.tsx + globals.css পড়া (metadata, lang="bn", ফন্ট-face: Kalpurush/SutonnyMJ Web, tok-* রঙ-ক্লাস, mcq-scroll স্ক্রলবার)
+- src/components/mcq/ এর সব ১৩টি ফাইল সম্পূর্ণ পড়া: input-card, detect-card, docx-detect-card, shuffle-card, sets-result, docx-sets-result, mode-tabs, multi-file-list, multi-download-card, serial-input-card, serial-extra-cards, color-serial-card, tok-text
+- সাপোর্টিং টাইপ যাচাই: exporter.ts (ExportOptions/DEFAULT_EXPORT_OPTIONS), set-engine.ts (Distribution/NameStyle/getSetName), docx-exporter.ts (englishSetName)
+- worklog.md পড়া (Task 17/18/19/19-a/19-b কনটেক্সট)
+- structured markdown রিপোর্ট (৯ সেকশন, প্রতিটি দাবিতে file:line রেফ + হুবহু বাংলা লেবেল) মেইন এজেন্টকে রিটার্ন
+
+Stage Summary:
+- অ্যাপ = ২ মোড (🔀 শাফল / 🔢 সিরিয়াল) — ModeTabs-এ localStorage মনে রাখা; শাফল মোড ৩ পাইপলাইন (text paste, একক .docx, মাল্টি .docx), সিরিয়াল মোড = .docx-অনলি (paste নেই), ১ ফাইলে রঙ-চিপ স্কিম + ≥২ ফাইলে মার্জ/ZIP
+- ধাপ-ব্যাজ ১→৪ (ইনপুট/ডিটেকশন/শাফল সেটিংস/রেজাল্ট); গেট-লজিক gateReason + multiGateReason টেক্সট-ভিত্তিক, ShuffleCard বাটন lock icon+কারণ দেখায়
+- রেজাল্ট এক্সপোর্ট: text মোডে .docx/.doc/প্রিন্ট/কপি + ফন্ট/হেডার/সেট-নেমিং সেটিংস; docx মোডে দুই ডাউনলোড (রিনাম্বার/আসল নম্বর) + ক্লিকেবল সিরিয়াল টগল; মাল্টিতে মার্জ .docx + ZIP
+- localStorage: mcq-shuffler-text (৬০০ms ডিবাউন্স) + mcq-shuffler-mode; ~৩০টি বাংলা toast; ফুটারে ক্লায়েন্ট-সাইড প্রসেসিং নোট
+- মোবাইল: min-h-[44px] ট্যাব, তীর-বাটন রি-অর্ডার (ড্র্যাগের বিকল্প), grid-cols-1→sm/md/lg ব্রেকপয়েন্ট, কাস্টম mcq-scroll
+
+---
+Task ID: 20-b
+Agent: Explore (lib capabilities)
+Task: ইঞ্জিন ক্যাপাবিলিটি ম্যাপ রিসার্চ (RESEARCH ONLY — কোনো কোড পরিবর্তন নেই)
+
+Work Log:
+- worklog.md (Task 1–19) সম্পূর্ণ পড়ে প্রজেক্ট-বিবর্তনের কনটেক্সট নেওয়া হয়েছে
+- src/lib/mcq/-এর ৯টা মডিউল লাইন-ধরে পড়া: parser (249), set-engine (137), encoding (214), exporter (340), docx-exporter (172), docx-xml (567), color-serial (750), multi-docx (176), sample (77) — প্রতিটার exported API, থ্রেশহোল্ড ও হার্ডকোড ম্যাপ করা
+- layout.tsx + globals.css (font-face) + public/ অ্যাসেট (fonts: kalpurush.woff2/ttf 308K+112K, SutonnyMJ.woff 44K; sample/hsc27-physics-bijoy.docx 68K; robots.txt) যাচাই
+- grep "2000|২০০০|MAX_": একমাত্র বাকি 2000-লিমিট = parser.ts:108 `num > 2000` (সিরিয়াল-নম্বর-ভ্যালু সিলিং, প্রশ্ন-কাউন্ট নয়); UI-র "সর্বোচ্চ ২০০০ প্রশ্ন" টেক্সট আগেই বাদ; MAX_ কনস্ট্যান্ট নেই
+- ডিপেন্ডেন্সি অডিট: src/+scripts/-এর সব import গ্রেপ + node_modules/bun.lock চেক — ব্যবহৃত: docx, jszip, lucide-react, clsx, tailwind-merge, class-variance-authority, @radix-ui ৮টা (switch/slot/toast/select/checkbox/radio-group/tabs/label), tw-animate-css, next/react; অব্যবহৃত-প্রমাণিত ৩০+ (prisma/@prisma/client ইনস্টলড কিন্তু import শূন্য, next-auth, recharts, framer-motion, zod, zustand, @dnd-kit×৩, @tanstack×২, @mdxeditor, sonner, next-themes, next-intl, uuid, sharp, date-fns ইত্যাদি); mammoth আর package.json/node_modules-এই নেই (আগেই রিমুভড); e2e স্ক্রিপ্টগুলো playwright import করে যা package.json-এ ডিক্লেয়ারডই নেই
+- ফরম্যাট/সীমা তথ্য সংগ্রহ: input accept (.docx/.txt/.csv শাফল; .docx-only সিরিয়াল), 8_000_000-char বিশাল-ফাইল টোস্ট (page.tsx), docx-xml isQuestionStart num≤5000/tier-3 ≤999, serial issues cap 30, set-engine original-retry 16, palette 70 রঙ, NON_MCQ ≤80 অক্ষর গার্ড
+
+Stage Summary:
+- ৯-মডিউল lib-লেয়ারের সম্পূর্ণ ক্যাপাবিলিটি-ম্যাপ (ফাইল:লাইন রেফসহ) রিপোর্ট আকারে দেওয়া হয়েছে — ২টা প্যারালাল পাইপলাইন (টেক্সট: parser/set-engine/exporter; docx: docx-xml/docx-exporter/color-serial/multi-docx) + ভাগ-করা encoding
+- একমাত্র বাকি 2000 = parser.ts:108-এর সিরিয়াল-নম্বর সিলিং (২০০১+ নম্বরের প্রশ্ন টেক্সট-পার্সে ধরা পড়বে না); docx-পথে সিলিং 5000 — অসামঞ্জস্য নোট করা হয়েছে
+- অব্যবহৃত ডিপেন্ডেন্সি নিশ্চিত-প্রমাণসহ তালিকাভুক্ত (import-শূন্য): package.json-এর ~৩৫টা এন্ট্রি; mammoth আর নেই; playwright ডিক্লেয়ার-অনুপস্থিত
+- কোনো কোড পরিবর্তন হয়নি — শুধু worklog আপডেট
+
+---
+Task ID: 20
+Agent: Main Agent (Super Z) + Explore ×2 (20-a UI inventory, 20-b lib capabilities)
+Task: প্রজেক্ট ক্লিনআপ (অপ্রয়োজনীয় ফাইল/ফোল্ডার ডিলিট) + ফুল ওয়েবসাইট ফিচার-রিভিউ
+
+Work Log:
+- সার্ভে: root/src/scripts/public স্ট্রাকচার, git ls-files, .gitignore, package.json, dev HTTP 200 যাচাই
+- ডিলিট (git rm): src/app/api/ (ডেড /api/extract রুট — .txt এখন ক্লায়েন্ট-সাইডে পড়ে), scripts/e2e-mode-tabs.png, scripts/e2e-shuffle-headers.png (ট্র্যাকড স্ক্রিনশট আর্টিফ্যাক্ট), scripts/tmp-e2e/ (টেম্প docx), tool-results/ (৮টা টুল-ডাম্প, ডিস্ক থেকে), tsconfig.tsbuildinfo
+- .gitignore-এ tool-results/, scripts/*.png, scripts/tmp-e2e/ যোগ
+- bun remove mammoth — শুধু ডেড API রুটই ব্যবহার করত; package.json + bun.lock আপডেট
+- ভেরিফিকেশন: tsc --noEmit ক্লিন (skills/-এর ২ প্রি-একজিস্টিং এরর বাদে), ইউনিট টেস্ট ২৯০/২৯০ (test-mcq ৬১ + test-docx ৪৩ + test-color-serial ১২৯ + test-multi-docx ৫৭), dev HTTP 200
+- git commit 78a01a0 "chore: প্রজেক্ট ক্লিনআপ…" (লোকাল — git remote কনফিগার্ড নেই, পুশ হয়নি)
+- রিভিউ: Explore 20-a = UI ফিচার-ইনভেন্টরি (page.tsx 1273 লাইন + ১৩টা mcq কম্পোনেন্ট + layout/globals), Explore 20-b = lib ক্যাপাবিলিটি-ম্যাপ (৯ মডিউল + ডিপেন্ডেন্সি অডিট); main agent page.tsx:1-260 নিজে পড়ে ক্রস-যাচাই — অসামঞ্জস্য পাওয়া যায়নি
+
+Stage Summary:
+- প্রজেক্ট এখন ১০০% ক্লায়েন্ট-সাইড — src/app-এ API রুট নেই, ভবিষ্যতের স্ট্যাটিক এক্সপোর্ট/cPanel হোস্টিং-এর পথ প্রস্তুত
+- রিভিউ থেকে চিহ্নিত গ্যাপ: parser.ts:108 সিরিয়াল-ভ্যালু সিলিং 2000 বনাম docx-xml.ts:207-এ 5000 (অসামঞ্জস্য), ~৩৫টা অব্যবহৃত টেমপ্লেট ডিপেন্ডেন্সি + মরা db:* স্ক্রিপ্ট (prisma/ ফোল্ডার নেই), playwright devDependency-তে ডিক্লেয়ারড নেই (E2E তবু চলে), সিরিয়াল-মাল্টিতে রঙ-স্কিম UI নেই (ইচ্ছাকৃত, continuous), সিরিয়াল মোডে paste ইনপুট নেই
+- ইউজারকে দুই মোডের সম্পূর্ণ ইউজার-জার্নি, সব অপশন/ডাউনলোড, core/optional ফিচার-শ্রেণিবিভাগসহ বিস্তারিত রিভিউ চ্যাটে দেওয়া হয়েছে
