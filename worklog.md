@@ -253,3 +253,51 @@ Stage Summary:
 - শাফল মোডে এখন ৩ স্তরের বাদ-দেওয়া: রঙ-হেডার (শেডিং) → নন-MCQ হেডার/শিরোনাম (টেক্সট-প্যাটার্ন: অধ্যায়/Aa¨vq/Chapter/Type-N) → বাকি সব প্রশ্ন এক সিরিয়ালে ইউজারের সেট-সেটিং অনুযায়ী
 - বাদ পড়া প্রতিটা লাইন কারণসহ (রঙ-হেডার / নন-MCQ) UI-র আলাদা কলাপ্সিবল লিস্টে দেখা যায় — ভুল কিছু বাদ পড়লে ইউজার সাথে সাথে দেখতে পারবেন
 - Agri ফাইলের রঙহীন "Aa¨vq-8" এখন আর প্রশ্ন-৯৯৭-এর সাথে শাফল হয় না — লিস্টে "নন-MCQ" চিপ দিয়ে দেখানো হয়
+
+---
+Task ID: 19-b
+Agent: general-purpose
+Task: মাল্টি-ফাইল মোডের দুইটা নতুন প্রেজেন্টেশনাল কম্পোনেন্ট — MultiFileList (ড্র্যাগ-রি-অর্ডার লিস্ট) ও MultiDownloadCard (মার্জ/ZIP ডাউনলোড কার্ড)
+
+Work Log:
+- স্টাইল কনসিস্টেন্সির জন্য আগে serial-input-card, serial-extra-cards, ui/card, ui/button, ui/badge, ui/radio-group, shuffle-card পড়া হয়েছে; docx-xml.ts-এর numberToDigits(n,"bn") সিরিয়ালে ব্যবহার
+- `src/components/mcq/multi-file-list.tsx` নতুন: "use client", props MultiFileItem{id,name,status,error,questionCount} + MultiFileListProps{items,onReorder,onRemove,disabled}; প্রতি রো-তে GripVertical হ্যান্ডেল + HTML5 ড্র্যাগ (dragFrom state, onDragOver→preventDefault+hoverIndex, onDrop→onReorder(from,to), from===to/disabled গার্ড, dragEnd/drop-এ রিসেট) + মোবাইলের জন্য ChevronUp/Down ghost আইকন-বাটন (বাউন্ডারিতে disabled) + X রিমুভ বাটন; রো-কনটেন্ট: বাংলা নম্বর ব্যাজ (numberToDigits(i+1,"bn"), emerald স্কয়ার) + ট্রাংকেটেড ফাইলনেম (min-w-0 flex-1) + স্টেটাস (loading→Loader2 spin, ready→emerald Badge "N টি প্রশ্ন", error→red text-xs + লাল বর্ডার); ড্র্যাগিং রো opacity-50, হোভার-ড্রপ রো ring-2 ring-emerald-500, disabled→pointer-events-none opacity-60; খালি items→null
+- `src/components/mcq/multi-download-card.tsx` নতুন: "use client", props MultiDownloadCardProps{title,description,stats,showSerialChoice,serialStrategy,onSerialStrategyChange,onDownloadMerged,onDownloadZip,mergedBusy,zipBusy,disabled} + SerialStrategy টাইপ; CardHeader-এ FileDown সবুজ আইকন-টাইল + stats মিউটেড লাইন; showSerialChoice হলে shadcn RadioGroup-এ দুই rounded-border অপশন (per-file: "প্রতি ফাইলে নতুন করে ১ থেকে" / global: "একটানা এক সিরিয়াল") বাংলা বর্ণনাসহ; sm:grid-cols-2 গ্রিডে দুই বড় বাটন — সবুজ প্রাইমারি "এক ফাইলে ডাউনলোড (.docx)" (FileText, পেজ-ব্রেক সাব-লাইন, mergedBusy→Loader2+"তৈরি হচ্ছে...") ও আউটলাইন "আলাদা আলাদা ডাউনলোড (.zip)" (Archive, zipBusy→Loader2+"ZIP হচ্ছে...")
+- কোনো এক্সিস্টিং ফাইল মডিফাই করা হয়নি, page.tsx-এ ওয়্যার করা হয়নি (মেইন এজেন্টের কাজ); TypeScript strict, কোনো `any` নেই, সব UI টেক্সট বাংলা
+- ভেরিফিকেশন: `bunx tsc --noEmit` — আমার ফাইল থেকে শূন্য এরর (শুধু skills/-এর ২টা প্রি-একজিস্টিং এরর, জানা); ডেভ-সার্ভার চালানো হয়নি
+
+Stage Summary:
+- মাল্টি-ফাইল মোডের দুই কম্পোনেন্ট তৈরি ও টাইপ-ক্লিন: multi-file-list.tsx (ড্র্যাগ + তীর-বাটন রি-অর্ডার, বাংলা সিরিয়াল নম্বর, লোডিং/রেডি/এরর স্টেট) এবং multi-download-card.tsx (সিরিয়াল-স্ট্র্যাটেজি রেডিও + মার্জ .docx / ZIP ডাউল ডাউনলোড বাটন, বিজি-স্টেটসহ)
+- পরের এজেন্টের জন্য: page.tsx-এ এই দুটো কম্পোনেন্ট ওয়্যার করতে হবে — MultiFileList-এর onReorder(from,to)/onRemove(id) কলব্যাকে state অ্যারে আপডেট, MultiDownloadCard-এ mergedBusy/zipBusy ফ্ল্যাগ আর SerialStrategy অনুযায়ী এক্সপোর্ট লজিক
+
+---
+Task ID: 19-a
+Agent: general-purpose
+Task: নতুন lib মডিউল src/lib/mcq/multi-docx.ts (মাল্টি-docx মার্জ + zip বান্ডেল) + টেস্ট scripts/test-multi-docx.ts
+
+Work Log:
+- প্রাক-পাঠ: worklog শেষ ৩ এন্ট্রি, color-serial.ts-এর downloadColorSerialDocx (JSZip কপি-রিবিল্ড প্যাটার্ন + DOCX_MIME), docx-xml.ts (loadDocxXml/W_NS), test-color-serial.ts-এর assertion-স্টাইল — কোনো existing ফাইল স্পর্শ করা হয়নি
+- src/lib/mcq/multi-docx.ts (নতুন): PAGE_BREAK_P কনস্ট্যান্ট; extractBodyInner (প্রথম <w:body>…</w:body>-এর ভিতরের অংশ, না পেলে বাংলা এরর); splitTrailingSectPr (lastIndexOf("<w:sectPr") → self-closing regex /^<w:sectPr[^>]*\/>/ নয়তো </w:sectPr> খোঁজা; কেবল remainder whitespace-only হলেই body-level ধরে স্ট্রিপ — pPr-লেভেল মিড-ডক sectPr কখনো কাটে না, defensive null); buildMergedDocumentXml (base-এর body-level sectPr-এর ঠিক আগে প্রতিটা extra-এর আগে PAGE_BREAK_P, extra-দের trailing sectPr বাদ, রিকনস্ট্রাকশন base-এর ORIGINAL offsets-এ — prologue/epilogue byte-হুবহু; খালি extras-এ "items খালি" এরর); DOCX_MIME + replaceDocumentXml (downloadColorSerialDocx-এর হুবহু JSZip প্যাটার্ন: loadAsync → non-dir এন্ট্রি uint8array কপি, document.xml বাদ → নতুন JSZip → document.xml আগে → generateAsync blob DEFLATE); buildMergedDocxBlob (items[0]=base container, merged XML দিয়ে base-এর document.xml রিপ্লেস); buildZipBlob (ডুপ্লিকেট নামে extension-এর আগে " (2)", " (3)" — set-ভিত্তিক লুপে "a (2).docx" নিজেই থাকলেও সংঘর্ষ-মুক্ত); offsetSerialPlan (সবসময় নতুন Map, আসলটা mutate না, offset 0 হলেও)
+- scripts/test-multi-docx.ts (নতুন): test-color-serial-এর হুবহু ok()-কাউন্টার স্টাইল, বাংলা টেস্ট-নাম; ইন-মেমরি সিনথেটিক docx (JSZip → uint8array → Blob): BASE (BASE-Q1 + মিড-ডক pPr-sectPr-প্যারা BASE-Q2 + trailing body sectPr), EXTRA1 (আলাদা pgSz 21001 মার্কার), EXTRA2 (self-closing <w:sectPr/>) + প্রতিটায় মার্কার-যুক্ত styles.xml ও [Content_Types].xml; ৬ সেকশনে ৫৭ দাবি: extractBodyInner, splitTrailingSectPr (৪ ভ্যারিয়েন্ট incl. pPr-only-শেষ → null, whitespace-tail), buildMergedDocumentXml (অর্ডার, PAGE_BREAK_P×২, body-level sectPr×১, extras' sectPr বাদ, mid-doc অক্ষত, body-ট্যাগ×১, DOMParser well-formed, body-children=৭, ২টা page w:br, prologue/epilogue byte-হুবহু, খালি→এরর), replaceDocumentXml+buildMergedDocxBlob (MIME, styles BASE-এরটাই, extras' না, zip এন্ট্রি), buildZipBlob ডিডাপ (set.docx/set (2).docx + AAA/BBB/CCC ম্যাপিং), offsetSerialPlan (mutate-না/নতুন Map/offset-0)
+- বান-এনভায়রনমেন্ট ২টা আবিষ্কার: (১) bun-এ FileReader নেই বলে JSZip-এর Blob-ইনপুট পথ (prepareContent) কাজ করে না — টেস্টে jsdom-DOMParser-পলিফিল-স্টাইলে মিনিমাল FileReaderShim বসানো হয়েছে (lib হুবহু ব্রাউজার-প্যাটার্নেই আছে, ব্রাউজারে FileReader নিজেই থাকে); (২) JSZip createFolders জেনারেটে "word/" ডিরেক্টরি-এন্ট্রি দেয় (downloadColorSerialDocx-এর আউটপুটও একই) — টেস্ট দাবি সেই অনুযায়ী
+- ভেরিফিকেশন: bun scripts/test-multi-docx.ts → ৫৭/৫৭ পাস; রিগ্রেশন — test-mcq ৬১, test-docx ৪৩, test-color-serial ১২৯ (মোট ২৩৩) সব পাস; tsc --noEmit-এ src+scripts শূন্য এরর (skills/-এর ২টা প্রি-একজিস্টিং এরর ছাড়া); git status-এ নতুন মাত্র ২ ফাইল
+
+Stage Summary:
+- এক মডিউলে সম্পূর্ণ multi-docx স্ট্যাক: string-level (OOM-মুক্ত) body-extract → নিরাপদ sectPr-split (মিড-ডক সেকশন-ব্রেক প্রিজার্ভ) → পেজ-ব্রেক-সহ মার্জ → base-container সংরক্ষণে docx রি-বিল্ড → ডুপ্লিকেট-নাম-সচেতন zip বান্ডেল → গ্লোবাল সিরিয়াল-অফসেট; ৫৭ নতুন + ২৩৩ পুরনো = ২৯০/২৯০ টেস্ট পাস, কোনো existing ফাইল বদলায়নি
+
+---
+Task ID: 19
+Agent: Main Agent (Super Z) + 2 subagents (19-a lib, 19-b UI)
+Task: দুই মোডেই মাল্টি-ফাইল আপলোড — সিরিয়াল (মার্জ+পেজব্রেক+দুই সিরিয়াল-স্ট্র্যাটেজি+ZIP) ও শাফল (মাল্টি-শাফল+মার্জ/ZIP) + drag&drop ফিক্স + .txt client-side ফিক্স
+
+Work Log:
+- 19-a (subagent): src/lib/mcq/multi-docx.ts নতুন — extractBodyInner, splitTrailingSectPr (pPr-level sectPr রক্ষা করে), buildMergedDocumentXml (PAGE_BREAK_P স্প্লাইস), replaceDocumentXml, buildMergedDocxBlob (base=১ম ফাইল container), buildZipBlob (নাম-ডুপ্লিকেট dedupe), offsetSerialPlan; scripts/test-multi-docx.ts — ৫৭ টেস্ট
+- 19-b (subagent): src/components/mcq/multi-file-list.tsx (HTML5 drag reorder + তীর-বাটন + remove + বাংলা নম্বর/স্ট্যাটাস ব্যাজ) ও multi-download-card.tsx (মার্জ/ZIP দুই বাটন + per-file/global সিরিয়াল RadioGroup) — দুটোই pure presentational
+- 19-c/d (main): serial-input-card.tsx রিরাইট (multiple + drag&drop ড্রপজোন + "আরও ফাইল" append); input-card.tsx (multiple .docx + drag&drop + .txt/.csv client-side f.text() — মৃত /api/extract 404 বাগ ফিক্স + "সর্বোচ্চ ২০০০ প্রশ্ন" টেক্সট সরানো); page.tsx — serialDocs[]/shuffleItems[] লিস্ট-স্টেট, loadSerialFiles/reorder/remove, handleSerialMultiMerged (offsetSerialPlan দিয়ে global vs per-file), handleSerialMultiZip, handleShuffleFiles (প্রতি ফাইল আলাদা স্ট্রিপ+পার্স; ১ ফাইল হলে পুরনো একক পাইপলাইন), handleMultiShuffle/handleMultiMergedDownload/handleMultiZipDownload, multiGateReason, রেন্ডার শাখা
+- ভেরিফিকেশন: tsc ক্লিন (skills/-এর ২ পুরনো এরর বাদে), ২৯০/২৯০ ইউনিট টেস্ট (৬১+৪৩+১২৯+৫৭), নতুন scripts/e2e-multi-file.ts — সিরিয়াল ৩-ফাইল (লিস্ট+reorder+মার্জ পেজব্রেক×২+ZIP×৩+একক-ফাইল রিগ্রেশন) ও শাফল ২-ফাইল (শাফল+মার্জ Set A×২+পেজব্রেক×৭+ZIP×২) সব পাস, কনসোল-এরর শূন্য; e2e-mode-tabs + e2e-shuffle-headers রিগ্রেশন-মুক্ত
+
+Stage Summary:
+- সিরিয়াল মোড: একসাথে একাধিক .docx → ক্রম-লিস্ট (টেনে/তীরে সাজানো) → মার্জ এক .docx (পেজ ব্রেকসহ; সিরিয়াল file-by-file বা শুরু-থেকে-শেষ একটানা — দুটোই) অথবা এক ক্লিকে ZIP (প্রতি ফাইল আলাদা সিরিয়াল)
+- শাফল মোড: একসাথে একাধিক .docx → প্রতি ফাইল নিজের ভিতরে শাফল (একই সেট-কনফিগ) → মার্জ .docx বা ZIP
+- ১ ফাইলের পুরনো ফ্লো (রঙ-চিপ সিরিয়াল, একক শাফল UI) অক্ষত; drag&drop আপলোড এখন দুই কার্ডেই কাজ করে; .txt আর সার্ভারে যায় না
+- সিদ্ধান্ত: মাল্টি-ফাইল সিরিয়ালে রঙ-ভিত্তিক স্কিম UI দেওয়া হয়নি (continuous ধরা হয়েছে) — রঙ লাগলে একক-ফাইল মোড; ইউজার চাইলে পরে যোগ হবে

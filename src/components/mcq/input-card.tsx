@@ -15,7 +15,9 @@ interface InputCardProps {
   onSample: () => void;
   /** .docx আপলোড — XML হুবহু প্রিজার্ভ পাইপলাইনে যাবে */
   onDocxFile: (f: File) => void;
-  /** .txt — সার্ভার এক্সট্র্যাকশনের পরে অটো-ডিটেক্টসহ */
+  /** একাধিক .docx — মাল্টি-ফাইল পাইপলাইনে যাবে; দিলে input-এ multiple চালু হয় */
+  onDocxFiles?: (files: File[]) => void;
+  /** .txt — ব্রাউজারেই পড়া, অটো-ডিটেক্টসহ */
   onTextFileLoaded?: (t: string) => void;
   detecting: boolean;
   detected: boolean;
@@ -31,6 +33,7 @@ export function InputCard({
   onDetect,
   onSample,
   onDocxFile,
+  onDocxFiles,
   onTextFileLoaded,
   detecting,
   detected,
@@ -40,34 +43,42 @@ export function InputCard({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadName, setUploadName] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
 
   const busy = uploading || docxLoading;
 
-  const handleFile = async (f: File) => {
+  /** একাধিক ফাইল — .docx গুলো মাল্টি/সিঙ্গেল পাইপলাইনে, .txt/.csv ব্রাউজারেই পড়ে */
+  const handleFiles = async (list: File[]) => {
     setUploadError(null);
-    setUploading(true);
-    setUploadName(f.name);
-    try {
-      if (/\.docx$/i.test(f.name)) {
-        onDocxFile(f);
-        return;
+    if (!list.length) return;
+    const docxFiles = list.filter((f) => /\.docx$/i.test(f.name));
+    const textFile = list.find((f) => /\.(txt|csv)$/i.test(f.name));
+    if (docxFiles.length) {
+      setUploading(true);
+      try {
+        if (onDocxFiles) onDocxFiles(docxFiles);
+        else onDocxFile(docxFiles[0]);
+      } finally {
+        setUploading(false);
       }
-      const fd = new FormData();
-      fd.append("file", f);
-      const res = await fetch("/api/extract", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok) {
-        setUploadError(data.error || "ফাইল পড়া যায়নি");
-      } else if (onTextFileLoaded) {
-        onTextFileLoaded(data.text);
-      } else {
-        onTextChange(data.text);
-      }
-    } catch {
-      setUploadError("ফাইল আপলোডে সমস্যা হয়েছে");
-    } finally {
-      setUploading(false);
+      return;
     }
+    if (textFile) {
+      setUploading(true);
+      setUploadName(textFile.name);
+      try {
+        // ব্রাউজারেই পড়া — কোনো সার্ভার লাগে না
+        const text = await textFile.text();
+        if (onTextFileLoaded) onTextFileLoaded(text);
+        else onTextChange(text);
+      } catch {
+        setUploadError("ফাইল পড়া যায়নি");
+      } finally {
+        setUploading(false);
+      }
+      return;
+    }
+    setUploadError("সাপোর্টেড ফাইল: .docx বা .txt");
   };
 
   const handleSampleDocx = async () => {
@@ -115,7 +126,22 @@ export function InputCard({
               type="button"
               onClick={() => fileRef.current?.click()}
               disabled={busy}
-              className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50/50 p-8 text-center transition hover:border-emerald-500 hover:bg-emerald-50 disabled:opacity-60 dark:border-emerald-800 dark:bg-emerald-950/20 dark:hover:border-emerald-600 sm:p-10"
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (!busy) setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                if (!busy) handleFiles(Array.from(e.dataTransfer?.files ?? []));
+              }}
+              className={
+                "flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-8 text-center transition disabled:opacity-60 sm:p-10 " +
+                (dragOver
+                  ? "border-emerald-500 bg-emerald-100 dark:border-emerald-500 dark:bg-emerald-900/40"
+                  : "border-emerald-300 bg-emerald-50/50 hover:border-emerald-500 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/20 dark:hover:border-emerald-600")
+              }
             >
               {busy ? (
                 <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
@@ -123,10 +149,10 @@ export function InputCard({
                 <FileUp className="h-8 w-8 text-emerald-600" />
               )}
               <span className="text-sm font-medium">
-                {busy ? "ফাইল পড়া হচ্ছে..." : "ফাইল সিলেক্ট করতে ক্লিক করুন"}
+                {busy ? "ফাইল পড়া হচ্ছে..." : "ফাইল সিলেক্ট করতে ক্লিক করুন বা টেনে ছাড়ুন"}
               </span>
               <span className="text-xs text-muted-foreground">
-                সাপোর্টেড: .docx (ফরম্যাট হুবহু থাকবে), .txt — সর্বোচ্চ ২০০০ প্রশ্ন। আপলোডের পরেই ডিটেক্টর অটো চলবে।
+                সাপোর্টেড: .docx (ফরম্যাট হুবহু থাকবে), .txt — একসাথে একাধিক .docx সিলেক্ট করা যাবে। আপলোডের পরেই ডিটেক্টর অটো চলবে।
               </span>
             </button>
             <div className="text-center">
@@ -138,13 +164,14 @@ export function InputCard({
               ref={fileRef}
               type="file"
               accept=".docx,.txt,.csv"
+              multiple={!!onDocxFiles}
               className="hidden"
               onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) handleFile(f);
+                handleFiles(Array.from(e.target.files ?? []));
                 e.target.value = "";
               }}
             />
+            {/* .docx হলে মূল পেজে ফাইল-লিস্ট দেখায় — এখানে শুধু .txt-এর নাম */}
             {uploadName && !uploadError && (
               <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
                 <FileText className="h-4 w-4" /> {uploadName} লোড হয়েছে

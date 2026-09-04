@@ -8,6 +8,9 @@ import { ShuffleCard } from "@/components/mcq/shuffle-card";
 import { SetsResult } from "@/components/mcq/sets-result";
 import { DocxSetsResult } from "@/components/mcq/docx-sets-result";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { MultiFileList } from "@/components/mcq/multi-file-list";
+import { MultiDownloadCard, type SerialStrategy } from "@/components/mcq/multi-download-card";
 import {
   autoFixNumbering,
   parseMcq,
@@ -32,6 +35,7 @@ import {
 } from "@/lib/mcq/docx-xml";
 import {
   analyzeColorDocx,
+  applyColorSerialXml,
   downloadColorSerialDocx,
   planSerialByColor,
   stripNonMcqLinesXml,
@@ -40,6 +44,12 @@ import {
   type ColorAnalysis,
   type SerialScheme,
 } from "@/lib/mcq/color-serial";
+import {
+  buildMergedDocxBlob,
+  buildZipBlob,
+  offsetSerialPlan,
+  replaceDocumentXml,
+} from "@/lib/mcq/multi-docx";
 import { ColorSerialCard } from "@/components/mcq/color-serial-card";
 import { ModeTabs, type McqMode } from "@/components/mcq/mode-tabs";
 import { SerialInputCard } from "@/components/mcq/serial-input-card";
@@ -49,16 +59,22 @@ import {
   NoColorSerialCard,
 } from "@/components/mcq/serial-extra-cards";
 import {
+  buildShuffledXml,
   downloadSerialFixedDocx,
   downloadShuffledDocx,
   englishSetName,
 } from "@/lib/mcq/docx-exporter";
+import { downloadBlob } from "@/lib/mcq/exporter";
 import { SAMPLE_MCQ } from "@/lib/mcq/sample";
 import { toast } from "@/hooks/use-toast";
 import { Dices, ShieldCheck, Zap } from "lucide-react";
 
 const STORAGE_KEY = "mcq-shuffler-text";
 const MODE_KEY = "mcq-shuffler-mode";
+
+// মাল্টি-ফাইল লিস্টের আইটেম-id (reorder/remove-এর জন্য স্টেবল কী দরকার)
+let multiIdCounter = 0;
+const nextMultiId = () => `mf-${++multiIdCounter}-${Date.now().toString(36)}`;
 
 interface DocxState {
   file: File;
@@ -77,12 +93,25 @@ interface DocxState {
   blocked: BlockedLine[];
 }
 
-/** সিরিয়াল মোডের আলাদা স্টেট — শাফলের সাথে কোনো মিল নেই */
+/** সিরিয়াল মোডের আলাদা স্টেট — এখন একাধিক ফাইলও থাকতে পারে (লিস্ট-ক্রমেই আউটপুট) */
 interface SerialState {
+  id: string;
   file: File;
   baseName: string;
   xml: string;
   analysis: ColorAnalysis;
+}
+
+/** শাফল মোড মাল্টি-ফাইল আইটেম — প্রতিটা ফাইল আলাদাভাবে স্ট্রিপ + পার্স হয় */
+interface ShuffleItemState {
+  id: string;
+  file: File;
+  baseName: string;
+  /** হেডার/নন-MCQ বাদ দেওয়া xml */
+  xml: string;
+  parse: DocxParseResult;
+  /** বাদ পড়া লাইন (রঙ-হেডার + নন-MCQ) */
+  blocked: BlockedLine[];
 }
 
 export default function Home() {
@@ -119,10 +148,23 @@ export default function Home() {
   const [busy, setBusy] = useState<string | null>(null);
   const [copiedSet, setCopiedSet] = useState<number | null>(null);
 
-  // ---- সিরিয়াল মোডের সম্পূর্ণ আলাদা স্টেট ----
-  const [serialDoc, setSerialDoc] = useState<SerialState | null>(null);
+  // ---- সিরিয়াল মোডের সম্পূর্ণ আলাদা স্টেট (একাধিক ফাইল সাপোর্ট) ----
+  const [serialDocs, setSerialDocs] = useState<SerialState[]>([]);
   const [serialLoading, setSerialLoading] = useState(false);
   const [serialBusy, setSerialBusy] = useState(false);
+  const [serialMergedBusy, setSerialMergedBusy] = useState(false);
+  const [serialZipBusy, setSerialZipBusy] = useState(false);
+  const [serialStrategy, setSerialStrategy] = useState<SerialStrategy>("per-file");
+  // ঠিক ১ টা ফাইল হলে পুরনো একক-ফাইল কার্ড (রঙ-চিপসহ) — ≥২ হলে মাল্টি ডাউনলোড কার্ড
+  const serialDoc = serialDocs.length === 1 ? serialDocs[0] : null;
+
+  // ---- শাফল মোড মাল্টি-ফাইল (একসাথে একাধিক .docx) ----
+  const [shuffleItems, setShuffleItems] = useState<ShuffleItemState[] | null>(null);
+  const [shuffleLoading, setShuffleLoading] = useState(false);
+  const [shuffleMultiSets, setShuffleMultiSets] = useState<number[][][] | null>(null);
+  const [multiShuffling, setMultiShuffling] = useState(false);
+  const [multiMergedBusy, setMultiMergedBusy] = useState(false);
+  const [multiZipBusy, setMultiZipBusy] = useState(false);
 
   const resultsRef = useRef<HTMLDivElement>(null);
 
@@ -179,6 +221,8 @@ export default function Home() {
   const handleTextChange = (t: string) => {
     setRawText(t);
     setDocx(null);
+    setShuffleItems(null);
+    setShuffleMultiSets(null);
     if (parsed) {
       setParsed(null);
       setSelected(new Set());
@@ -197,6 +241,8 @@ export default function Home() {
   const loadAndDetect = (t: string) => {
     setRawText(t);
     setDocx(null);
+    setShuffleItems(null);
+    setShuffleMultiSets(null);
     resetResults();
     if (!t.trim()) {
       setParsed(null);
@@ -278,6 +324,8 @@ export default function Home() {
 
   const handleDocxFile = useCallback(async (f: File) => {
     setDocxLoading(true);
+    setShuffleItems(null);
+    setShuffleMultiSets(null);
     try {
       const originalXml = await loadDocxXml(f);
       // রঙ-বিশ্লেষণ (string-level, হালকা)
@@ -368,35 +416,47 @@ export default function Home() {
 
   // ================== SERIAL MODE (সম্পূর্ণ আলাদা ওয়ার্কফ্লো) ==================
 
-  const handleSerialFile = async (f: File) => {
+  /** .docx লোড + রঙ-বিশ্লেষণ — একাধিক হলে লিস্টে বসে; append=false হলে লিস্ট বদলে যায় */
+  const loadSerialFiles = async (files: File[], append: boolean) => {
     setSerialLoading(true);
-    try {
-      const xml = await loadDocxXml(f);
-      const analysis = analyzeColorDocx(xml);
-      setSerialDoc({ file: f, baseName: f.name.replace(/\.docx$/i, ""), xml, analysis });
-      if (analysis.colors.length > 0) {
-        toast({
-          title: `🎨 ${analysis.colors.length} টি রঙ পাওয়া গেছে`,
-          description: `মোট ${analysis.questionCount} টি প্রশ্ন, ${analysis.shadedCount} টি রঙ-হেডার। নিচে রঙ বাছাই করে সিরিয়াল ডাউনলোড করুন।`,
-        });
-      } else {
-        toast({
-          title: "এই ফাইলে রঙ-হেডার নেই",
-          description: analysis.questionCount
-            ? `তবে ${analysis.questionCount} টি প্রশ্ন পাওয়া গেছে — চাইলে একটানা ১..N সিরিয়াল দেওয়া যাবে।`
-            : "কোনো প্রশ্ন-লাইনও পাওয়া যায়নি — ফাইল চেক করুন।",
-        });
+    const added: SerialState[] = [];
+    const errors: string[] = [];
+    let colors = 0;
+    let questions = 0;
+    for (const f of files) {
+      try {
+        const xml = await loadDocxXml(f);
+        const analysis = analyzeColorDocx(xml);
+        added.push({ id: nextMultiId(), file: f, baseName: f.name.replace(/\.docx$/i, ""), xml, analysis });
+        colors += analysis.colors.length;
+        questions += analysis.questionCount;
+      } catch (e) {
+        errors.push(`${f.name}: ${e instanceof Error ? e.message : String(e)}`);
       }
-    } catch (e) {
+    }
+    setSerialDocs((prev) => (append ? [...prev, ...added] : added));
+    setSerialLoading(false);
+    if (added.length) {
       toast({
-        title: "ফাইল পড়া যায়নি",
-        description: String(e instanceof Error ? e.message : e),
-        variant: "destructive",
+        title: `✅ ${added.length} টি ফাইল ${append ? "যোগ" : "লোড"} হয়েছে`,
+        description: `মোট ${questions} টি প্রশ্ন${colors ? `, ${colors} টি রঙ-হেডার` : ""}।${added.length > 1 ? " লিস্ট থেকে ক্রম বদলাতে পারবেন — নিচে মার্জ/ZIP ডাউনলোড।" : ""}`,
       });
-    } finally {
-      setSerialLoading(false);
+    }
+    if (errors.length) {
+      toast({ title: "কিছু ফাইল পড়া যায়নি", description: errors.join("\n"), variant: "destructive" });
     }
   };
+
+  const reorderSerialDocs = (from: number, to: number) => {
+    setSerialDocs((prev) => {
+      const next = prev.slice();
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  };
+
+  const removeSerialDoc = (id: string) => setSerialDocs((prev) => prev.filter((d) => d.id !== id));
 
   const handleColorSerial = async (scheme: SerialScheme, label: string) => {
     if (!serialDoc) return;
@@ -432,16 +492,76 @@ export default function Home() {
     }
   };
 
+  // ---- মাল্টি-ফাইল সিরিয়াল ডাউনলোড (≥২ ফাইল) ----
+
+  /** প্রতিটা ফাইল সিরিয়াল করে এক .docx-এ মার্জ — ফাইলের মাঝে পেজ ব্রেক */
+  const handleSerialMultiMerged = async () => {
+    if (serialDocs.length < 2) return;
+    setSerialMergedBusy(true);
+    try {
+      const items: Array<{ xml: string; file: Blob }> = [];
+      let offset = 0;
+      for (const d of serialDocs) {
+        const base = planSerialByColor(d.analysis, { kind: "continuous" });
+        // file-by-file হলে প্রতি ফাইল ১ থেকে; global হলে আগের ফাইলের শেষ নম্বরের পর থেকে
+        const plan = serialStrategy === "global" ? offsetSerialPlan(base, offset) : base;
+        offset += base.size;
+        const xml = applyColorSerialXml(d.xml, plan);
+        items.push({ xml, file: await replaceDocumentXml(d.file, xml) });
+      }
+      const merged = await buildMergedDocxBlob(items);
+      downloadBlob(merged, `${serialDocs[0].baseName} (merged serial).docx`);
+      toast({
+        title: "✅ মার্জ করা .docx ডাউনলোড হয়েছে",
+        description:
+          serialStrategy === "global"
+            ? "সব ফাইল পরপর, পেজ ব্রেকসহ — সিরিয়াল শুরু থেকে শেষ পর্যন্ত একটানা।"
+            : "সব ফাইল পরপর, পেজ ব্রেকসহ — প্রতি ফাইলে সিরিয়াল নতুন করে ১ থেকে।",
+      });
+    } catch (e) {
+      toast({ title: "মার্জ করা যায়নি", description: String(e), variant: "destructive" });
+    } finally {
+      setSerialMergedBusy(false);
+    }
+  };
+
+  /** প্রতিটা ফাইল আলাদাভাবে সিরিয়াল করে এক .zip-এ বানিয়ে দেয় */
+  const handleSerialMultiZip = async () => {
+    if (serialDocs.length < 2) return;
+    setSerialZipBusy(true);
+    try {
+      const out: Array<{ name: string; blob: Blob }> = [];
+      for (const d of serialDocs) {
+        const plan = planSerialByColor(d.analysis, { kind: "continuous" });
+        const xml = applyColorSerialXml(d.xml, plan);
+        out.push({ name: `${d.baseName} (serial).docx`, blob: await replaceDocumentXml(d.file, xml) });
+      }
+      const zip = await buildZipBlob(out);
+      downloadBlob(zip, "MCQ-serial-files.zip");
+      toast({
+        title: "✅ ZIP ডাউনলোড হয়েছে",
+        description: `${out.length} টি ফাইল আলাদা আলাদা সিরিয়াল করা — ভিতরে সবগুলো আছে।`,
+      });
+    } catch (e) {
+      toast({ title: "ZIP বানানো যায়নি", description: String(e), variant: "destructive" });
+    } finally {
+      setSerialZipBusy(false);
+    }
+  };
+
   /** শাফল মোডে উঠা রঙ-ফাইল সিরিয়াল মোডে খোলা (ফাইল নিজেই চলে যায়, আবার আপলোড লাগে না) */
   const openInSerialMode = () => {
     if (!docx?.colorAn) return;
-    setSerialDoc({
-      file: docx.file,
-      baseName: docx.baseName,
-      // সিরিয়াল মোডে অরিজিনাল xml লাগে — রঙ-ইনডেক্স অরিজিনাল ফাইলের সাথে মেলে
-      xml: docx.originalXml,
-      analysis: docx.colorAn,
-    });
+    setSerialDocs([
+      {
+        id: nextMultiId(),
+        file: docx.file,
+        baseName: docx.baseName,
+        // সিরিয়াল মোডে অরিজিনাল xml লাগে — রঙ-ইনডেক্স অরিজিনাল ফাইলের সাথে মেলে
+        xml: docx.originalXml,
+        analysis: docx.colorAn,
+      },
+    ]);
     changeMode("serial");
     toast({
       title: "🔢 সিরিয়াল মোডে ফাইল খোলা হলো",
@@ -575,6 +695,17 @@ export default function Home() {
   const activeCount = docx?.parse ? docx.parse.questions.length : parsed?.questions.length ?? 0;
   const serialOk = activeSerial?.status === "ok";
 
+  // ---- মাল্টি-শাফল গেট (≥২ ফাইল) ----
+  const shuffleMultiTotal = shuffleItems?.reduce((a, i) => a + i.parse.questions.length, 0) ?? 0;
+  const shuffleMultiZero = shuffleItems?.filter((i) => i.parse.questions.length === 0).length ?? 0;
+  const multiGateReason = useMemo(() => {
+    if (!shuffleItems || shuffleItems.length === 0) return "প্রথমে ফাইল আপলোড করুন";
+    if (shuffleMultiTotal < 2) return "ফাইলগুলোতে মোট অন্তত ২ টি প্রশ্ন দরকার";
+    if (shuffleMultiZero > 0)
+      return `${shuffleMultiZero} টি ফাইলে কোনো প্রশ্ন পাওয়া যায়নি — লিস্ট থেকে বাদ দিন`;
+    return null;
+  }, [shuffleItems, shuffleMultiTotal, shuffleMultiZero]);
+
   const gateReason = useMemo(() => {
     if (!docx && !parsed) return "প্রথমে প্রশ্ন ডিটেক্ট করুন";
     if (activeCount === 0) return "কোনো প্রশ্ন পাওয়া যায়নি";
@@ -618,8 +749,169 @@ export default function Home() {
   };
 
   const handleShuffle = () => {
-    if (docx) handleDocxShuffle();
+    if (shuffleItems) handleMultiShuffle();
+    else if (docx) handleDocxShuffle();
     else handleTextShuffle();
+  };
+
+  // ================== SHUFFLE MODE — মাল্টি-ফাইল ==================
+
+  /** একাধিক .docx — প্রতিটা আলাদাভাবে হেডার-স্ট্রিপ + পার্স; ১টা হলে পুরনো একক পাইপলাইন */
+  const handleShuffleFiles = async (files: File[]) => {
+    if (files.length === 1) {
+      setShuffleItems(null);
+      setShuffleMultiSets(null);
+      handleDocxFile(files[0]);
+      return;
+    }
+    setShuffleLoading(true);
+    const items: ShuffleItemState[] = [];
+    const errors: string[] = [];
+    let totalQuestions = 0;
+    for (const f of files) {
+      try {
+        const originalXml = await loadDocxXml(f);
+        let colorAn: ColorAnalysis | null = null;
+        try {
+          colorAn = analyzeColorDocx(originalXml);
+        } catch {}
+        let xml = originalXml;
+        const blocked: BlockedLine[] = [];
+        if (colorAn && colorAn.colors.length > 0) {
+          const st = stripShadedParasXml(originalXml);
+          xml = st.xml;
+          for (const t of st.texts) blocked.push({ text: t, reason: "color" });
+        }
+        const st2 = stripNonMcqLinesXml(xml);
+        xml = st2.xml;
+        blocked.push(...st2.removed);
+        const parse = parseDocxXml(xml);
+        items.push({ id: nextMultiId(), file: f, baseName: f.name.replace(/\.docx$/i, ""), xml, parse, blocked });
+        totalQuestions += parse.questions.length;
+      } catch (e) {
+        errors.push(`${f.name}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    setShuffleItems(items.length ? items : null);
+    setShuffleMultiSets(null);
+    setDocx(null);
+    setParsed(null);
+    resetResults();
+    setSelected(new Set());
+    setShuffleLoading(false);
+    if (items.length) {
+      const zeroQ = items.filter((i) => i.parse.questions.length === 0).length;
+      toast({
+        title: `✅ ${items.length} টি ফাইল লোড হয়েছে — মোট ${totalQuestions} টি প্রশ্ন`,
+        description: zeroQ
+          ? `${zeroQ} টি ফাইলে কোনো প্রশ্ন পাওয়া যায়নি — লিস্ট থেকে বাদ দিন। ক্রম বদলাতে টেনে ধরুন।`
+          : "লিস্ট থেকে ক্রম বদলাতে পারবেন — নিচের শাফল-কনফিগ দিয়ে সব ফাইল একসাথে শাফল হবে।",
+      });
+    }
+    if (errors.length) {
+      toast({ title: "কিছু ফাইল পড়া যায়নি", description: errors.join("\n"), variant: "destructive" });
+    }
+  };
+
+  const reorderShuffleItems = (from: number, to: number) => {
+    setShuffleItems((prev) => {
+      if (!prev) return prev;
+      const next = prev.slice();
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+    // ক্রম বদলালে আগের শাফল-ফল বাতিল
+    setShuffleMultiSets(null);
+  };
+
+  const removeShuffleItem = (id: string) => {
+    setShuffleItems((prev) => (prev ? prev.filter((i) => i.id !== id) : prev));
+    setShuffleMultiSets(null);
+  };
+
+  /** সব ফাইল একসাথে শাফল — প্রতিটা ফাইলের প্রশ্ন নিজের ভিতরেই থাকে, সেটগুলো আলাদা পেজে */
+  const handleMultiShuffle = () => {
+    if (!shuffleItems || shuffleItems.length === 0) return;
+    setMultiShuffling(true);
+    try {
+      const isOriginal = distribution === "original";
+      const all = shuffleItems.map((it) =>
+        buildSets(it.parse.questions, {
+          setCount,
+          distribution,
+          shuffleWithin: isOriginal ? true : shuffleWithin,
+        }).map((s) => s.map((q) => q.id))
+      );
+      setShuffleMultiSets(all);
+      setTimeout(() => {
+        resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 80);
+      toast({
+        title: `🔀 ${shuffleItems.length} টি ফাইল শাফল হয়েছে — প্রতি ফাইলে ${setCount} টি সেট!`,
+        description: "নিচে মার্জ (.docx) বা ZIP — দুইভাবেই ডাউনলোড করা যাবে।",
+      });
+    } finally {
+      setMultiShuffling(false);
+    }
+  };
+
+  /** সব ফাইলের শাফল্ড আউটপুট এক .docx-এ — ফাইলের মাঝে পেজ ব্রেক */
+  const handleMultiMergedDownload = async () => {
+    if (!shuffleItems || !shuffleMultiSets) return;
+    setMultiMergedBusy(true);
+    try {
+      const items: Array<{ xml: string; file: Blob }> = [];
+      for (let i = 0; i < shuffleItems.length; i++) {
+        const it = shuffleItems[i];
+        if (it.parse.questions.length === 0) continue;
+        const xml = buildShuffledXml(it.xml, it.parse.questions, shuffleMultiSets[i] ?? [], {
+          renumber,
+          includeSetHeader: true,
+        });
+        items.push({ xml, file: await replaceDocumentXml(it.file, xml) });
+      }
+      if (items.length < 2) throw new Error("মার্জ করার মতো পর্যাপ্ত ফাইল নেই");
+      const merged = await buildMergedDocxBlob(items);
+      downloadBlob(merged, `${shuffleItems[0].baseName} (merged shuffled).docx`);
+      toast({
+        title: "✅ মার্জ করা Word ফাইল ডাউনলোড হয়েছে",
+        description: "সব ফাইলের সেটগুলো পরপর — ফাইলের মাঝে পেজ ব্রেক, ফরম্যাট হুবহু অক্ষত।",
+      });
+    } catch (e) {
+      toast({ title: "মার্জ করা যায়নি", description: String(e), variant: "destructive" });
+    } finally {
+      setMultiMergedBusy(false);
+    }
+  };
+
+  /** প্রতিটা ফাইলের শাফল্ড .docx এক ZIP-এ */
+  const handleMultiZipDownload = async () => {
+    if (!shuffleItems || !shuffleMultiSets) return;
+    setMultiZipBusy(true);
+    try {
+      const out: Array<{ name: string; blob: Blob }> = [];
+      for (let i = 0; i < shuffleItems.length; i++) {
+        const it = shuffleItems[i];
+        if (it.parse.questions.length === 0) continue;
+        const xml = buildShuffledXml(it.xml, it.parse.questions, shuffleMultiSets[i] ?? [], {
+          renumber,
+          includeSetHeader: true,
+        });
+        out.push({ name: `${it.baseName} (shuffled).docx`, blob: await replaceDocumentXml(it.file, xml) });
+      }
+      if (!out.length) throw new Error("ডাউনলোড করার মতো ফাইল নেই");
+      const zip = await buildZipBlob(out);
+      downloadBlob(zip, "MCQ-shuffled-files.zip");
+      toast({
+        title: "✅ ZIP ডাউনলোড হয়েছে",
+        description: `${out.length} টি আলাদা শাফল্ড ফাইল ভিতরে আছে।`,
+      });
+    } catch (e) {
+      toast({ title: "ZIP বানানো যায়নি", description: String(e), variant: "destructive" });
+    } finally {
+      setMultiZipBusy(false);
+    }
   };
 
   // ---- TEXT mode সেট অ্যাকশন ----
@@ -730,13 +1022,22 @@ export default function Home() {
         {mode === "serial" ? (
           <>
             <SerialInputCard
-              onFile={handleSerialFile}
+              onFiles={(fs) => loadSerialFiles(fs, false)}
+              onAddFiles={(fs) => loadSerialFiles(fs, true)}
               loading={serialLoading}
-              loadedName={serialDoc?.file.name ?? null}
+              items={serialDocs.map((d) => ({
+                id: d.id,
+                name: d.file.name,
+                status: "ready" as const,
+                questionCount: d.analysis.questionCount,
+              }))}
+              onReorder={reorderSerialDocs}
+              onRemove={removeSerialDoc}
             />
 
-            {serialDoc &&
-              (serialDoc.analysis.colors.length > 0 ? (
+            {/* ঠিক ১ টা ফাইল — পুরনো রঙ-চিপ কার্ড */}
+            {serialDocs.length === 1 && serialDoc ? (
+              serialDoc.analysis.colors.length > 0 ? (
                 <ColorSerialCard
                   analysis={serialDoc.analysis}
                   fileName={serialDoc.file.name}
@@ -749,7 +1050,24 @@ export default function Home() {
                   busy={serialBusy}
                   onContinuous={() => handleColorSerial({ kind: "continuous" }, "continuous")}
                 />
-              ))}
+              )
+            ) : null}
+
+            {/* ≥২ ফাইল — মার্জ (.docx, দুই ধরনের সিরিয়াল) বা ZIP */}
+            {serialDocs.length >= 2 && (
+              <MultiDownloadCard
+                title="সব ফাইল একসাথে সিরিয়াল করুন"
+                description="প্রতিটা ফাইলের সব প্রশ্ন পরপর নম্বর পাবে — রঙ-হেডার, ইকুয়েশন, ছবি সব অক্ষত থাকবে। রঙ-অনুযায়ী সিরিয়াল লাগলে ওই ফাইলটা একা আপলোড করুন।"
+                stats={`${serialDocs.length} টি ফাইল • মোট ${serialDocs.reduce((a, d) => a + d.analysis.questionCount, 0)} টি প্রশ্ন`}
+                showSerialChoice
+                serialStrategy={serialStrategy}
+                onSerialStrategyChange={setSerialStrategy}
+                onDownloadMerged={handleSerialMultiMerged}
+                onDownloadZip={handleSerialMultiZip}
+                mergedBusy={serialMergedBusy}
+                zipBusy={serialZipBusy}
+              />
+            )}
           </>
         ) : (
           <>
@@ -759,13 +1077,73 @@ export default function Home() {
               onDetect={handleDetect}
               onSample={handleSample}
               onDocxFile={handleDocxFile}
+              onDocxFiles={handleShuffleFiles}
               onTextFileLoaded={loadAndDetect}
               detecting={detecting}
               detected={parsed !== null && parsed.questions.length > 0}
-              docxLoading={docxLoading}
+              docxLoading={docxLoading || shuffleLoading}
             />
 
-            {docx ? (
+            {shuffleItems ? (
+              <>
+                {/* মাল্টি-ফাইল লিস্ট — টেনে ক্রম বদলানো যায় */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base md:text-lg">
+                      📂 আপলোড হওয়া ফাইল ({shuffleItems.length} টি)
+                    </CardTitle>
+                    <CardDescription>
+                      ক্রম বদলাতে টেনে ধরুন বা তীর চাপুন — মার্জ/ZIP-এ ঠিক এই ক্রমেই আসবে। প্রতিটা ফাইল নিজের ভিতরেই শাফল হবে।
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <MultiFileList
+                      items={shuffleItems.map((it) => ({
+                        id: it.id,
+                        name: it.file.name,
+                        status: "ready" as const,
+                        questionCount: it.parse.questions.length,
+                      }))}
+                      onReorder={reorderShuffleItems}
+                      onRemove={removeShuffleItem}
+                      disabled={shuffleLoading || multiShuffling}
+                    />
+                  </CardContent>
+                </Card>
+
+                {shuffleItems.some((i) => i.blocked.length > 0) && (
+                  <BlockedLinesCard blocked={shuffleItems.flatMap((i) => i.blocked)} />
+                )}
+
+                <ShuffleCard
+                  enabled={multiGateReason === null}
+                  lockReason={multiGateReason}
+                  selectedCount={shuffleMultiTotal}
+                  setCount={setCount}
+                  onSetCountChange={setSetCount}
+                  distribution={distribution}
+                  onDistributionChange={setDistribution}
+                  shuffleWithin={shuffleWithin}
+                  onShuffleWithinChange={setShuffleWithin}
+                  onShuffle={handleShuffle}
+                  shuffling={multiShuffling}
+                />
+
+                <div ref={resultsRef} className="scroll-mt-4">
+                  {shuffleMultiSets && (
+                    <MultiDownloadCard
+                      title="শাফল সম্পন্ন — এখন ডাউনলোড করুন"
+                      description="প্রতিটা ফাইলের সেটগুলো আলাদা পেজে, সিরিয়াল ১,২,৩… করা।"
+                      stats={`${shuffleItems.length} টি ফাইল • প্রতি ফাইলে ${setCount} টি সেট`}
+                      onDownloadMerged={handleMultiMergedDownload}
+                      onDownloadZip={handleMultiZipDownload}
+                      mergedBusy={multiMergedBusy}
+                      zipBusy={multiZipBusy}
+                    />
+                  )}
+                </div>
+              </>
+            ) : docx ? (
               <>
                 {docx.colorAn && (
                   <ColorShuffleInfoCard
