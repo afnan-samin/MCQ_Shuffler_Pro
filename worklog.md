@@ -450,3 +450,25 @@ Stage Summary:
 - ব্যবহৃত ফিচার-সেট সম্পূর্ণ: সিরিয়াল মোডে এখন paste ইনপুটও আছে; মাল্টি-ফাইল সিরিয়ালে প্রতি ফাইলে রঙ-স্কিম বাছা যায়; ৯৯৯৯ পর্যন্ত সিরিয়াল দুই পাইপলাইনেই ধরে
 - node_modules 1.2G→997M, lockfile ৫৪ ডিপ হালকা — CI ইনস্টল দ্রুত
 - অবশিষ্ট (ইচ্ছাকৃত-বাদ): .doc বাইনারি ইনপুট (ব্রাউজারে বাস্তবসম্মত নয়), পেস্টে রঙ-স্কিম (রঙের উৎসই নেই — নোট UI-তে)
+
+---
+Task ID: 28
+Agent: Main Agent (Super Z)
+Task: "Ekn poro project clean kre felo" + lipilab merge/revenue/marketing strategy consultation (স্যান্ডবক্স রোলব্যাক পুনঃস্থাপনসহ)
+
+Work Log:
+- স্যান্ডবক্স রোলব্যাক শনাক্ত: worklog/git-এ সর্বশেষ Task 21 (42de10b) — গত সেশনের Task 26 (redownload/renumber মোড) ও Task 27 (favicon) বর্তমান ফাইলসিস্টেমে নেই; ব্যবহারকারীকে জানানো হবে
+- Word view সার্চ: src/-তে "word view/ওয়ার্ড ভিউ/previewMode" — কোনো ম্যাচ নেই (ফিচারটি রোলব্যাকে হারিয়েছে), তাই বাদ দেওয়ার কিছু অবশিষ্ট নেই
+- Task 27 পুনঃস্থাপন: src/app/icon.svg (emerald #059669 rounded tile + সাদা lucide Dices), scripts/gen-favicon-png.js → icon.png 512px + apple-icon.png 180px (sharp), layout.tsx থেকে metadata.icons z-cdn URL বাদ
+- ক্লিন-আপ যাচাই: tsc --noEmit ০ এরর, eslint ক্লিন, tool-results/tmp জাঞ্জ পরিষ্কার, টেস্ট/ই২ই স্ক্রিপ্ট অক্ষত
+- ডেভ সার্ভার পুনরায় চালু (nohup bun run dev, port 3000) — curl 200
+- ব্রাউজার e2e: হোম রেন্ডার ✓ (মোড-ট্যাব, আপলোড/পেস্ট ট্যাব), icon লিংক /icon.svg|icon.png|apple-icon.png ✓, নমুনা Bijoy .docx → অটো-ডিটেক্ট ৬০ প্রশ্ন ✓, pageerror/কনসোল-এরর শূন্য
+- STATIC_EXPORT=1 NEXT_PUBLIC_BASE_PATH=/fix_mcq build সফল — .next-static root-এ icon.svg/png/apple-icon.png emit, index.html-এ basePath-যুক্ত href, z-cdn রেফারেন্স ০; বিল্ড আর্টিফ্যাক্ট পরিষ্কার
+- লোকাল কমিট 5b754d1 (push করা হয়নি — ফ্রিজ বলবত)
+- lipilab রিসার্চ: afnan-samin/lipilab = "Bangla Unicode ↔ Bijoy Converter", single-page vanilla JS + JSZip, কাস্টম ডোমেইন lipilab.pro.bd (CNAME), v2.0 master-prompt-এ points-wallet (1 BDT=2000 pts), SSLCommerz/ShurjoPay, freemium+quota, rewarded-ad cooldown ডিজাইন ও "MCQ Serial" LLM ফিচার পরিকল্পিত
+- কনসালটেশন উত্তর (Banglish): স্ট্যাক-ভার্ডিক্ট (JS ইঞ্জিন রেখে হাইব্রিড ব্যাকএন্ড; Laravel=ব্যাকএন্ড+অ্যাডমিন+ব্লগ, UI/UX ফ্রন্টএন্ডনির্ভর), মার্জ আর্কিটেকচার (lipilab.pro.bd হাব + /mcq পাথ, এক repo), ads (AdSense→Ezoic/Mediavine) ও non-ads (points, প্রিমিয়াম, B2B কোচিং লাইসেন্স, API/white-label, সার্ভিস), মার্কেটিং (SEO বাংলা কিওয়ার্ড, FB টিচার-গ্রুপ, YouTube বাংলা টিউটোরিয়াল, পরীক্ষা-সিজন টাইমিং), দরকারি চেকলিস্ট
+
+Stage Summary:
+- প্রজেক্ট এখন ক্লিন + লোগো favicon সহ লাইভ প্রিভিউ চলছে (dev server 200, e2e ক্লিন)
+- গত সেশনের redownload মোড বর্তমান কোডে নেই — ব্যবহারকারী চাইলে পুনর্নির্মাণ করতে হবে
+- কৌশলগত সুপারিশ: উভয় টুল JS-ইঞ্জিন হিসেবে থেকে এক হাব-সাইটে মার্জ → হাইব্রিড ব্যাকএন্ড (auth/points/quota) → ads+freemium+B2B রাজস্ব
