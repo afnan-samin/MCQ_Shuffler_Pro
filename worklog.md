@@ -472,3 +472,23 @@ Stage Summary:
 - প্রজেক্ট এখন ক্লিন + লোগো favicon সহ লাইভ প্রিভিউ চলছে (dev server 200, e2e ক্লিন)
 - গত সেশনের redownload মোড বর্তমান কোডে নেই — ব্যবহারকারী চাইলে পুনর্নির্মাণ করতে হবে
 - কৌশলগত সুপারিশ: উভয় টুল JS-ইঞ্জিন হিসেবে থেকে এক হাব-সাইটে মার্জ → হাইব্রিড ব্যাকএন্ড (auth/points/quota) → ads+freemium+B2B রাজস্ব
+
+---
+Task ID: 29
+Agent: Main Agent (Super Z)
+Task: সম্পূর্ণ project rebuild — Task 26-এর renumber/redownload মোড hubhu (আগের চেয়ে ভালো) + নতুন GitHub repo push-prep (ব্যবহারকারীর নির্দেশ: "ager mto kro and noton github repo te push krba")
+
+Work Log:
+- ব্যবহারকারীর অনুমোদনে Task 26 (গত সেশনে sandbox-reset-এ হারানো) পুনর্নির্মাণ + নতুন repo-তে push-এর নির্দেশ
+- স্যান্ডবক্সে GitHub credentials নেই (remote/gh/token শূন্য) — push নিজে সম্ভব নয়; scripts/push-new-repo.sh তৈরি (repo নাম বসিয়ে এক-কমান্ড push + Pages সেটআপ গাইড); deploy workflow ইতিমধ্যে repo-নাম-dynamic (GITHUB_REPOSITORY থেকে basePath) — যেকোনো নতুন নামে কাজ করবে
+- src/lib/mcq/redownload.ts নতুন ইঞ্জিন: ছয়-অংশ ডিটেকশন (সিরিয়াল/প্রশ্ন/রেফারেন্স/অপশন/উত্তর/ব্যাখ্যা) — রঙ-হেডার কীওয়ার্ড + টেক্সট-প্যাটার্ন হাইব্রিড; গার্ডেড প্রশ্ন-শুরু (উত্তরমালার "১২. ক" প্রশ্ন নয়; এক-লাইন অপশন-রোর শেষের "Dt K" পুরো লাইনকে উত্তর বানায় না; "22-23" রেঞ্জ জোড়া নয় — digit-lookahead); blockIndex-সহ body-child ম্যাপ
+- এক্সপোর্ট: buildRedownloadXml — বাছাই অংশের cloneNode(true) deep copy; রিনাম্বার (সিলেক্টেড ক্রমে ১..N, renumberSerialParaTo); সিরিয়াল-বাদ (stripSerialPrefix); উত্তর-বিস্তার — ব্লক-উত্তর "উঃ ক" → "উঃ ক) পুরো লেখা" + উত্তরমালার "১২. ক" → সিরিয়াল দিয়ে প্রশ্ন খুঁজে বিস্তার; ব্লক-বহির টাইটেল/নির্দেশনা সবসময় থাকে
+- docx-xml.ts: scanOptions + isSectionSeparator export; multi-docx.ts reuse (replaceDocumentXml/buildMergedDocxBlob/buildZipBlob)
+- UI: mode-tabs ৩-ট্যাব (📥 MCQ রিডাউনলোড); redownload-input-card (ড্রপজোন+MultiFileList); redownload-parts-card (৬ চেকবক্স+কাউন্ট, ডিফল্ট সিরিয়াল+প্রশ্ন, রিনাম্বার সুইচ, বিস্তার-হিন্ট); redownload-questions-card — H-বিন্যাস (প্রশ্ন লাইন → অপশন লাইন → উত্তর লাইন), বাংলা পজিশন, ট্যাব-গ্যাপ রেন্ডার (.tab-gap), ওয়াটারমার্ক ওভারলে (VML textpath→rotate-24deg), বাংলা/English রেঞ্জ-ইনপুট (digitsToNumber); page.tsx ফুল ওয়্যারিং (state/handlers/merged+ZIP)
+- বাগ-ফিক্স টেস্ট-চালানিত: pair-regex-এ digit-lookahead + বাধ্যতমক সেপারেটর ("32"→"3"+"2" ফলস-পেয়ার বন্ধ); অপশন-সারির "Dt K" শেষাংশ পুরো লাইনকে উত্তর বানাত (আসল ফাইলে 22/60 প্রশ্ন হারাচ্ছিল → এখন 60/60); extractWatermark Blob|Uint8Array সিগনেচার
+- ভেরিফিকেশন: test-redownload ৪১/৪১; রিগ্রেশন — test-docx ৪৮, test-mcq ৭১, test-color-serial ১২৯, test-multi-docx ৫৭ (মোট ৩৪৬/৩৪৬); tsc ০ এরর; lint ক্লিন; ব্রাউজার e2e — ৩ ট্যাব, আপলোড→অটো-ডিটেক্ট (৬০ প্রশ্ন/৯২ অপশন), H-বিন্যাস, সব-সিলেক্ট/সব-বাদ/বাংলা-রেঞ্জ (৫-৮ → ৪টি), ডাউনলোড → বৈধ 55KB docx, কনসোল-এরর শূন্য; STATIC_EXPORT বিল্ড সফল
+- কমিট b1583b6 + push script (push হয়নি — credentials নেই, ব্যবহারকারী চালাবে)
+
+Stage Summary:
+- রিডাউনলোড মোড সম্পূর্ণ পুনর্নির্মিত — আগের চেয়ে বাড়তি: উত্তরমালা-বিস্তার, সিরিয়াল-বাদ, বাংলা-রেঞ্জ ইনপুট, ট্যাব-প্রিভিউ, ওয়াটারমার্ক-ওভারলে (গত সেশনের tab/watermark বাগ-রিপোর্ট দুটিই এখানে ফিক্সড)
+- push অবশিষ্ট: ব্যবহারকারী github.com/new-এ খালি repo বানিয়ে scripts/push-new-repo.sh-এ নাম বসিয়ে চালাবে → Pages-এ লাইভ
