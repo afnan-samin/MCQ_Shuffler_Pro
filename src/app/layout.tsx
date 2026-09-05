@@ -38,9 +38,7 @@ export const metadata: Metadata = {
   description:
     "MCQ প্রশ্ন শাফল করুন, একাধিক সেটে ভাগ বা প্রতি সেটে সব প্রশ্ন (Original Shuffle) করুন। শব্দ ধরে ধরে Bijoy/ইউনিকোড/English ডিটেক্টর, সিরিয়াল ডিটেক্ট ও অটো-ফিক্স। Kalpurush + Bijoy (SutonnyMJ) ফন্ট সাপোর্ট, Word (.docx) এক্সপোর্ট — প্রতি সেট আলাদা পেজে, প্লেইন টেক্সট সিরিয়াল। একদম ফ্রি।",
   keywords: ["MCQ shuffle", "MCQ set maker", "Original Shuffle", "Bijoy font", "SutonnyMJ", "Kalpurush", "বাংলা MCQ", "exam set generator", "question shuffle", "Word export"],
-  icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
-  },
+  // favicon: src/app/icon.svg|icon.png|apple-icon.png — App Router অটো-সার্ভ করে (basePath-সহ)
   openGraph: {
     title: "MCQ Shuffler Pro",
     description: "MCQ শাফল, সেট তৈরি ও সিরিয়াল ডিটেক্ট — একদম ফ্রি",
