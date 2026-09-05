@@ -197,3 +197,9 @@ input[type="number"] {
   color: #a5b4fc;
 }
 
+
+/* রিডাউনলোড প্রিভিউ — Word-এর ট্যাবের মত ফিক্সড-উইডথ গ্যাপ */
+.tab-gap {
+  display: inline-block;
+  width: 3rem;
+}

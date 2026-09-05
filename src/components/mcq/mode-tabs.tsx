@@ -1,9 +1,9 @@
 "use client";
 
-import { Dices, ListOrdered } from "lucide-react";
+import { Dices, FileOutput, ListOrdered } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type McqMode = "shuffle" | "serial";
+export type McqMode = "shuffle" | "serial" | "redownload";
 
 interface ModeTabsProps {
   mode: McqMode;
@@ -13,28 +13,42 @@ interface ModeTabsProps {
 const TABS: { id: McqMode; title: string; sub: string }[] = [
   { id: "shuffle", title: "🔀 MCQ শাফল", sub: "প্রশ্ন শাফল + সেট তৈরি" },
   { id: "serial", title: "🔢 MCQ সিরিয়াল", sub: "রঙ-অনুযায়ী নম্বর বসানো" },
+  { id: "redownload", title: "📥 MCQ রিডাউনলোড", sub: "অংশ বাছাই করে নতুন ফাইল" },
 ];
 
-/** উপরের দুইটা মোড-বাটন — শাফল আর সিরিয়ালের কাজ সম্পূর্ণ আলাদা */
+const ICONS: Record<McqMode, typeof Dices> = {
+  shuffle: Dices,
+  serial: ListOrdered,
+  redownload: FileOutput,
+};
+
+const ARIA_LABELS: Record<McqMode, string> = {
+  shuffle: "শাফল মোড",
+  serial: "সিরিয়াল মোড",
+  redownload: "রিডাউনলোড মোড",
+};
+
+/** উপরের তিনটা মোড-বাটন — শাফল, সিরিয়াল আর রিডাউনলোডের কাজ সম্পূর্ণ আলাদা */
 export function ModeTabs({ mode, onChange }: ModeTabsProps) {
   return (
     <div
       role="tablist"
-      aria-label="মোড বাছাই — শাফল বা সিরিয়াল"
-      className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3"
+      aria-label="মোড বাছাই — শাফল, সিরিয়াল বা রিডাউনলোড"
+      className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3"
     >
       {TABS.map((t) => {
         const active = mode === t.id;
-        const Icon = t.id === "shuffle" ? Dices : ListOrdered;
+        const Icon = ICONS[t.id];
         return (
           <button
             key={t.id}
             role="tab"
             aria-selected={active}
+            aria-label={ARIA_LABELS[t.id]}
             type="button"
             onClick={() => onChange(t.id)}
             className={cn(
-              "flex min-h-[44px] items-center gap-3 rounded-xl border-2 p-3 text-left transition-all sm:p-4",
+              "flex min-h-[44px] items-center gap-3 rounded-xl border-2 p-3 text-left transition-all",
               active
                 ? "border-emerald-600 bg-emerald-600 text-white shadow-md"
                 : "border-border bg-card hover:border-emerald-400 hover:bg-emerald-50/60 dark:hover:border-emerald-600 dark:hover:bg-emerald-950/20"

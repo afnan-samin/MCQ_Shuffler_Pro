@@ -198,7 +198,7 @@ export function looksOptionLed(t: string): boolean {
 }
 
 /** সেকশন সেপারেটর/শিরোনাম ("PHYSICS", "A" ইত্যাদি) — প্রশ্ন নয় */
-function isSectionSeparator(text: string): boolean {
+export function isSectionSeparator(text: string): boolean {
   const t = text.trim();
   if (!t || t.includes("\t")) return false;
   if (t.length <= 3) return true;
@@ -236,7 +236,7 @@ const OPTION_FAMILIES: string[][] = [
   ["A", "B", "C", "D"],
 ];
 
-function scanOptions(blockText: string, serialRaw: string): { options: OptionPreview[]; answer: string | null; qText: string } {
+export function scanOptions(blockText: string, serialRaw: string): { options: OptionPreview[]; answer: string | null; qText: string } {
   const si = blockText.indexOf(serialRaw);
   const body = si >= 0 ? blockText.slice(si + serialRaw.length) : blockText;
 

@@ -67,6 +67,19 @@ import {
   englishSetName,
 } from "@/lib/mcq/docx-exporter";
 import { downloadBlob } from "@/lib/mcq/exporter";
+import { RedownloadInputCard } from "@/components/mcq/redownload-input-card";
+import { RedownloadPartsCard } from "@/components/mcq/redownload-parts-card";
+import { RedownloadQuestionsCard } from "@/components/mcq/redownload-questions-card";
+import {
+  buildRedownloadXml,
+  DEFAULT_PART_SELECTION,
+  extractWatermark,
+  parseRedownloadXml,
+  type PartKind,
+  type PartSel,
+  type RdParseResult,
+  type WatermarkInfo,
+} from "@/lib/mcq/redownload";
 import { SAMPLE_MCQ } from "@/lib/mcq/sample";
 import { renumberQuestionsByPosition } from "@/lib/mcq/serial-paste";
 import { toast } from "@/hooks/use-toast";
@@ -115,6 +128,16 @@ interface ShuffleItemState {
   parse: DocxParseResult;
   /** বাদ পড়া লাইন (রঙ-হেডার + নন-MCQ) */
   blocked: BlockedLine[];
+}
+
+/** রিডাউনলোড মোডের আলাদা স্টেট — একাধিক ফাইল, প্রতি ফাইলের অংশ-বিশ্লেষণ */
+interface RdDocState {
+  id: string;
+  file: File;
+  baseName: string;
+  xml: string;
+  parse: RdParseResult;
+  watermark: WatermarkInfo | null;
 }
 
 export default function Home() {
@@ -177,13 +200,37 @@ export default function Home() {
   const [multiMergedBusy, setMultiMergedBusy] = useState(false);
   const [multiZipBusy, setMultiZipBusy] = useState(false);
 
+  // ---- রিডাউনলোড মোডের সম্পূর্ণ আলাদা স্টেট (একাধিক .docx + অংশ-বাছাই) ----
+  const [rdDocs, setRdDocs] = useState<RdDocState[]>([]);
+  const [rdLoading, setRdLoading] = useState(false);
+  // প্রতি ফাইলে সিলেক্ট করা প্রশ্ন (কী = RdDocState.id)
+  const [rdSel, setRdSel] = useState<Record<string, Set<number>>>({});
+  // কোন অংশগুলো নতুন ফাইলে থাকবে (ডিফল্ট: সিরিয়াল + প্রশ্ন)
+  const [rdParts, setRdParts] = useState<PartSel>(DEFAULT_PART_SELECTION);
+  const [rdRenumber, setRdRenumber] = useState(true);
+  const [rdMergedBusy, setRdMergedBusy] = useState(false);
+  const [rdZipBusy, setRdZipBusy] = useState(false);
+
+  // রিডাউনলোড মোডের ডেরাইভড — সব ফাইল মিলিয়ে অংশ-কাউন্ট ও সিলেকশন স্ট্যাট
+  const rdTotalCounts = rdDocs.reduce<Record<PartKind, number>>(
+    (acc, d) => {
+      for (const k of ["serial", "question", "reference", "options", "answer", "bekkha", "other"] as PartKind[]) {
+        acc[k] = (acc[k] ?? 0) + d.parse.kindCounts[k];
+      }
+      return acc;
+    },
+    { serial: 0, question: 0, reference: 0, options: 0, answer: 0, bekkha: 0, other: 0 }
+  );
+  const rdTotalQuestions = rdDocs.reduce((a, d) => a + d.parse.questions.length, 0);
+  const rdSelTotal = rdDocs.reduce((a, d) => a + (rdSel[d.id]?.size ?? 0), 0);
+
   const resultsRef = useRef<HTMLDivElement>(null);
 
   // শেষ ব্যবহৃত মোড মনে রাখা
   useEffect(() => {
     try {
       const m = localStorage.getItem(MODE_KEY);
-      if (m === "shuffle" || m === "serial") setMode(m);
+      if (m === "shuffle" || m === "serial" || m === "redownload") setMode(m);
     } catch {}
   }, []);
 
@@ -824,6 +871,158 @@ export default function Home() {
 
   const canShuffle = gateReason === null;
 
+  // ================== REDOWNLOAD MODE ==================
+
+  /** রিডাউনলোড মোডে ফাইল লোড — পার্স + অংশ-বিশ্লেষণ + ওয়াটারমার্ক এক্সট্র্যাক্ট */
+  const loadRedownloadFiles = async (files: File[], append: boolean) => {
+    setRdLoading(true);
+    const added: RdDocState[] = [];
+    const errors: string[] = [];
+    for (const f of files) {
+      try {
+        const xml = await loadDocxXml(f);
+        const parse = parseRedownloadXml(xml);
+        const watermark = await extractWatermark(f);
+        added.push({ id: nextMultiId(), file: f, baseName: f.name.replace(/\.docx$/i, ""), xml, parse, watermark });
+      } catch (e) {
+        errors.push(`${f.name}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    setRdDocs((prev) => (append ? [...prev, ...added] : added));
+    if (added.length) {
+      // নতুন ফাইলের সব প্রশ্ন ডিফল্ট সিলেক্টেড
+      setRdSel((prev) => {
+        const next = append ? { ...prev } : {};
+        for (const d of added) next[d.id] = new Set(d.parse.questions.map((q) => q.id));
+        return next;
+      });
+      const totalQ = added.reduce((a, d) => a + d.parse.questions.length, 0);
+      toast({
+        title: `✅ ${added.length} টি ফাইল ${append ? "যোগ" : "লোড"} হয়েছে`,
+        description: `মোট ${totalQ} টি প্রশ্ন। এখন অংশ বাছাই করে ডাউনলোড করুন।`,
+      });
+    }
+    if (errors.length) {
+      toast({ title: "কিছু ফাইল পড়া যায়নি", description: errors.join("\n"), variant: "destructive" });
+    }
+    setRdLoading(false);
+  };
+
+  const reorderRdDocs = (from: number, to: number) => {
+    setRdDocs((prev) => {
+      const next = prev.slice();
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  };
+
+  const removeRdDoc = (id: string) => {
+    setRdDocs((prev) => prev.filter((d) => d.id !== id));
+    setRdSel((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  };
+
+  const rdSelOf = (id: string): Set<number> => rdSel[id] ?? new Set<number>();
+
+  const toggleRdQuestion = (docId: string, qid: number) => {
+    setRdSel((prev) => {
+      const cur = new Set(prev[docId] ?? []);
+      if (cur.has(qid)) cur.delete(qid);
+      else cur.add(qid);
+      return { ...prev, [docId]: cur };
+    });
+  };
+
+  const selectAllRd = (docId: string) => {
+    const d = rdDocs.find((x) => x.id === docId);
+    if (!d) return;
+    setRdSel((prev) => ({ ...prev, [docId]: new Set(d.parse.questions.map((q) => q.id)) }));
+  };
+
+  const selectNoneRd = (docId: string) => {
+    setRdSel((prev) => ({ ...prev, [docId]: new Set<number>() }));
+  };
+
+  const selectRangeRd = (docId: string, from: number, to: number) => {
+    const d = rdDocs.find((x) => x.id === docId);
+    if (!d) return;
+    const ids = d.parse.questions.slice(from, to + 1).map((q) => q.id);
+    setRdSel((prev) => ({ ...prev, [docId]: new Set(ids) }));
+  };
+
+  /** সব ফাইলের বাছাই করা প্রশ্ন + অংশ দিয়ে রেডি XML-আইটেম (খালি-সিলেক্ট ফাইল স্কিপ) */
+  const buildRdItems = (): Array<{ xml: string; file: Blob; baseName: string }> | null => {
+    const items = rdDocs
+      .map((d) => {
+        const sel = rdSelOf(d.id);
+        if (!sel.size) return null;
+        const xml = buildRedownloadXml(d.xml, d.parse, sel, {
+          partSel: rdParts,
+          renumber: rdRenumber,
+          expandAnswer: true,
+        });
+        return { xml, file: d.file as Blob, baseName: d.baseName };
+      })
+      .filter((x): x is { xml: string; file: Blob; baseName: string } => x !== null);
+    return items.length ? items : null;
+  };
+
+  const handleRdMerged = async () => {
+    const items = buildRdItems();
+    if (!items) {
+      toast({ title: "প্রশ্ন সিলেক্ট করুন", description: "অন্তত একটা ফাইলে প্রশ্ন টিক দিন।", variant: "destructive" });
+      return;
+    }
+    setRdMergedBusy(true);
+    try {
+      const blob =
+        items.length === 1
+          ? await replaceDocumentXml(items[0].file, items[0].xml)
+          : await buildMergedDocxBlob(items);
+      const name =
+        items.length === 1 ? `${items[0].baseName} (redownload).docx` : "MCQ-Redownload-merged.docx";
+      downloadBlob(blob, name);
+      toast({
+        title: "✅ রিডাউনলোড ফাইল তৈরি",
+        description: `${items.length} টি ফাইলের বাছাই করা অংশ নতুন ফাইলে — ট্যাব, ইকুয়েশন, ওয়াটারমার্ক সব অক্ষত।`,
+      });
+    } catch (e) {
+      toast({ title: "ডাউনলোডে সমস্যা", description: String(e), variant: "destructive" });
+    } finally {
+      setRdMergedBusy(false);
+    }
+  };
+
+  const handleRdZip = async () => {
+    const items = buildRdItems();
+    if (!items) {
+      toast({ title: "প্রশ্ন সিলেক্ট করুন", description: "অন্তত একটা ফাইলে প্রশ্ন টিক দিন।", variant: "destructive" });
+      return;
+    }
+    setRdZipBusy(true);
+    try {
+      const files: Array<{ name: string; blob: Blob }> = [];
+      for (const it of items) {
+        const blob = await replaceDocumentXml(it.file, it.xml);
+        files.push({ name: `${it.baseName} (redownload).docx`, blob });
+      }
+      const zip = await buildZipBlob(files);
+      downloadBlob(zip, "MCQ-Redownload.zip");
+      toast({
+        title: "✅ ZIP ডাউনলোড হয়েছে",
+        description: `${files.length} টি আলাদা ফাইল — প্রতিটাতেই বাছাই করা অংশ।`,
+      });
+    } catch (e) {
+      toast({ title: "ZIP-এ সমস্যা", description: String(e), variant: "destructive" });
+    } finally {
+      setRdZipBusy(false);
+    }
+  };
+
   // ---- TEXT mode শাফল ----
   const handleTextShuffle = () => {
     if (!parsed || !canShuffle) return;
@@ -1125,7 +1324,65 @@ export default function Home() {
         {/* মোড-বাটন — শাফল আর সিরিয়ালের কাজ সম্পূর্ণ আলাদা */}
         <ModeTabs mode={mode} onChange={changeMode} />
 
-        {mode === "serial" ? (
+        {mode === "redownload" ? (
+          <>
+            <RedownloadInputCard
+              onFiles={loadRedownloadFiles}
+              loading={rdLoading}
+              items={rdDocs.map((d) => ({
+                id: d.id,
+                name: d.file.name,
+                status: "ready" as const,
+                questionCount: d.parse.questions.length,
+              }))}
+              onReorder={reorderRdDocs}
+              onRemove={removeRdDoc}
+            />
+
+            {rdDocs.length > 0 && (
+              <>
+                <RedownloadPartsCard
+                  counts={rdTotalCounts}
+                  sel={rdParts}
+                  onChange={(k, v) => setRdParts((p) => ({ ...p, [k]: v }))}
+                  renumber={rdRenumber}
+                  onRenumberChange={setRdRenumber}
+                  filesCount={rdDocs.length}
+                  questionsCount={rdTotalQuestions}
+                />
+
+                {rdDocs.map((d) => (
+                  <RedownloadQuestionsCard
+                    key={d.id}
+                    fileName={d.file.name}
+                    questions={d.parse.questions}
+                    selected={rdSelOf(d.id)}
+                    onToggle={(qid) => toggleRdQuestion(d.id, qid)}
+                    onSelectAll={() => selectAllRd(d.id)}
+                    onSelectNone={() => selectNoneRd(d.id)}
+                    onSelectRange={(f, t) => selectRangeRd(d.id, f, t)}
+                    watermark={d.watermark}
+                    dominant={null}
+                  />
+                ))}
+
+                <MultiDownloadCard
+                  title={rdDocs.length === 1 ? "৪. ডাউনলোড — বাছাই করা অংশের নতুন ফাইল" : "৪. ডাউনলোড — সব ফাইলের বাছাই করা অংশ"}
+                  description={
+                    rdDocs.length === 1
+                      ? "টিক দেওয়া প্রশ্নগুলোর বাছাই করা অংশ নিয়ে নতুন .docx — ট্যাব, ইকুয়েশন, ওয়াটারমার্ক সব অক্ষত।"
+                      : "সব ফাইল পরপর এক .docx-এ (ফাইলের মাঝে পেজ ব্রেক) অথবা ZIP-এ আলাদা আলাদা নামান।"
+                  }
+                  stats={`${rdDocs.length} টি ফাইল • সিলেক্টেড ${rdSelTotal} টি প্রশ্ন`}
+                  onDownloadMerged={handleRdMerged}
+                  onDownloadZip={handleRdZip}
+                  mergedBusy={rdMergedBusy}
+                  zipBusy={rdZipBusy}
+                />
+              </>
+            )}
+          </>
+        ) : mode === "serial" ? (
           <>
             <SerialInputCard
               onFiles={(fs) => loadSerialFiles(fs, false)}
