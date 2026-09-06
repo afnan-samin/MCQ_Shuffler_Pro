@@ -674,3 +674,25 @@ Work Log:
 Stage Summary:
 - লাইভ সাইট এখন Task 34 ফিক্সসহ সর্বশেষ কোড: https://afnan-samin.github.io/MCQ_Shuffler_Pro/
 - রিডিপ্লয়-পদ্ধতি (পরেরবার): STATIC_EXPORT=1 NEXT_PUBLIC_BASE_PATH=/MCQ_Shuffler_Pro npx next build && bash scripts/deploy-pages.sh <token>
+
+---
+Task ID: 35
+Agent: Main Agent (Super Z)
+Task: ইউজারের Doc1.docx (৪৬তম বিসিএস English, Bijoy) ডিটেকশন-ফিক্স — উত্তর/ব্যাখ্যা/প্রশ্ন/অপশন ধরা পড়ছিল না
+
+Work Log:
+- মূল-কারণ ৪টি: ① উত্তর-মার্কার "D:"/"Dt" (Bijoy উ) ANSWER_RE-তে ছিল না + উত্তর ব্লক-শেষে না থেকে অপশন-প্যারার শেষে গ্লুড ② ব্যাখ্যা-মার্কার "e¨vL¨v:" (Bijoy) BEKKHA_PREFIX_RE-তে ছিল না → ব্যাখ্যার সব প্যারা "options"-কাইন্ড (868!) ③ পরীক্ষা-টাইটেল ("46Zg wewmGm wcÖwjwgbvwi cix¶v") সেপারেটর হিসেবে চিনত না → পরের সেকশনের টাইটেল আগের প্রশ্নের ব্লকে লেগে যেত ④ সিরিয়াল "broken" দেখাত — আসলে সব ১১টি ইস্যুই সেকশন-রিস্টার্ট (৪৬তম→৪৫তম→…, প্রতি সেকশনে ১ থেকে শুরু)
+- docx-xml.ts scanOptions রিরাইট: ব্যাখ্যা-মার্কার-লাইন থেকে ব্লক-শেষ আলাদা (bekkha রিটার্ন), উত্তর = অপশন-অঞ্চলের শেষতম লাইন-শেষ মার্কার (D:/Dt/Cvw/উঃ/উত্তর/Ans) — গ্লুড ("…sand\tD: L + N") বা একা-লাইন ("D: K") দুই অবস্থানেই, মাল্টি-উত্তর "L + N"/"ক, খ", ঝুলন্ত-মার্কার ("…\tDt", "…\tD: -") টেক্সট-ক্লিন + উত্তর null ("No Answer" অপশন রক্ষা — মার্কারের আগে ট্যাব/লাইন-শুরু বাধ্যতমক)
+- DocxQuestion/RdQuestion-এ bekkha ফিল্ড; serial issue-এ restart ফ্ল্যাগ (found===1)
+- isExamTitleLine (Bijoy "NNZg … cix[¶ÿ]v" + Unicode "NNতম … পরীক্ষা") → isSectionSeparator; isQuestionStart-এ Unicode-ক্রমবাচক ("৪৫তম") + সাল/year গার্ড (parser.ts-এর সাথে সামঞ্জস্য)
+- 🐛 ক্যাচ-ফিক্স (ক্যাসকেড): ব্যাখ্যা-মার্কার section="bekkha" সেট করত → isQuestionStartPara পরের সব প্রশ্ন-শুরু ব্লক করত (374→12 প্রশ্নে নেমে যায়) → strongEvidence (ট্যাব/পরের-অপশন-লেড) হলে সেকশন-ভিতরেও প্রশ্ন + প্রশ্ন-শুরুতে section=null
+- redownload pass-1: সেপারেটর → kind "other" + কনটেক্সট-রিসেট; ব্যাখ্যা/রেফারেন্স চলমান থাকলে অপশন-লেড কনটিনিউয়েশন ("\t†hgb : i. …") একই অংশ; pass-2: isQStart-প্রায়োরিটি + সেপারেটর শুধু other-কাইন্ডে ("A. TRUE"-জাতীয় অপশন সেপারেটর হয়ে যাওয়ার ল্যাটেন্ট-বাগও ফিক্স)
+- UI: DocxDetectCard স্ট্যাট-গ্রিডে উত্তরসহ/ব্যাখ্যাসহ সেল + প্রশ্ন-রোতে "ব্যাখ্যা ✓" ব্যাজ + রিস্টার্ট-অনলি সিরিয়ালে স্কাই-ব্লু বান্ধব মেসেজ; রিডাউনলাউড-প্রিভিউতে ব্যাখ্যা-লাইন
+- টেস্ট: scripts/test-doc1.ts (৫৪ — আসল Doc1 লোকাল-অনলি ফিক্সচার + সিনথেটিক ফুল-ডক যা সবখানে চলে); প্রাইভেসি: ইউজারের আসল ফাইল রিপোতে কমিট করা হয়নি (gitignore); test-reference/test-color-serial-এ আনট্র্যাকড-ফিক্সচার গ্রেসফুল স্কিপ (আগে ক্র্যাশ করত)
+- ভেরিফিকেশন: টেস্ট ৩৮৮/৩৮৮ (test-mcq ৭১ + test-docx ৪৮ + test-color-serial ১০৪ + test-multi-docx ৬৫ + test-redownload ৪১ + test-reference ১৬ + verify-export ৭ + test-doc1 ৫৪), tsc ০, eslint ক্লিন; লাইভ E2E (agent-browser, আসল Doc1 আপলোড): উত্তরসহ ০→৩৭৩, ব্যাখ্যাসহ ০→৩৬৭, "উত্তর: L + N" মাল্টি-ব্যাজ, ব্যাখ্যা-পার্ট ৪২২ লাইন, রিস্টার্ট-মেসেজ, কনসোল-এরর শূন্য
+- push: 6c03f03..25a876f (কমিট 6187188 fix + 25a876f test-harness) → STATIC_EXPORT বিল্ড → deploy-pages.sh → লাইভ
+
+Stage Summary:
+- Doc1.docx-ফরম্যাত (Bijoy K/L/M/N + D:/Dt উত্তর + e¨vL¨v ব্যাখ্যা + বহু-পরীক্ষা এক ফাইলে) সম্পূর্ণ সাপোর্টেড; উত্তর/ব্যাখ্যা ডিটেকশন ০ থেকে ~৯৯% প্রশ্নে
+- লাইভ: https://afnan-samin.github.io/MCQ_Shuffler_Pro/ (কমিট 6187188)
+- টোকেন ghp_lQZP… কাজ শেষ — ইউজারকে রিভোক করতে বলতে হবে
