@@ -136,18 +136,19 @@ const [dlO] = await Promise.all([
 ]);
 ok(dlO.suggestedFilename() === "hsc27-physics-bijoy (shuffled, original serial).docx", "আসল-নম্বর ডাউনলোড নাম", dlO.suggestedFilename());
 
-// A10. পেছনে → মোড-বাছাই
-await page.click('button[aria-label="পেছনে — মোড বাছাই"]');
-await page.waitForSelector('button[role="tab"]:has-text("MCQ সিরিয়াল")', { timeout: 30000 });
-ok(true, "পেছনে → ৩ মোড-বাটন আবার দেখা যায়");
+// A10. পেছনে → হোমে ফেরা (আপলোড-কার্ড; সব ফাইল রিসেট)
+await page.click('button[aria-label="পেছনে — হোমে ফিরুন"]');
+await page.waitForSelector("#step-upload", { timeout: 30000 });
+ok((await page.locator('button[role="tab"]:has-text("MCQ")').count()) === 0, "পেছনে → হোমে ফেরা (মোড-বাটন নেই, সব রিসেট)");
 
 // ============================================================
 // B. সিরিয়াল মোড — carry-over (শাফলের ফাইল) → ১ ফাইল রঙ → মাল্টি → পেস্ট
 // ============================================================
 console.log("\n== B. সিরিয়াল মোড ==");
+await stage(RAW10); // নতুন ফ্লো: পেছনে = ফুল-রিসেট → সিরিয়ালের ফাইল নতুন করে স্টেজ
 await openMode("MCQ সিরিয়াল");
 await page.waitForSelector("text=রঙ-ভিত্তিক সিরিয়াল", { timeout: 120000 });
-ok((await page.locator("text=১/৫০").count()) >= 0, "সিরিয়াল মোডে ঢোকা (শাফলের ফাইল carry-over)");
+ok((await page.locator("text=১/৫০").count()) >= 0, "সিরিয়াল মোডে ঢোকা (নতুন স্টেজ করা ফাইল)");
 // ১ ফাইল + রঙ → চিপ সিলেক্ট → B1 ডাউনলোড
 await page.click('button:has-text("B1")');
 const [dlB1] = await Promise.all([

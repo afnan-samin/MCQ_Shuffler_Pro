@@ -118,12 +118,12 @@ console.log("✓ সিরিয়াল মোডে রঙহীন ফাই
 // ---- ৭. নন-MCQ টেক্সট-প্যাটার্ন ফিচার (Agri ফাইল: ১৩৫ রঙ-হেডার + রঙহীন "Aa¨vq-8") ----
 // ইউজারের নিয়ম: "jeta mcq noi seta jate bad dey" + বাদ-পড়া লাইনের আলাদা লিস্ট
 const AGRI = "/home/z/my-project/upload/Agri MCQ Botany 997 mcq - Copy - type serial.docx";
-// নতুন ফ্লো: কাজের ভিউতে ট্যাব নেই — পেছনে → শাফল ট্যাব
-await page.click('button[aria-label="পেছনে — মোড বাছাই"]');
-await page.waitForSelector('button[role="tab"]:has-text("MCQ শাফল")', { timeout: 15000 });
+// নতুন ফ্লো: কাজের ভিউতে ট্যাব নেই — পেছনে → হোম → নতুন ফাইল স্টেজ → শাফল ট্যাব
+await page.click('button[aria-label="পেছনে — হোমে ফিরুন"]');
+await page.waitForSelector("#step-upload", { timeout: 15000 });
+await page.setInputFiles("#step-upload input[type='file']", AGRI);
+await page.waitForSelector('button[role="tab"]:has-text("MCQ শাফল")', { timeout: 30000 });
 await page.click('button[role="tab"]:has-text("MCQ শাফল")');
-// ইনপুট-কার্ডের নিজের ইনপুট (replace) — ওয়ার্ক-বারের ইনপুট নয় (append)
-await page.setInputFiles('#step-input input[type="file"]', AGRI);
 await page.waitForSelector("text=বাদ পড়া লাইনসমূহ", { timeout: 120000 });
 await page.waitForSelector("text=136 টি (শাফলে যাবে না)", { timeout: 20000 });
 await page.waitForSelector("text=135 রঙ-হেডার", { timeout: 15000 });

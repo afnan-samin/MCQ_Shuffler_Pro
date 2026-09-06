@@ -35,7 +35,7 @@ await page.waitForSelector("text=রঙ-ভিত্তিক সিরিয়
 const tabsInWork = await page.locator('button[role="tab"]:has-text("MCQ")').count();
 if (tabsInWork !== 0) throw new Error(`কাজের ভিউতে ${tabsInWork} টা মোড-বাটন এখনো দেখা যাচ্ছে — লুকানো উচিত!`);
 await page.waitForSelector('[data-testid="mode-work-bar"]', { timeout: 15000 });
-await page.waitForSelector('button[aria-label="পেছনে — মোড বাছাই"]', { timeout: 10000 });
+await page.waitForSelector('button[aria-label="পেছনে — হোমে ফিরুন"]', { timeout: 10000 });
 const addBtn = await page.locator('button:has-text("আরও ফাইল")').count();
 if (addBtn < 1) throw new Error("ওয়ার্ক-বারে 'আরও ফাইল' বাটন নেই!");
 for (const chip of ["A3", "A4", "B1", "B6"]) {
@@ -81,13 +81,19 @@ await page.waitForSelector("text=আপলোড হওয়া ফাইল (2
 await page.waitForSelector("text=২/৫০ ফাইল", { timeout: 15000 });
 console.log("✓ শাফলে 'আরও ফাইল' append → ২/৫০ চিপ");
 
-// ---- ৯. পেছনে বাটন → মোড-বাছাইয়ে ফেরা (৩ ট্যাব আবার দেখা যায়) → রিডাউনলোডে বহন ----
-await page.click('button[aria-label="পেছনে — মোড বাছাই"]');
-await page.waitForSelector('button[role="tab"]:has-text("MCQ রিডাউনলোড")', { timeout: 15000 });
-console.log("✓ পেছনে → মোড-বাছাই ধাপে ফেরা (৩টা মোড-বাটন আবার দৃশ্যমান)");
+// ---- ৯. পেছনে বাটন → হোমে ফেরা (আপলোড-কার্ড; সব ফাইল/ডেটা রিসেট) ----
+await page.click('button[aria-label="পেছনে — হোমে ফিরুন"]');
+await page.waitForSelector("#step-upload", { timeout: 15000 });
+const tabsAfterBack = await page.locator('button[role="tab"]:has-text("MCQ")').count();
+if (tabsAfterBack !== 0) throw new Error("হোমে ফেরার পরেও মোড-ট্যাব দেখা যাচ্ছে!");
+console.log("✓ পেছনে → হোমে ফেরা (আপলোড-কার্ড, সব ফাইল রিসেট)");
+
+// ---- ৯বি. নতুন করে ২ ফাইল স্টেজ → রিডাউনলোড মোড ----
+await page.setInputFiles("#step-upload input[type='file']", [CHEM, NOCOLOR]);
+await page.waitForSelector('button[role="tab"]:has-text("MCQ রিডাউনলোড")', { timeout: 30000 });
 await page.click('button[role="tab"]:has-text("MCQ রিডাউনলোড")');
 await page.waitForSelector("text=নতুন ফাইলে কী কী থাকবে", { timeout: 120000 });
-console.log("✓ পেছনে-ফেরা ধাপ থেকেই ফাইল রিডাউনলোড মোডে বহন");
+console.log("✓ ২ ফাইল রিডাউনলোড মোডে লোড");
 
 // ---- ১০. ২ ফাইল → মার্জ (.docx) + ZIP দুই বাটনই; ১ ফাইলে নামলে একটাই বাটন (ZIP নেই) ----
 const mergedBtn = await page.locator('button:has-text("এক ফাইলে ডাউনলোড (.docx)")').count();

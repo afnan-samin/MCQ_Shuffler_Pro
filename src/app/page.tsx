@@ -297,8 +297,24 @@ export default function Home() {
     setFlowStep("work");
   };
 
-  /** "পেছনে" — মোড-বাছাইয়ে ফেরা (৩টা মোড-বাটন শুধু সেখানে দেখা যায়); চলমান কাজ অক্ষত থাকে */
-  const backToModes = () => setFlowStep("select");
+  /** "পেছনে" — হোমে (ধাপ ১: আপলোড-কার্ড) ফেরা — লোড করা ফাইল/ডেটা মুছে একদম নতুন শুরু (ড্রাফট-টেক্সট localStorage-এ থাকে) */
+  const backToHome = () => {
+    setStagedFiles(null);
+    setDocx(null);
+    setParsed(null);
+    setShuffleItems(null);
+    setShuffleMultiSets(null);
+    setSelected(new Set());
+    setAllowBroken(false);
+    setSerialDocs([]);
+    setSerialSchemes({});
+    setSerialPaste(null);
+    setSerialPasteText("");
+    setRdDocs([]);
+    setRdSel({});
+    resetResults();
+    setFlowStep("select"); // hasAnyInput ফলস হলেই অটো ধাপ ১ (আপলোড-কার্ড) দেখাবে
+  };
 
   /** কাজ-চলাকালীন "আরও ফাইল" — নতুন ফাইল বর্তমান মোডেই যোগ (append) হয় */
   const handleAddMoreFiles = (files: File[]) => {
@@ -1586,12 +1602,12 @@ export default function Home() {
           </>
         ) : (
           <>
-            {/* কাজ-চলাকালীন বার — ৩ মোড আর দেখানো হয় না; বাঁয়ে পেছনে, ডানে আরও ফাইল */}
+            {/* কাজ-চলাকালীন বার — ৩ মোড আর দেখানো হয় না; বাঁয়ে পেছনে (হোমে ফেরা), ডানে আরও ফাইল */}
             <ModeWorkBar
               mode={mode}
-              onBack={backToModes}
+              onBack={backToHome}
               onAddFiles={handleAddMoreFiles}
-              busy={shuffleLoading || docxLoading || serialLoading || rdLoading}
+              busy={shuffleLoading || docxLoading || serialLoading || rdLoading || detecting || shuffling || multiShuffling || multiMergedBusy || multiZipBusy || serialBusy || serialMergedBusy || serialZipBusy || serialPasteBusy || serialPasteFixing || serialPasteDlBusy || rdMergedBusy || rdZipBusy || fixing}
               filesCount={mode === "shuffle" ? shuffleFileCount : mode === "serial" ? serialFileCount : rdFileCount}
               maxFiles={mode === "shuffle" ? SHUFFLE_MAX_FILES : undefined}
             />

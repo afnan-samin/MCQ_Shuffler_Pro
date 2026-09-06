@@ -103,12 +103,12 @@ await page.waitForSelector("text=রঙ-ভিত্তিক সিরিয়
 console.log("✓ ১ ফাইলে নামলে পুরনো রঙ-চিপ কার্ড ফিরে আসে (রিগ্রেশন OK)");
 
 // ================== শাফল মোড — মাল্টি-ফাইল ==================
-// নতুন ফ্লো: কাজের ভিউতে মোড-ট্যাব থাকে না — আগে "পেছনে" → তারপর মোড-বাটন
-await page.click('button[aria-label="পেছনে — মোড বাছাই"]');
-await page.waitForSelector('button[role="tab"]:has-text("MCQ শাফল")', { timeout: 15000 });
+// নতুন ফ্লো: কাজের ভিউতে মোড-ট্যাব থাকে না — পেছনে → হোম → নতুন ফাইল স্টেজ → শাফল ট্যাব
+await page.click('button[aria-label="পেছনে — হোমে ফিরুন"]');
+await page.waitForSelector("#step-upload", { timeout: 15000 });
+await page.setInputFiles("#step-upload input[type='file']", [HSC, NOCOLOR]);
+await page.waitForSelector('button[role="tab"]:has-text("MCQ শাফল")', { timeout: 30000 });
 await page.click('button[role="tab"]:has-text("MCQ শাফল")');
-await page.waitForSelector("text=প্রশ্ন দিন — ফাইল আপলোড বা পেস্ট", { timeout: 30000 });
-await page.locator('input[type="file"]').first().setInputFiles([HSC, NOCOLOR]);
 await page.waitForSelector("text=আপলোড হওয়া ফাইল", { timeout: 120000 });
 console.log("✓ শাফল: ২ ফাইল আপলোড → মাল্টি লিস্ট");
 

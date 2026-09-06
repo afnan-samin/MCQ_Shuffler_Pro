@@ -15,7 +15,7 @@ const bn = (n: number) => String(n).replace(/\d/g, (d) => "০১২৩৪৫৬
 
 interface ModeWorkBarProps {
   mode: McqMode;
-  /** "পেছনে" — মোড-বাছাইয়ের ধাপে ফেরা (৩টা মোড-বাটন সেখানেই শুধু দেখা যায়) */
+  /** "পেছনে" (শুধু অ্যারো) — হোমে ফেরা (আপলোড-কার্ড); লোড করা সব ডেটা রিসেট হয় */
   onBack: () => void;
   /** নতুন ফাইল এই মোডেই যোগ হবে (append) */
   onAddFiles: (files: File[]) => void;
@@ -28,7 +28,7 @@ interface ModeWorkBarProps {
 
 /**
  * কাজ-চলাকালীন উপরের পাতলা বার — মোড সিলেক্ট হয়ে গেলে ৩টা মোড-বাটন আর দেখানো হয় না।
- * বাঁয়ে "পেছনে" (মোড-বাছাইয়ে ফেরা), ডানে "আরও ফাইল" — নতুন ফাইল এই মোডেই যুক্ত হয়।
+ * বাঁয়ে অ্যারো-বাটন (হোমে ফেরা), ডানে "আরও ফাইল" — নতুন ফাইল এই মোডেই যুক্ত হয়।
  */
 export function ModeWorkBar({ mode, onBack, onAddFiles, busy, filesCount, maxFiles }: ModeWorkBarProps) {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -41,17 +41,18 @@ export function ModeWorkBar({ mode, onBack, onAddFiles, busy, filesCount, maxFil
         type="button"
         variant="outline"
         size="sm"
-        className="gap-1.5"
+        className="px-2"
         onClick={onBack}
         disabled={busy}
-        aria-label="পেছনে — মোড বাছাই"
+        aria-label="পেছনে — হোমে ফিরুন"
+        title="হোমে ফিরুন — লোড করা ফাইল মুছে নতুন শুরু"
       >
-        <ArrowLeft className="h-4 w-4" /> পেছনে
+        <ArrowLeft className="h-4 w-4" />
       </Button>
 
       <div className="min-w-0 flex-1 text-center">
         <span className="text-sm font-bold sm:text-base">{meta.icon} {meta.title}</span>
-        <span className="ml-2 hidden text-xs text-muted-foreground sm:inline">— মোড বদলাতে "পেছনে" চাপুন</span>
+        <span className="ml-2 hidden text-xs text-muted-foreground sm:inline">— হোমে ফিরতে অ্যারো চাপুন</span>
       </div>
 
       {maxFiles !== undefined && filesCount !== undefined && (
