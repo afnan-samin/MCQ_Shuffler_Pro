@@ -619,3 +619,43 @@ Work Log:
 Stage Summary:
 - নতুন টোকেন পাওয়া মাত্র ২ ধাপ: ① git push (main) ② bash scripts/deploy-pages.sh <token> — স্ক্রিপ্ট ও বিল্ড রেডি
 - ইউজারকে নতুন classic PAT (repo scope) চাওয়া হলো; পাওয়ার সাথে সাথেই push+deploy করে নেওয়া হবে (রিভোক-এর আগেই)
+
+---
+Task ID: 34-c
+Agent: project-review (subagent)
+Task: Read-only full project review — risk-ranked findings report (no edits, no commits)
+
+Work Log:
+- worklog.md স্কিম (Task 1-3 + Task 30-33-live) — প্রজেক্ট কনটেক্সট: ৩ মোড, docx XML-preserving pipeline, static export + Pages লাইভ
+- সম্পূর্ণ ফাইল-রিভিউ: package.json/next.config.ts/tsconfig/eslint.config/README, src/app/** (page.tsx ১৮৮৬ লাইন ৩ চাংকে + layout + globals.css), src/components/mqc/** ১৮ কম্পোনেন্ট, src/lib/mcq/** ১২ মডিউল (docx-xml, docx-exporter, color-serial, redownload, reference, multi-docx, exporter, set-engine, parser, encoding, serial-paste, limits), scripts/** স্কিম
+- ক্রস-চেক: প্রতিটা হ্যান্ডলারের finally, খালি catch, useMemo/useEffect deps, carryToMode/filesOfMode ফ্লো, SHUFFLE_MAX_FILES লজিক, offsetSerialPlan, replaceSpans offset-গণিত হাতে-যাচাই
+- ভেরিফিকেশন রান: npx tsc --noEmit → exit 0 (দুইবার — কনকারেন্ট এডিটের আগে/পরে); eslint src → ক্লিন; টেস্ট ৩৯৮/৩৯৮ পাস (test-mcq ৭১ + test-docx ৪৮ + test-color-serial ১২৯ + test-multi-docx ৫৭ + test-redownload ৪১ + test-reference ৪৫ + verify-export ৭)
+- bun দিয়ে এজ-কেস যাচাই: buildSets(৩ প্রশ্ন, setCount ৫) → ৩ সেট (ক্ল্যাম্প); empty pool → [[]]; original+২ প্রশ্ন×৫ সেট → k=২ ও দুটো সেটই "2,1" (ইউনিক-অসম্ভব); parseInt("৫") → NaN (রেঞ্জ-ইনপুট বাগ নিশ্চিত)
+- প্রাইভেসি যাচাই: src/app/api নেই, mammoth নেই, src-এ console.log/debugger নেই — "সব প্রসেসিং ব্রাউজারেই" দাবা রানটাইমে সত্যি; কিন্তু upload/ (১৯টা আসল পরীক্ষার ফাইল, ৫.৬MB) git-tracked ও রিপো পাবলিক — প্রাইভেসি/IP ঝুঁকি
+- কনকারেন্সি নোট: রিভিউ চলাকালীন shuffle-card.tsx (২–৫০ → ১–১০) অন্য এজেন্টের হাতে এডিট হচ্ছিল (আনকমিটেড); scripts/document.xml + scripts/test-export.docx রিভিউ-মাঝে নতুন এজে (অন্য এজেন্টের টেস্ট আর্টিফ্যাক্ট) — কোনো ফাইল এডিট/কমিট করা হয়নি
+
+Stage Summary:
+- P0: ০ | P1: ৩ | P2: ৫ | P3: ~১৫ — সর্বোচ্চ: (১) upload/-এর আসল পরীক্ষার ফাইল পাবলিক রিপোতে কমিটেড, (২) README-র deploy.yml ইনস্ট্রাকশন পুরনো (scripts/deploy.yml.disabled), (৩) DetectCard/DocxDetectCard-এ বাংলা ডিজিট রেঞ্জ-ইনপুট নীরবে ব্যর্থ (parseInt NaN vs rd-কার্ডের digitsToNumber)
+- পরবর্তী টপ-ফিক্স: upload/ untrack+gitignore, README আপডেট, digitsToNumber রেঞ্জ-কার্ডে, openInSerialMode-এর ডাবল-লোড স্টেল-স্টেট ফিক্স, বড়-ফাইল আর্লি-গার্ড (f.size)
+- ক্লিনআপ: scripts/tmp-e2e/, scripts/e2e-*.png, scripts/{document.xml,test-export.docx} (কনকারেন্ট এজেন্টের — সমন্বয় করে), ডেড এক্সপোর্ট ৭টা (getStats, isSetCountLimitedByPool, withBase/BASE_PATH, REF_MODE_LABEL, ENC_LABEL, encPercent, PART_KINDS)
+- সামগ্রিক: প্রজেক্ট সুস্থ — tsc/lint/৩৯৮ টেস্ট সব সবুজ, কোর XML-এডিটিং গণিত (replaceSpans/offsetSerialPlan/sectPr) যাচাই-করা সঠিক, কোনো P0 নেই
+
+---
+Task ID: 34
+Agent: Main Agent (Super Z) + 3 subagents (34-a docx-export-fix, 34-b modes-ui-e2e, 34-c project-review)
+Task: ইউজার বাগ-রিপোর্ট — merged redownload .docx Word-এ করাপ্ট (unreadable content), ডিফল্ট-ছাড়া অন্য অপশন কাজ করে না, শাফল সেট min 1 max 10, পুরো প্রজেক্ট রিভিউ+ক্লিন — সব ঠিক করে push+deploy
+
+Work Log:
+- ৩টা প্যারালাল সাব-এজেন্টে ভাগ: 34-a (docx করাপশন), 34-b (মোড/UX E2E), 34-c (রিড-ওনলি পুরো-প্রজেক্ট রিভিউ); 34-a/34-b ডেডলাইন-মৃত্যুতে দুইবার আটকে অবশিষ্ট কাজ কোঅর্ডিনেটর+পুনঃডিসপ্যাচে শেষ
+- 🐛 মূল-কারণ (Word corruption): buildMergedDocxBlob আউটপুটে শুধু base-এর word/_rels/document.xml.rels ও পার্ট-ফাইল থাকত; extra-এর body-এর r:embed/r:id (ছবি/হাইপারলিংক) ড্যাংলিং হয়ে যেত → Word "unreadable content" রিপেয়ার; সাথে extra-এর আনডিক্লেয়ার্ড xmlns প্রিফিক্স ঝুঁকি
+- ফিক্স (multi-docx.ts, string-level, DOMParser-নেই): ① extra body-এর ব্যবহৃত রিল-আইডি স্ক্যান → base-এ Type+Target+কনটেন্ট(বাইট-তুলনা) সমতুল্য থাকলে রিম্যাপ, নাহলে ইউনিক আইডিতে base rels-এ যোগ + টার্গেট-পার্ট (ছবি ইত্যাদি) ইউনিক নামে (stem_m<n>.ext) zip-এ কপি ② [Content_Types].xml-এ নতুন এক্সটেনশনের Default (known-mime ম্যাপ) ③ xmlns-ইউনিয়ন — extra root→স্ট্যান্ডার্ড ম্যাপ ক্রমে, mc:Ignorable/Requires প্রিফিক্স-লিস্টসহ ④ external রিল (হাইপারলিংক) ডিডাপ ⑤ base-এর নিজের বাইট অক্ষত
+- নতুন ভ্যালিডেশন টুলিং: scripts/test-merger-repro.ts (playwright-ব্রাউজারে আসল বান্ডল — jsdom নয় — দিয়ে হুবহু পাইপলাইন; unzip -t + ooxml_check.py (নতুন স্ট্রিক্ট namespace/rels/content-type চেকার) + LibreOffice headless pdf-কনভার্সন; --combo/--set/--mode স্লাইস-ফিল্টার OOM-এড়াতে) + scripts/e2e-modes.ts (৩ মোড × সব অপশন-পাথ)
+- ভেরিফিকেশন: রিপ্রো-কুইক ২০/২০; আসল ভিন্ন-ফাইল merged (phy1+phy2, fixture+colorfree, botany 997+chem) single/merged/zip সব পাস (LibreOffice পর্যন্ত); ইউনিট ৪০৬/৪০৬ (test-multi-docx ৬৫ — রিল-রিম্যাপ রিগ্রেশনসহ); E2E ৫৫/৫৫ কনসোল-এরর শূন্য; tsc ০; eslint ক্লিন
+- শাফল সেট min 1 max 10: shuffle-card.tsx গেট setCount<2||>50 → <1||>10, ইনপুট-ক্ল্যাম্প, কপি ২–৫০→১–১০; মাল্টি-ফাইল ফ্লোতে per-file min-প্রশ্ন গেট + আসল ক্ল্যাম্প-করা সেট-সংখ্যা টোস্টে
+- 34-b2 ফিক্স: বাংলা-ডিজিট রেঞ্জ-ইনপুট (detect-card/docx-detect-card parseInt NaN → digitsToNumber), openInSerialMode-এর স্টেল-স্টেট ডাবল-লোড (changeMode skipCarry), 50MB আর্লি-গার্ড (৪ লোডার), রি-এনট্র‍্যান্ট লোডার গার্ড (loadersBusyRef), ডুপ্লিকেট exporter-import মার্জ, sets-result ডেড busy-ব্রাঞ্চ বাদ, README deploy-সেকশন (deploy.yml.disabled), localStorage খালি-catch কমেন্ট
+- 34-c রিভিউ (P0 ০/P1 ৩/P2 ৫/P3 ~১৫) থেকে: P1 upload/ (১৯টা আসল পরীক্ষার ফাইল) পাবলিক-রিপো থেকে untrack + .gitignore (লোকাল টেস্টে থাকবে), P3 ডেড-কোড বাদ (parser getStats/DetectionStats, set-engine isSetCountLimitedByPool, reference REF_MODE_LABEL, encoding encPercent, redownload PART_KINDS, base-path.ts ফাইল), Original Shuffle ছোট-পুল কপি-নোট, scripts/tmp-e2e + টেস্ট-আর্টিফ্যাক্ট ক্লিন
+- ENC_LABEL রাখা হলো (docx-xml/docx-detect-card ব্যবহার করে); কনফিগ-স্ট্রিক্টনেস (noImplicitAny/ignoreBuildErrors/exhaustive-deps) ভবিষ্যত-কাজ — এখন বদলালে বিল্ড-ঝুঁকি
+
+Stage Summary:
+- Word-corruption মূল-কারণ (merged docx-এ ড্যাংলিং রিলেশনশিপ) ঠিক + ব্রাউজার-রিয়াল রিপ্রো-ম্যাট্রিক্স ও LibreOffice-ভ্যালিডেশন সবুজ; সেট ১–১০; সব নন-ডিফল্ট অপশন-পাথ E2E-যাচাইকৃত; প্রাইভেসি-লিক untrack; ৪০৬ ইউনিট + ৫৫ E2E সবুজ, tsc/eslint ক্লিন
+- অবশিষ্ট: push + STATIC_EXPORT বিল্ড + deploy-pages.sh (নতুন টোকেন) — লাইভ আপডেট

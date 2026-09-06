@@ -240,23 +240,4 @@ export function autoFixNumbering(text: string, startFrom = 1): string {
   return out.join("\n").trimEnd() + "\n";
 }
 
-// ---------- ডিটেকশন স্ট্যাটস ----------
 
-export interface DetectionStats {
-  total: number;
-  withOptions: number;
-  numberScript: "bn" | "en" | "mixed" | null;
-  serial: SerialReport | null;
-  optionsDetected: boolean;
-}
-
-export function getStats(parsed: ParseOutput): DetectionStats {
-  const withOptions = parsed.questions.filter((q) => q.options.length >= 2).length;
-  return {
-    total: parsed.questions.length,
-    withOptions,
-    numberScript: parsed.numberScript,
-    serial: parsed.serial,
-    optionsDetected: parsed.questions.some((q) => q.options.length > 0),
-  };
-}

@@ -58,3 +58,6 @@ tool-results/
 scripts/*.png
 scripts/tmp-e2e/
 .gh-pages-deploy/
+
+# ইউজারের নমুনা/টেস্ট ফাইল — লোকাল টেস্টে লাগে, রিপোতে যাবে না
+upload/

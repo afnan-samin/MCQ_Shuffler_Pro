@@ -46,15 +46,6 @@ export type PartKind =
 /** ব্যবহারকারী যে ছয়টা অংশ টিক দিয়ে বাছাই করে ("other" অংশ টিক-নির্ভর নয়) */
 export type PartSel = Record<Exclude<PartKind, "other">, boolean>;
 
-export const PART_KINDS: PartKind[] = [
-  "serial",
-  "question",
-  "reference",
-  "options",
-  "answer",
-  "bekkha",
-];
-
 export const PART_LABELS: Record<PartKind, string> = {
   serial: "সিরিয়াল (নম্বর)",
   question: "প্রশ্ন",

@@ -86,11 +86,6 @@ export function buildSets<T extends PoolItem>(pool: T[], opts: BuildSetsOptions)
   return sets;
 }
 
-/** Original Shuffle মোডে সেট সংখ্যা প্রশ্ন সংখ্যার দ্বারা সীমাবদ্ধ না (প্রতি সেটে সবগুলো প্রশ্ন) */
-export function isSetCountLimitedByPool(distribution: Distribution): boolean {
-  return distribution !== "original";
-}
-
 // ---------- সেটের নাম ----------
 
 const BN_LETTERS = ["ক", "খ", "গ", "ঘ", "ঙ", "চ", "ছ", "জ", "ঝ", "ঞ", "ট", "ঠ", "ড", "ঢ", "ণ", "ত", "থ", "দ", "ধ", "ন", "প", "ফ", "ব", "ভ", "ম", "য"];

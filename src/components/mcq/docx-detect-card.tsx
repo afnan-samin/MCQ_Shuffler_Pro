@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { AlertTriangle, CheckCircle2, ChevronDown, Download, ListChecks, ScanText, TriangleAlert } from "lucide-react";
 import type { DocxParseResult, DocxQuestion } from "@/lib/mcq/docx-xml";
-import { DIGIT_ENC_LABEL } from "@/lib/mcq/docx-xml";
+import { DIGIT_ENC_LABEL, digitsToNumber } from "@/lib/mcq/docx-xml";
 import { lineDominantOf, type Enc, type EncodingStats } from "@/lib/mcq/encoding";
 import { TokText } from "@/components/mcq/tok-text";
 
@@ -88,10 +88,11 @@ export function DocxDetectCard({
   const shown = questions.slice(0, visible);
 
   const applyRange = () => {
-    const f = parseInt(rangeFrom, 10);
-    const t = parseInt(rangeTo, 10);
-    if (!isNaN(f) && !isNaN(t) && f >= 1 && t >= f && t <= questions.length) {
-      onSelectRange(f - 1, t - 1);
+    // বাংলা/Bijoy ও English — সব ডিজিটেই রেঞ্জ চলে (parseInt শুধু English পারত — বাকিগুলো নীরব নো-অপ হতো)
+    const f = digitsToNumber(rangeFrom.trim());
+    const t = digitsToNumber(rangeTo.trim());
+    if (f && t && f.num >= 1 && t.num >= f.num && t.num <= questions.length) {
+      onSelectRange(f.num - 1, t.num - 1);
     }
   };
 

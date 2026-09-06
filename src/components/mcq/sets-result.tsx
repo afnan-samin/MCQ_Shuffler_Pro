@@ -217,7 +217,7 @@ export function SetsResult({
             ⬇️ Word (.docx) — প্রতি সেট আলাদা পেজে
           </Button>
           <Button variant="outline" className="gap-2" onClick={onExportDoc} disabled={busy !== null}>
-            {busy === "doc" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowDownToLine className="h-4 w-4" />}
+            <ArrowDownToLine className="h-4 w-4" />
             .doc (পুরনো Word)
           </Button>
           <Button variant="outline" className="gap-2" onClick={onPrint} disabled={busy !== null}>

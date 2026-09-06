@@ -298,5 +298,131 @@ console.log("\n== ৬) offsetSerialPlan ==");
 }
 
 // ============================================================
+
+console.log("\n== ৭) রিল-ইন্টিগ্রেশন — extra-এর ছবি + xmlns-ইউনিয়ন (Word-corruption ফিক্স) ==");
+{
+  const R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+  const WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
+  const A = "http://schemas.openxmlformats.org/drawingml/2006/main";
+  const PIC = "http://schemas.openxmlformats.org/drawingml/2006/picture";
+  const IMG_TYPE = `${R}/image`;
+  const RELS_NS = "http://schemas.openxmlformats.org/package/2006/relationships";
+
+  const IMG_BASE = new Uint8Array([1, 2, 3, 4]); // base-এর word/media/image1.png
+  const IMG_EXTRA = new Uint8Array([9, 8, 7, 6, 5]); // extra-র image1.png — একই নাম, ভিন্ন বাইট
+
+  const relsXml = (inner: string) =>
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${RELS_NS}">${inner}</Relationships>`;
+  const imageRel = (id: string) =>
+    `<Relationship Id="${id}" Type="${IMG_TYPE}" Target="media/image1.png"/>`;
+
+  // extra-এর root-এ wp/a/pic ডিক্লেয়ার্ড (বাস্তব Word-ফাইলের মত); body সেগুলোই ব্যবহার করে,
+  // কিন্তু base-এর root-এ নেই — মার্জে base root-এ xmlns-ইউনিয়ন হওয়ার প্রমাণে
+  const EXTRA_IMG_XML =
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${W}" xmlns:r="${R}"` +
+    ` xmlns:wp="${WP}" xmlns:a="${A}" xmlns:pic="${PIC}"><w:body>${pText("EXTRA-IMG-Q")}` +
+    `<w:p><w:r><w:drawing><wp:inline><a:graphic><a:graphicData><pic:pic><pic:blipFill>` +
+    `<a:blip r:embed="rIdImg"/></pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:inline>` +
+    `</w:drawing></w:r></w:p></w:body></w:document>`;
+
+  async function makeDocxEntries(entries: Record<string, string | Uint8Array>): Promise<Blob> {
+    const zip = new JSZip();
+    for (const [path, data] of Object.entries(entries)) zip.file(path, data);
+    const u8 = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
+    return new Blob([u8 as unknown as BlobPart]);
+  }
+
+  const baseEntries = (rels: string): Record<string, string | Uint8Array> => ({
+    "[Content_Types].xml": CONTENT_TYPES_XML, // png-Default নেই — CT-যোগের প্রমাণে
+    "word/document.xml": BASE_XML,
+    "word/styles.xml": stylesXml("BASE-STYLE-MARK"),
+    "word/_rels/document.xml.rels": rels,
+    "word/media/image1.png": IMG_BASE,
+  });
+  const extraEntries: Record<string, string | Uint8Array> = {
+    "[Content_Types].xml": CONTENT_TYPES_XML,
+    "word/document.xml": EXTRA_IMG_XML,
+    "word/styles.xml": stylesXml("EXTRA-IMG-STYLE-MARK"),
+    "word/_rels/document.xml.rels": relsXml(imageRel("rIdImg")),
+    "word/media/image1.png": IMG_EXTRA,
+  };
+
+  // ---- কেস A: base-এ ভিন্ন-কনটেন্ট image1.png → নতুন rel + ইউনিক নামে কপি ----
+  try {
+    const baseBlob = await makeDocxEntries(baseEntries(relsXml(imageRel("rIdBase"))));
+    const mergedBlob = await buildMergedDocxBlob([
+      { xml: BASE_XML, file: baseBlob },
+      { xml: EXTRA_IMG_XML, file: await makeDocxEntries(extraEntries) },
+    ]);
+    const zip = await JSZip.loadAsync(mergedBlob);
+    const mergedXml = await zip.file("word/document.xml")!.async("string");
+    const mergedRels = await zip.file("word/_rels/document.xml.rels")!.async("string");
+
+    // xmlns-ইউনিয়ন: extra body-র wp:/a:/pic: base root-এ ডিক্লেয়ার্ড হয়েছে
+    const rootTag = mergedXml.slice(mergedXml.indexOf("<w:document"), mergedXml.indexOf(">", mergedXml.indexOf("<w:document")) + 1);
+    ok(
+      /xmlns:wp="/.test(rootTag) && /xmlns:a="/.test(rootTag) && /xmlns:pic="/.test(rootTag),
+      "xmlns-ইউনিয়ন: wp/a/pic base root-এ ডিক্লেয়ার্ড",
+    );
+
+    // ড্যাংলিং রিল শূন্য: প্রতিটা r:embed মার্জড rels-এ আছে, পুরনো rIdImg নেই
+    const embeds = [...mergedXml.matchAll(/r:embed="([^"]+)"/g)].map((m) => m[1]);
+    const relIdsOut = new Set([...mergedRels.matchAll(/Id="([^"]+)"/g)].map((m) => m[1]));
+    ok(
+      embeds.length > 0 && embeds.every((id) => relIdsOut.has(id)) && !embeds.includes("rIdImg"),
+      `ড্যাংলিং r:embed নেই — রিম্যাপড: ${embeds.join(", ") || "—"} `,
+    );
+
+    // নতুন rel + ইউনিক নামের পার্ট, বাইট-হুবহু extra-র ছবি
+    const newRel = /<Relationship\b[^>]*Type="[^"]*\/image"[^>]*Target="(media\/image1_m\d+\.png)"[^>]*\/>/.exec(mergedRels);
+    ok(!!newRel, `নতুন image-rel যোগ হয়েছে (Target=${newRel?.[1] ?? "—"})`);
+    const partPath = newRel ? `word/${newRel[1]}` : "";
+    const copied = partPath ? await zip.file(partPath)?.async("uint8array") : null;
+    ok(!!copied && copied.every((b, i) => b === IMG_EXTRA[i]), "কপি হওয়া পার্ট-বাইট = extra-র ছবি (base-এরটা নয়)");
+
+    // [Content_Types].xml png-Default পেয়েছে; base-এর নিজের rel/কনটেন্ট অক্ষত
+    const ctOut = await zip.file("[Content_Types].xml")!.async("string");
+    ok(ctOut.includes('Extension="png"'), "[Content_Types].xml-এ png-Default যোগ হয়েছে");
+    ok(
+      mergedRels.includes(imageRel("rIdBase")) && mergedXml.includes("BASE-Q1"),
+      "base-এর নিজের rel (rIdBase) ও body অক্ষত",
+    );
+
+    // well-formed (document.xml + rels দুটোই)
+    const dp = new dom.window.DOMParser();
+    ok(
+      dp.parseFromString(mergedXml, "application/xml").getElementsByTagName("parsererror").length === 0 &&
+        dp.parseFromString(mergedRels, "application/xml").getElementsByTagName("parsererror").length === 0,
+      "মার্জড document.xml + rels well-formed",
+    );
+  } catch (e) {
+    ok(false, `রিল-ইন্টিগ্রেশন কেস A: ${String(e)}`);
+  }
+
+  // ---- কেস B: base-এ একই-কনটেন্ট image1.png থাকলে ডিডাপ — নতুন পার্ট/rel ছাড়াই রিম্যাপ ----
+  try {
+    const baseBlob = await makeDocxEntries({
+      ...baseEntries(relsXml(imageRel("rIdBase") + imageRel("rIdSame"))),
+      "word/media/image1.png": IMG_EXTRA, // extra-র বাইটের সাথে হুবহু মিল
+    });
+    const mergedBlob = await buildMergedDocxBlob([
+      { xml: BASE_XML, file: baseBlob },
+      { xml: EXTRA_IMG_XML, file: await makeDocxEntries(extraEntries) },
+    ]);
+    const zip = await JSZip.loadAsync(mergedBlob);
+    const mergedXml = await zip.file("word/document.xml")!.async("string");
+    const mergedRels = await zip.file("word/_rels/document.xml.rels")!.async("string");
+    const embeds = [...mergedXml.matchAll(/r:embed="([^"]+)"/g)].map((m) => m[1]);
+    // rels-অর্ডারে প্রথম path-ম্যাচ = rIdBase — সেটাতেই রিম্যাপ, নতুন পার্ট/rel কিছুই নেই
+    ok(
+      embeds.length === 1 && embeds[0] === "rIdBase" && !mergedRels.includes("_m"),
+      "কনটেন্ট-সমতুল্য হলে existing rel-এ (rIdBase) রিম্যাপ — নতুন পার্ট/rel নেই",
+    );
+  } catch (e) {
+    ok(false, `রিল-ইন্টিগ্রেশন কেস B: ${String(e)}`);
+  }
+}
+
+// ============================================================
 console.log(`\n===== ফলাফল: ${passed} পাস, ${failed} ফেল =====`);
 process.exit(failed ? 1 : 0);

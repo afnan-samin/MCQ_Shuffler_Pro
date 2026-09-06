@@ -50,7 +50,7 @@ export function ShuffleCard({
   const perSet = setCount > 0 ? Math.floor(selectedCount / setCount) : 0;
   const remainder = setCount > 0 ? selectedCount % setCount : 0;
   const countInvalid =
-    setCount < 2 || setCount > 50 || (isOriginal ? false : setCount > selectedCount);
+    setCount < 1 || setCount > 10 || (isOriginal ? false : setCount > selectedCount);
 
   return (
     <Card id="step-shuffle" className={enabled ? "border-emerald-300 dark:border-emerald-700" : ""}>
@@ -60,7 +60,7 @@ export function ShuffleCard({
           <CardTitle className="text-lg md:text-xl">শাফল সেটিংস ও শুরু</CardTitle>
         </div>
         <CardDescription>
-          কতটা সেট চান লিখে দিন (২–৫০, সাধারণত ৩–১০)। Original Shuffle-এ প্রতি সেটে সবগুলো প্রশ্ন থাকে, বাকি স্টাইলে প্রশ্ন ভাগ হয়ে যায়।
+          কতটা সেট চান লিখে দিন (১–১০)। Original Shuffle-এ প্রতি সেটে সবগুলো প্রশ্ন থাকে, বাকি স্টাইলে প্রশ্ন ভাগ হয়ে যায়।
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -74,10 +74,12 @@ export function ShuffleCard({
               <Input
                 id="set-count"
                 type="number"
-                min={2}
-                max={50}
+                min={1}
+                max={10}
                 value={setCount}
-                onChange={(e) => onSetCountChange(parseInt(e.target.value, 10) || 1)}
+                onChange={(e) =>
+                  onSetCountChange(Math.min(10, parseInt(e.target.value, 10) || 1))
+                }
                 className="w-24 text-center text-lg font-semibold"
               />
               <div className="flex flex-wrap gap-1.5">
@@ -96,7 +98,7 @@ export function ShuffleCard({
             </div>
             {countInvalid && (
               <p className="text-xs text-red-600 dark:text-red-400">
-                ২ থেকে ৫০ এর মধ্যে দিন{!isOriginal && " — সিলেক্টেড প্রশ্নের সংখ্যার চেয়ে বেশি হতে পারবে না"}।
+                ১ থেকে ১০ এর মধ্যে দিন{!isOriginal && " — সিলেক্টেড প্রশ্নের সংখ্যার চেয়ে বেশি হতে পারবে না"}।
               </p>
             )}
             {enabled && !countInvalid && isOriginal && (
@@ -121,7 +123,7 @@ export function ShuffleCard({
                 <Label htmlFor="dist-original" className="cursor-pointer text-sm leading-snug flex-col items-start gap-0.5">
                   <span className="font-medium">⭐ Original Shuffle — সব সেটে সব প্রশ্ন</span>
                   <span className="block text-xs text-muted-foreground">
-                    ১০০ প্রশ্ন × ৫ সেট = প্রতি সেটেই ১০০টা প্রশ্ন, কিন্তু সিরিয়াল ক্রম সেটভেদে আলাদা — সেট A: ১,২,৩,৪… সেট B: ৪,১,২,৫,৩… এক সেটের ক্রম আরেক সেটের সাথে মিলবে না। প্রশ্ন-অপশন হুবহু অপরিবর্তিত।
+                    ১০০ প্রশ্ন × ৫ সেট = প্রতি সেটেই ১০০টা প্রশ্ন, কিন্তু সিরিয়াল ক্রম সেটভেদে আলাদা — সেট A: ১,২,৩,৪… সেট B: ৪,১,২,৫,৩… প্রশ্ন-অপশন হুবহু অপরিবর্তিত। (বিঃদ্রঃ: খুব কম প্রশ্নে — যেমন ২টা — সম্ভাব্য সব ক্রম সীমিত হয়, তাই কিছু সেট একই ক্রমের হতে পারে।)
                   </span>
                 </Label>
               </div>

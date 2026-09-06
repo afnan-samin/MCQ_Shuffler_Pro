@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { AlertTriangle, CheckCircle2, ChevronDown, Wrench, ListChecks, ScanText } from "lucide-react";
 import type { ParseOutput } from "@/lib/mcq/parser";
+import { digitsToNumber } from "@/lib/mcq/docx-xml";
 import { lineDominantOf, type Enc, type EncodingStats } from "@/lib/mcq/encoding";
 import { TokText } from "@/components/mcq/tok-text";
 
@@ -81,10 +82,11 @@ export function DetectCard({
     parsed.numberScript === "bn" ? "বাংলা সংখ্যা (১,২,৩)" : parsed.numberScript === "en" ? "English সংখ্যা (1,2,3)" : parsed.numberScript === "mixed" ? "বাংলা + English মিক্স" : "—";
 
   const applyRange = () => {
-    const f = parseInt(rangeFrom, 10);
-    const t = parseInt(rangeTo, 10);
-    if (!isNaN(f) && !isNaN(t) && f >= 1 && t >= f && t <= questions.length) {
-      onSelectRange(f - 1, t - 1);
+    // বাংলা ও English — দুই ডিজিটেই রেঞ্জ চলে (parseInt("৫")=NaN হতো — বাংলা রেঞ্জ নীরবে নো-অপ হতো)
+    const f = digitsToNumber(rangeFrom.trim());
+    const t = digitsToNumber(rangeTo.trim());
+    if (f && t && f.num >= 1 && t.num >= f.num && t.num <= questions.length) {
+      onSelectRange(f.num - 1, t.num - 1);
     }
   };
 

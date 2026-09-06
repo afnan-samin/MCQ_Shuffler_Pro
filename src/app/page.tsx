@@ -22,6 +22,7 @@ import { analyzeText, type Enc, type EncodingStats } from "@/lib/mcq/encoding";
 import {
   allSetsClipboardText,
   copyToClipboard,
+  downloadBlob,
   exportDocHtml,
   exportDocx,
   printSets,
@@ -70,7 +71,6 @@ import {
   englishSetName,
 } from "@/lib/mcq/docx-exporter";
 import { analyzeRefReport, type RefMode, type RefReport } from "@/lib/mcq/reference";
-import { downloadBlob } from "@/lib/mcq/exporter";
 import { RedownloadInputCard } from "@/components/mcq/redownload-input-card";
 import { RedownloadPartsCard } from "@/components/mcq/redownload-parts-card";
 import { RedownloadQuestionsCard } from "@/components/mcq/redownload-questions-card";
@@ -92,6 +92,10 @@ const STORAGE_KEY = "mcq-shuffler-text";
 const MODE_KEY = "mcq-shuffler-mode";
 /** শাফল মোডে একসাথে সর্বোচ্চ কতটা ফাইল নেওয়া যায় (min ১, max ১০) */
 const SHUFFLE_MAX_FILES = 10;
+
+/** একটা .docx-এর সর্বোচ্চ সাইজ — এর চেয়ে বড় হলে ব্রাউজার ফ্রিজ/ক্র্যাশ, তাই লোডই করা হয় না */
+const MAX_FILE_BYTES = 50_000_000;
+const FILE_TOO_BIG_MSG = "ফাইলটি খুব বড় (৫০MB+ সাপোর্টেড না)";
 
 // মাল্টি-ফাইল লিস্টের আইটেম-id (reorder/remove-এর জন্য স্টেবল কী দরকার)
 let multiIdCounter = 0;
@@ -267,21 +271,26 @@ export default function Home() {
   const rdFileCount = rdDocs.length;
 
   const resultsRef = useRef<HTMLDivElement>(null);
+  /** লোডার রি-এন্ট্রান্সি গার্ড — state নয়, ref (stale-closure এড়াতে); চলমান লোড থাকলে নতুন কল নীরবে বাদ */
+  const loadersBusyRef = useRef(false);
 
   // শেষ ব্যবহৃত মোড মনে রাখা
   useEffect(() => {
     try {
       const m = localStorage.getItem(MODE_KEY);
       if (m === "shuffle" || m === "serial" || m === "redownload") setMode(m);
-    } catch {}
+    } catch { // কোটা/প্রাইভেসি-মোড — নীরবে উপেক্ষা
+    }
   }, []);
 
-  const changeMode = (m: McqMode) => {
+  /** skipCarry=true → carry-over বাইপাস (openInSerialMode নিজেই স্টেট সাজিয়ে রাখে — দুইবার লোড/টোস্ট ঠেকাতে) */
+  const changeMode = (m: McqMode, skipCarry = false) => {
     setMode(m);
     try {
       localStorage.setItem(MODE_KEY, m);
-    } catch {}
-    carryToMode(m, mode);
+    } catch { // কোটা/প্রাইভেসি-মোড — নীরবে উপেক্ষা
+    }
+    if (!skipCarry) carryToMode(m, mode);
     setFlowStep("work");
   };
 
@@ -350,7 +359,8 @@ export default function Home() {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) setRawText(saved);
-    } catch {}
+    } catch { // কোটা/প্রাইভেসি-মোড — নীরবে উপেক্ষা
+    }
     setHydrated(true);
   }, []);
 
@@ -360,7 +370,8 @@ export default function Home() {
     const t = setTimeout(() => {
       try {
         localStorage.setItem(STORAGE_KEY, rawText);
-      } catch {}
+      } catch { // কোটা/প্রাইভেসি-মোড — নীরবে উপেক্ষা
+      }
     }, 600);
     return () => clearTimeout(t);
   }, [rawText, hydrated]);
@@ -403,7 +414,8 @@ export default function Home() {
       setFlowStep("work");
       try {
         localStorage.setItem(MODE_KEY, "shuffle");
-      } catch {}
+      } catch { // কোটা/প্রাইভেসি-মোড — নীরবে উপেক্ষা
+      }
     }
     announceDetect(result);
   };
@@ -489,6 +501,11 @@ export default function Home() {
   // ================== DOCX MODE (XML হুবহু প্রিজার্ভ) ==================
 
   const handleDocxFile = useCallback(async (f: File) => {
+    // বিশাল ফাইল আগেই ফেলে দিই — ব্রাউজার ফ্রিজ/ক্র্যাশের আগে
+    if (f.size > MAX_FILE_BYTES) {
+      toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
+      return;
+    }
     setDocxLoading(true);
     setShuffleItems(null);
     setShuffleMultiSets(null);
@@ -584,12 +601,20 @@ export default function Home() {
 
   /** .docx লোড + রঙ-বিশ্লেষণ — একাধিক হলে লিস্টে বসে; append=false হলে লিস্ট বদলে যায় */
   const loadSerialFiles = async (files: File[], append: boolean) => {
+    // রি-এন্ট্রান্সি গার্ড — চলমান লোড থাকলে ওভারল্যাপ কল নীরবে বাদ (state নয়, ref → stale closure নেই)
+    if (loadersBusyRef.current) return;
+    loadersBusyRef.current = true;
     setSerialLoading(true);
+    try {
     const added: SerialState[] = [];
     const errors: string[] = [];
     let colors = 0;
     let questions = 0;
     for (const f of files) {
+      if (f.size > MAX_FILE_BYTES) {
+        toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
+        continue;
+      }
       try {
         const xml = await loadDocxXml(f);
         const analysis = analyzeColorDocx(xml);
@@ -617,6 +642,9 @@ export default function Home() {
     }
     if (errors.length) {
       toast({ title: "কিছু ফাইল পড়া যায়নি", description: errors.join("\n"), variant: "destructive" });
+    }
+    } finally {
+      loadersBusyRef.current = false;
     }
   };
 
@@ -824,7 +852,8 @@ export default function Home() {
     ]);
     setSerialSchemes({ [id]: { kind: "continuous" } });
     setSerialPaste(null);
-    changeMode("serial");
+    // carry বাইপাস — changeMode-এর carryToMode স্টেল serialDocs=[] পড়ে ফাইলটা আবার লোড করত (ডাবল-বিশ্লেষণ + ডাবল-টোস্ট)
+    changeMode("serial", true);
     toast({
       title: "🔢 সিরিয়াল মোডে ফাইল খোলা হলো",
       description: "নিচে রঙ বাছাই করে সিরিয়াল ডাউনলোড করুন।",
@@ -961,13 +990,24 @@ export default function Home() {
   // ---- মাল্টি-শাফল গেট (≥২ ফাইল) ----
   const shuffleMultiTotal = shuffleItems?.reduce((a, i) => a + i.parse.questions.length, 0) ?? 0;
   const shuffleMultiZero = shuffleItems?.filter((i) => i.parse.questions.length === 0).length ?? 0;
+  /** ফাইলগুলোর মধ্যে সর্বনিম্ন প্রশ্নসংখ্যা — buildSets প্রতি ফাইলের সেট-সংখ্যা এতে ক্ল্যাম্প করে */
+  const multiMinQuestions = useMemo(
+    () => (shuffleItems?.length ? Math.min(...shuffleItems.map((i) => i.parse.questions.length)) : 0),
+    [shuffleItems]
+  );
+  /** ইউজারকে যে সেট-সংখ্যা দেখাবো — original বাদে buildSets-এর ক্ল্যাম্প হুবহু */
+  const multiEffectiveSets =
+    distribution === "original" ? setCount : Math.min(setCount, Math.max(1, multiMinQuestions));
   const multiGateReason = useMemo(() => {
     if (!shuffleItems || shuffleItems.length === 0) return "প্রথমে ফাইল আপলোড করুন";
     if (shuffleMultiTotal < 2) return "ফাইলগুলোতে মোট অন্তত ২ টি প্রশ্ন দরকার";
     if (shuffleMultiZero > 0)
       return `${shuffleMultiZero} টি ফাইলে কোনো প্রশ্ন পাওয়া যায়নি — লিস্ট থেকে বাদ দিন`;
+    // সেট-সংখ্যা প্রতি ফাইলের প্রশ্নসংখ্যায় ক্ল্যাম্প হয় — আগেই জানিয়ে দিই (original-এ ক্ল্যাম্প নেই)
+    if (distribution !== "original" && setCount > multiMinQuestions)
+      return `সবচেয়ে ছোট ফাইলে ${multiMinQuestions} টি প্রশ্ন — সর্বোচ্চ ${multiMinQuestions} টি সেট নেওয়া যাবে`;
     return null;
-  }, [shuffleItems, shuffleMultiTotal, shuffleMultiZero]);
+  }, [shuffleItems, shuffleMultiTotal, shuffleMultiZero, distribution, setCount, multiMinQuestions]);
 
   const gateReason = useMemo(() => {
     if (!docx && !parsed) return "প্রথমে প্রশ্ন ডিটেক্ট করুন";
@@ -985,10 +1025,18 @@ export default function Home() {
 
   /** রিডাউনলোড মোডে ফাইল লোড — পার্স + অংশ-বিশ্লেষণ + ওয়াটারমার্ক এক্সট্র্যাক্ট */
   const loadRedownloadFiles = async (files: File[], append: boolean) => {
+    // রি-এন্ট্রান্সি গার্ড — চলমান লোড থাকলে ওভারল্যাপ কল নীরবে বাদ
+    if (loadersBusyRef.current) return;
+    loadersBusyRef.current = true;
     setRdLoading(true);
+    try {
     const added: RdDocState[] = [];
     const errors: string[] = [];
     for (const f of files) {
+      if (f.size > MAX_FILE_BYTES) {
+        toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
+        continue;
+      }
       try {
         const xml = await loadDocxXml(f);
         const parse = parseRedownloadXml(xml);
@@ -1014,6 +1062,9 @@ export default function Home() {
     }
     if (errors.length) {
       toast({ title: "কিছু ফাইল পড়া যায়নি", description: errors.join("\n"), variant: "destructive" });
+    }
+    } finally {
+      loadersBusyRef.current = false;
     }
     setRdLoading(false);
   };
@@ -1173,6 +1224,11 @@ export default function Home() {
 
   /** একটা .docx পড়ে শাফল-আইটেম বানায় (হেডার/নন-MCQ স্ট্রিপ + পার্স) — রিপ্লেস/অ্যাপেন্ড দুই পথেই ব্যবহৃত */
   const parseShuffleFile = async (f: File): Promise<ShuffleItemState> => {
+    // বিশাল ফাইল আগেই ফেলে দিই — টোস্ট দেখিয়ে থ্রো; handleShuffleFiles-এর ক্যাচ এটা দেখে নীরবে স্কিপ করে
+    if (f.size > MAX_FILE_BYTES) {
+      toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
+      throw new Error(FILE_TOO_BIG_MSG);
+    }
     const originalXml = await loadDocxXml(f);
     let colorAn: ColorAnalysis | null = null;
     try {
@@ -1198,6 +1254,10 @@ export default function Home() {
    */
   const handleShuffleFiles = async (files: File[], append = false) => {
     if (!files.length) return;
+    // রি-এন্ট্রান্সি গার্ড — চলমান লোড থাকলে ওভারল্যাপ কল নীরবে বাদ (state নয়, ref → stale closure নেই)
+    if (loadersBusyRef.current) return;
+    loadersBusyRef.current = true;
+    try {
     const existingCount = shuffleItems ? shuffleItems.length : docx ? 1 : 0;
     let list = files;
     if (existingCount + files.length > SHUFFLE_MAX_FILES) {
@@ -1228,7 +1288,9 @@ export default function Home() {
         try {
           newItems.push(await parseShuffleFile(f));
         } catch (e) {
-          errors.push(`${f.name}: ${e instanceof Error ? e.message : String(e)}`);
+          // সাইজ-গার্ডের টোস্ট parseShuffleFile নিজেই দেখিয়েছে — ডাবল-টোস্ট এড়াতে সেটা এরর-লিস্টে নেই
+          const msg = e instanceof Error ? e.message : String(e);
+          if (msg !== FILE_TOO_BIG_MSG) errors.push(`${f.name}: ${msg}`);
         }
       }
       const items = [...base, ...newItems];
@@ -1267,7 +1329,9 @@ export default function Home() {
         items.push(it);
         totalQuestions += it.parse.questions.length;
       } catch (e) {
-        errors.push(`${f.name}: ${e instanceof Error ? e.message : String(e)}`);
+        // সাইজ-গার্ডের টোস্ট parseShuffleFile নিজেই দেখিয়েছে — ডাবল-টোস্ট এড়াতে সেটা এরর-লিস্টে নেই
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg !== FILE_TOO_BIG_MSG) errors.push(`${f.name}: ${msg}`);
       }
     }
     setShuffleItems(items.length ? items : null);
@@ -1288,6 +1352,9 @@ export default function Home() {
     }
     if (errors.length) {
       toast({ title: "কিছু ফাইল পড়া যায়নি", description: errors.join("\n"), variant: "destructive" });
+    }
+    } finally {
+      loadersBusyRef.current = false;
     }
   };
 
@@ -1326,7 +1393,7 @@ export default function Home() {
         resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 80);
       toast({
-        title: `🔀 ${shuffleItems.length} টি ফাইল শাফল হয়েছে — প্রতি ফাইলে ${setCount} টি সেট!`,
+        title: `🔀 ${shuffleItems.length} টি ফাইল শাফল হয়েছে — প্রতি ফাইলে ${multiEffectiveSets} টি সেট!`,
         description: "নিচে মার্জ (.docx) বা ZIP — দুইভাবেই ডাউনলোড করা যাবে।",
       });
     } finally {
@@ -1732,7 +1799,7 @@ export default function Home() {
                     <MultiDownloadCard
                       title="শাফল সম্পন্ন — এখন ডাউনলোড করুন"
                       description="প্রতিটা ফাইলের সেটগুলো আলাদা পেজে, সিরিয়াল ১,২,৩… করা।"
-                      stats={`${shuffleItems.length} টি ফাইল • প্রতি ফাইলে ${setCount} টি সেট`}
+                      stats={`${shuffleItems.length} টি ফাইল • প্রতি ফাইলে ${multiEffectiveSets} টি সেট`}
                       onDownloadMerged={handleMultiMergedDownload}
                       onDownloadZip={handleMultiZipDownload}
                       mergedBusy={multiMergedBusy}

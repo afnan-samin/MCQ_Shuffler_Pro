@@ -17,12 +17,6 @@ import {
 
 export type RefMode = "keep" | "strip" | "endline";
 
-export const REF_MODE_LABEL: Record<RefMode, string> = {
-  keep: "যেমন আছে তেমন রাখুন",
-  strip: "রেফারেন্স বাদ দিন",
-  endline: "প্রশ্নের শেষে আলাদা লাইনে সরান",
-};
-
 // ---------- টোকেন ডিটেকশন ----------
 
 export interface RefToken {

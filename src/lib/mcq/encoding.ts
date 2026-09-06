@@ -208,7 +208,4 @@ export const ENC_LABEL: Record<Enc, string> = {
   neutral: "অন্যান্য",
 };
 
-export function encPercent(count: number, total: number): number {
-  if (!total) return 0;
-  return Math.round((count / total) * 100);
-}
+
