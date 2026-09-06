@@ -492,3 +492,22 @@ Work Log:
 Stage Summary:
 - রিডাউনলোড মোড সম্পূর্ণ পুনর্নির্মিত — আগের চেয়ে বাড়তি: উত্তরমালা-বিস্তার, সিরিয়াল-বাদ, বাংলা-রেঞ্জ ইনপুট, ট্যাব-প্রিভিউ, ওয়াটারমার্ক-ওভারলে (গত সেশনের tab/watermark বাগ-রিপোর্ট দুটিই এখানে ফিক্সড)
 - push অবশিষ্ট: ব্যবহারকারী github.com/new-এ খালি repo বানিয়ে scripts/push-new-repo.sh-এ নাম বসিয়ে চালাবে → Pages-এ লাইভ
+
+---
+Task ID: 30
+Agent: Main Agent (Super Z)
+Task: নতুন ফ্লো redesign — আগে upload → ৩ মোড → কাজ → ডাউনলোডের পরে বাকি ২ মোডে ফাইল-বহন; single=এক বাটন/multi=ZIP; নতুন GitHub repo-তে push (ব্যবহারকারীর টোকেন)
+
+Work Log:
+- নতুন কম্পোনেন্ট: upload-first-card.tsx (UploadFirstCard — ধাপ ১ আপলোড-অনলি, মোড-বাটন লুকানো; StagedFilesCard — স্টেজ ফাইল-লিস্ট + বাতিল), next-modes-card.tsx (ডাউনলোড-কার্ডের নিচে বাকি ২ মোডের বাটন, ফাইলসহ বহন)
+- page.tsx: stagedFiles স্টেট + hasAnyInput গেট (আপলোডের আগে ট্যাব নেই) + carryToMode/filesOfMode/modeHasContent/loadIntoMode (মোড-সুইচে খালি টার্গেটে ফাইল বহন; টার্গেটে কাজ থাকলে অক্ষত) + openInSerialMode-এ স্টেজ-ক্লিয়ার
+- multi-download-card.tsx: fileCount প্রপ — ১ ফাইল = একটাই "ডাউনলোড করুন (.docx)" বাটন (ZIP লুকানো); রিডাউনলোড সিঙ্গেল-ফাইলে প্রয়োগ
+- e2e ৩টি নতুন ফ্লোতে রি-রাইট: e2e-mode-tabs (৯ ধাপ — upload-first gate, স্টেজ→সিরিয়াল বহন, B1 ডাউনলোড, next-modes→শাফল বহন, ট্যাব→রিডাউনলোড বহন, একক-বাটন, reload-ফ্রেশ), e2e-multi-file, e2e-shuffle-headers — সব পাস, কনসোল-এরর শূন্য
+- প্লেরাইট সিলেক্টর-নোট: UploadFirstCard-এর অভ্যন্তরীণ TabsList-ও role=tablist দেয়; "অংশ বাছাই" টেক্সট ট্যাব-সাবলেবেলেও ম্যাচ করে — ইউনিক সিলেক্টর ব্যবহার
+- ভেরিফিকেশন: ইউনিট ৩৪৬/৩৪৬, tsc ০, lint ক্লিন, STATIC_EXPORT বিল্ড ক্লিন
+- GitHub push: ব্যবহারকারীর টোকেন দিয়ে afnan-samin/MCQ_Shuffler_Pro → main push সফল; কিন্তু টোকেনে workflow-scope নেই বলে deploy.yml বাদ দিয়ে push, workflow ফেরত-কমিট (fcb52c9) লোকালে অপুশড
+- remote origin = টোকেন-সহ URL (.git/config-এ সংরক্ষিত) — ভবিষ্যতে push এক-কমান্ড
+
+Stage Summary:
+- নতুন ফ্লো লাইভ: আগে ফাইল → ৩ মোড → ডাউনলোডের পরে বাকি ২ মোডে সরাসরি ফাইল-বহন → সেখানেও ডাউনলোড; একক ফাইল = এক বাটন, একাধিক = .docx+ZIP
+- ব্যাকআপ সম্পন্ন: MCQ_Shuffler_Pro repo-তে পুরো কোড (deploy.yml ছাড়া); workflow-পুশের জন্য workflow-scope টোকেন দরকার
