@@ -732,3 +732,4 @@ Stage Summary:
 - শাফল মোডে এখন সর্বোচ্চ ৫০ টি ফাইল নেওয়া যায় (আগে ১০) — এক লাইনে পরিবর্তনযোগ্য কনস্ট্যান্ট, সব UI-টেক্সট অটো-সিঙ্ক
 - লাইভ: https://afnan-samin.github.io/MCQ_Shuffler_Pro/ (কমিট fd5ce07)
 - টোকেন ghp_lQZP… কাজ শেষ — ইউজারকে রিভোক করতে বলতে হবে
+- ⚠️ push/deploy বাধাগ্রস্ত: টোকেন ghp_lQZP… API-তে 401 — GitHub অটো-রিভোক করেছে (চ্যাটে লিক)। কমিট fd5ce07 + worklog লোকাল main-এ রেডি; নতুন টোকেন (classic, repo scope) পেলেই push + deploy-pages.sh চালানো হবে
