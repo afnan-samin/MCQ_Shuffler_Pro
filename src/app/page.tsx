@@ -90,8 +90,11 @@ import { Dices, ShieldCheck, Zap } from "lucide-react";
 
 const STORAGE_KEY = "mcq-shuffler-text";
 const MODE_KEY = "mcq-shuffler-mode";
-/** শাফল মোডে একসাথে সর্বোচ্চ কতটা ফাইল নেওয়া যায় (min ১, max ১০) */
-const SHUFFLE_MAX_FILES = 10;
+/** বাংলা ডিজিটে রূপান্তর — টোস্ট/চিপের নাম্বারগুলোর জন্য */
+const bnNum = (n: number) => String(n).replace(/\d/g, (d) => "০১২৩৪৫৬৭৮৯"[Number(d)]);
+/** শাফল মোডে একসাথে সর্বোচ্চ কতটা ফাইল নেওয়া যায় (min ১, max ৫০) — ব্রাউজার-মেমোরির সীম রাখতে ক্যাপ, দরকারে বাড়ানো যাবে */
+const SHUFFLE_MAX_FILES = 50;
+const SHUFFLE_MAX_FILES_BN = bnNum(SHUFFLE_MAX_FILES);
 
 /** একটা .docx-এর সর্বোচ্চ সাইজ — এর চেয়ে বড় হলে ব্রাউজার ফ্রিজ/ক্র্যাশ, তাই লোডই করা হয় না */
 const MAX_FILE_BYTES = 50_000_000;
@@ -1250,7 +1253,7 @@ export default function Home() {
 
   /**
    * শাফল মোডে ফাইল লোড — append=false: আগেরটা বদলে নতুনগুলো; append=true: আগের ফাইলের সাথে যোগ।
-   * সীমা: একসাথে সর্বোচ্চ ১০ টি ফাইল (min ১) — বেশি দিলে প্রথম ১০ টি নেওয়া হয়।
+   * সীমা: একসাথে সর্বোচ্চ ৫০ টি ফাইল (min ১) — বেশি দিলে প্রথম ৫০ টি নেওয়া হয়।
    */
   const handleShuffleFiles = async (files: File[], append = false) => {
     if (!files.length) return;
@@ -1264,10 +1267,10 @@ export default function Home() {
       const take = Math.max(0, SHUFFLE_MAX_FILES - (append ? existingCount : 0));
       list = files.slice(0, take);
       toast({
-        title: "⚠️ শাফল মোডে সর্বোচ্চ ১০ টি ফাইল",
+        title: `⚠️ শাফল মোডে সর্বোচ্চ ${SHUFFLE_MAX_FILES_BN} টি ফাইল`,
         description: take > 0
-          ? `একসাথে ১ থেকে ১০ টি ফাইল নেওয়া যায় — প্রথম ${take} টি নেওয়া হলো, বাকিগুলো বাদ।`
-          : "আগেই ১০ টি ফাইল আছে — নতুন ফাইল যোগ করতে হলে লিস্ট থেকে কিছু বাদ দিন।",
+          ? `একসাথে ১ থেকে ${SHUFFLE_MAX_FILES_BN} টি ফাইল নেওয়া যায় — প্রথম ${bnNum(take)} টি নেওয়া হলো, বাকিগুলো বাদ।`
+          : `আগেই ${SHUFFLE_MAX_FILES_BN} টি ফাইল আছে — নতুন ফাইল যোগ করতে হলে লিস্ট থেকে কিছু বাদ দিন।`,
         variant: "destructive",
       });
     }

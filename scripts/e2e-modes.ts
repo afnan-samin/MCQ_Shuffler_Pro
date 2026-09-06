@@ -58,7 +58,7 @@ await openMode("MCQ শাফল");
 await page.waitForSelector("text=60 প্রশ্ন শাফল হবে", { timeout: 120000 });
 ok(true, "শাফল-মোডে ঢোকা → রঙ-ইনফো (৬০ প্রশ্ন)");
 await page.waitForSelector('[data-testid="mode-work-bar"]', { timeout: 30000 });
-ok((await page.locator("text=১/১০ ফাইল").count()) === 1, "ফাইল-চিপ ১/১০ (SHUFFLE_MAX_FILES কপি ঠিক)");
+ok((await page.locator("text=১/৫০ ফাইল").count()) === 1, "ফাইল-চিপ ১/৫০ (SHUFFLE_MAX_FILES কপি ঠিক)");
 
 const shuffleBtn = 'button:has-text("শাফল করুন ও সেট তৈরি করুন")';
 await page.waitForSelector(shuffleBtn, { timeout: 60000 });
@@ -147,7 +147,7 @@ ok(true, "পেছনে → ৩ মোড-বাটন আবার দেখ�
 console.log("\n== B. সিরিয়াল মোড ==");
 await openMode("MCQ সিরিয়াল");
 await page.waitForSelector("text=রঙ-ভিত্তিক সিরিয়াল", { timeout: 120000 });
-ok((await page.locator("text=১/১০").count()) >= 0, "সিরিয়াল মোডে ঢোকা (শাফলের ফাইল carry-over)");
+ok((await page.locator("text=১/৫০").count()) >= 0, "সিরিয়াল মোডে ঢোকা (শাফলের ফাইল carry-over)");
 // ১ ফাইল + রঙ → চিপ সিলেক্ট → B1 ডাউনলোড
 await page.click('button:has-text("B1")');
 const [dlB1] = await Promise.all([
@@ -297,18 +297,18 @@ const [dlRdZ] = await Promise.all([
 ok(dlRdZ.suggestedFilename() === "MCQ-Redownload.zip", "রিডাউনলোড ZIP নাম", dlRdZ.suggestedFilename());
 
 // ============================================================
-// D. শাফল মাল্টি-ফাইল ক্যাপ (১০) — ওয়ার্ক-বার এনফোর্সমেন্ট
+// D. শাফল মাল্টি-ফাইল — সাব-ক্যাপ ফ্লো (১০ < ৫০ ক্যাপ) — ওয়ার্ক-বার
 // ============================================================
-console.log("\n== D. শাফল ফাইল-ক্যাপ (১..১০) ==");
+console.log("\n== D. শাফল ফাইল-চিপ (১০/৫০, সাব-ক্যাপ) ==");
 await fresh();
 const tenFiles = Array(10).fill(NOCOLOR);
 await stage(tenFiles);
 await openMode("MCQ শাফল");
 await page.waitForSelector("text=আপলোড হওয়া ফাইল (10 টি)", { timeout: 180000 });
-ok(true, "১০ ফাইল স্টেজ → শাফলে ১০টাই লোড (১..১০ এনফোর্স)");
-await page.waitForSelector("text=১০/১০ ফাইল", { timeout: 30000 });
+ok(true, "১০ ফাইল স্টেজ → শাফলে ১০টাই লোড (ক্যাপের নিচে)");
+await page.waitForSelector("text=১০/৫০ ফাইল", { timeout: 30000 });
 const addDisabled = (await page.locator('button:has-text("আরও ফাইল")').getAttribute("disabled")) !== null;
-ok(addDisabled, "১০/১০ → 'আরও ফাইল' ডিজেবলড");
+ok(!addDisabled, "১০/৫০ → 'আরও ফাইল' চালু (ক্যাপ ৫০)");
 // মাল্টি-শাফল রান (১০ ফাইল × setCount ডিফল্ট ৪)
 await page.waitForSelector(shuffleBtn, { timeout: 60000 });
 await page.click(shuffleBtn);

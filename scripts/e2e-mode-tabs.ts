@@ -72,14 +72,14 @@ console.log("✓ ডাউনলোডের পরে বাকি ২ মো�
 await page.locator('button:has-text("MCQ শাফল"):below(:text("এই ফাইলগুলো দিয়ে আরও কাজ করুন"))').first().click();
 await page.waitForSelector("text=শাফলে হেডার বাদ যাবে", { timeout: 120000 });
 await page.waitForSelector('button:has-text("শাফল করুন ও সেট তৈরি করুন")', { timeout: 60000 });
-await page.waitForSelector("text=১/১০ ফাইল", { timeout: 15000 });
-console.log("✓ ফাইল শাফল মোডে সরাসরি বহন → ইনফো-কার্ড + ফাইল-কাউন্ট চিপ ১/১০");
+await page.waitForSelector("text=১/৫০ ফাইল", { timeout: 15000 });
+console.log("✓ ফাইল শাফল মোডে সরাসরি বহন → ইনফো-কার্ড + ফাইল-কাউন্ট চিপ ১/৫০");
 
-// ---- ৮. 'আরও ফাইল' দিয়ে শাফলে ২য় ফাইল যোগ → ২/১০ ----
+// ---- ৮. 'আরও ফাইল' দিয়ে শাফলে ২য় ফাইল যোগ → ২/৫০ ----
 await page.setInputFiles('[data-testid="mode-work-bar-input"]', NOCOLOR);
 await page.waitForSelector("text=আপলোড হওয়া ফাইল (2 টি)", { timeout: 120000 });
-await page.waitForSelector("text=২/১০ ফাইল", { timeout: 15000 });
-console.log("✓ শাফলে 'আরও ফাইল' append → ২/১০ চিপ");
+await page.waitForSelector("text=২/৫০ ফাইল", { timeout: 15000 });
+console.log("✓ শাফলে 'আরও ফাইল' append → ২/৫০ চিপ");
 
 // ---- ৯. পেছনে বাটন → মোড-বাছাইয়ে ফেরা (৩ ট্যাব আবার দেখা যায়) → রিডাউনলোডে বহন ----
 await page.click('button[aria-label="পেছনে — মোড বাছাই"]');
