@@ -17,38 +17,6 @@ bun install
 bun run dev        # http://localhost:3000
 ```
 
-## GitHub Pages-এ ফ্রি হোস্টিং (ধাপে ধাপে)
-
-এই প্রজেক্টের ডিপ্লয়-ওয়ার্কফ্লো ফাইলটি **`scripts/deploy.yml.disabled`** নামে বন্ধ-অবস্থায় রাখা আছে। Actions দিয়ে অটো-ডিপ্লয় চালু করতে ফাইলটিকে `.github/workflows/deploy.yml`-এ সরিয়ে নিন — তারপর push করলেই স্ট্যাটিক বিল্ড হয়ে GitHub Pages-এ ডিপ্লয় হবে:
-
-```bash
-mkdir -p .github/workflows && git mv scripts/deploy.yml.disabled .github/workflows/deploy.yml
-```
-
-1. **GitHub-এ নতুন repo খুলুন** (যেমন `mcq-shuffler-pro`) — Public রাখলে Pages ফ্রি।
-2. **remote যোগ করে push করুন:**
-   ```bash
-   git remote add origin git@github.com:<username>/<repo>.git
-   git push -u origin main
-   ```
-3. **Pages সোর্স সেট করুন:** repo-র **Settings → Pages → Build and deployment → Source: GitHub Actions** সিলেক্ট করুন।
-4. **ওয়ার্কফ্লো অটো রান হবে** — push করার পরই Actions ট্যাবে "Deploy to GitHub Pages" চলবে (প্রথমবার Settings → Pages-এ Source সেট করা থাকতে হবে, নাহলে permission error আসতে পারে)। চাইলে Actions ট্যাব থেকে **Run workflow** দিয়ে ম্যানুয়ালি চালানোও যায়।
-5. **লাইভ URL:** `https://<username>.github.io/<repo>/`
-   - repo-র নাম **`<username>.github.io`** হলে সাইট রুট-ডোমেইনে চলবে: `https://<username>.github.io/` (ওয়ার্কফ্লো নিজেই base path খালি সেট করে)।
-   - অন্য নাম হলে সাবপাথ (`/<repo>/`) ওয়ার্কফ্লো অটো কম্পিউট করে বিল্ডে বসায় — কিছু করতে হয় না।
-6. **কাস্টম ডোমেইন (ঐচ্ছিক):** Settings → Pages → Custom domain-এ ডোমেইন দিন এবং DNS-এ CNAME রেকর্ড যোগ করুন; কাস্টম ডোমেইনেও সাইট রুট-পাথেই চলবে।
-
-## স্ট্যাটিক-বিল্ড লোকাল যাচাই
-
-```bash
-# সাবপাথ-সহ (প্রজেক্ট-সাইট হিসেবে) বিল্ড:
-STATIC_EXPORT=1 NEXT_PUBLIC_BASE_PATH=/mcq-shuffler-pro npx next build
-# Next.js 16-তে এক্সপোর্ট সাইট .next-static/-এ লেখে; GitHub Pages আর্টিফ্যাক্ট এটাই:
-ls .next-static/index.html
-```
-
-> নোট: Next.js 16-এ `output: "export"` + কাস্টম `distDir` দিলে এক্সপোর্ট আউটপুট সেই `distDir`-এই লেখা হয়; ওয়ার্কফ্লো এটিকে `out/`-এ এনে `.nojekyll` বসিয়ে আপলোড করে।
-
 ## টেক স্ট্যাক
 
 Next.js 16 (App Router, Turbopack) + Tailwind CSS v4 + shadcn/ui + TypeScript। ফন্ট: Kalpurush ও SutonnyMJ (`next/font/local` দিয়ে এমবেড)।
