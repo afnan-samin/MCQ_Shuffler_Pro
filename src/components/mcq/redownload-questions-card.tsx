@@ -185,6 +185,18 @@ export function RedownloadQuestionsCard({
                         </span>
                       </span>
                     )}
+                    {/* ব্যাখ্যা — প্রথম লাইন */}
+                    {q.bekkha && (
+                      <span className="mt-1 block pl-1 text-[13px] text-muted-foreground">
+                        <span className="font-medium text-sky-800 dark:text-sky-300">ব্যাখ্যা: </span>
+                        <span className={`${q.serialFontBijoy ? "tokfont-bijoy" : ""}`}>
+                          {(() => {
+                            const first = q.bekkha.split("\n").find((l) => l.trim()) ?? "";
+                            return first.length > 110 ? first.slice(0, 110) + "…" : first;
+                          })()}
+                        </span>
+                      </span>
+                    )}
                   </span>
                 </label>
               );

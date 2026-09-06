@@ -61,3 +61,9 @@ scripts/tmp-e2e/
 
 # ইউজারের নমুনা/টেস্ট ফাইল — লোকাল টেস্টে লাগে, রিপোতে যাবে না
 upload/
+# ইউজারের আসল টেস্ট-ফাইল ফিক্সচার (প্রাইভেসি — রিপোতে যাবে না)
+scripts/fixtures/bcs-english-bijoy-46.docx
+# verify-export রানটাইম আর্টিফ্যাক্ট
+scripts/document.xml
+scripts/test-export.docx
+/tmp/

@@ -197,18 +197,47 @@ export function looksOptionLed(t: string): boolean {
   return /^\s*(?:[KLMNklmn]\s*[.।):]|[কখগঘ]\s*[.।):]|[a-dA-D]\s*[.):]|[([]\s*[কখগঘa-dA-D]\s*[)\]]|Dt\b|উঃ|উত্তর)/.test(t);
 }
 
-/** সেকশন সেপারেটর/শিরোনাম ("PHYSICS", "A" ইত্যাদি) — প্রশ্ন নয় */
+/**
+ * পরীক্ষা/সেকশন-টাইটেল লাইন — প্রশ্ন-ব্লক ভাঙে:
+ *   Bijoy:  "46Zg wewmGm wcÖwjwgbvwi cix¶v"  (= ৪৬তম বিসিএস প্রিলিমিনারি পরীক্ষা)
+ *   Unicode: "৪৫তম বিসিএস প্রিলিমিনারি পরীক্ষা"
+ * শর্ত: শেষে "পরীক্ষা/cix¶v" + শুরুতে ক্রমবাচক (NNতম/NNZg) বা পরীক্ষা-কীওয়ার্ড
+ */
+const EXAM_TITLE_TAIL_RE = /(?:cix[¶ÿ]v|পরীক্ষা)\s*$/;
+const ORDINAL_HEAD_RE = /^\d{1,4}\s*(?:Zg|wW|gw|তম|শে|য়|র্থ|ঠ|ম(?=[\s।,]|$))/;
+const EXAM_TITLE_KEYWORD_RE = /(?:wewmGm|বিসিএস|wcÖwjwgbvwi|প্রিলিমিনারি|লিখিত|প্রশ্নপত্র|বিষয়|সালের)/;
+
+export function isExamTitleLine(text: string): boolean {
+  const t = text.trim();
+  if (!t || t.includes("\t") || t.length < 6 || t.length > 100) return false;
+  if (!EXAM_TITLE_TAIL_RE.test(t)) return false;
+  if (looksOptionLed(t)) return false;
+  return ORDINAL_HEAD_RE.test(t) || EXAM_TITLE_KEYWORD_RE.test(t);
+}
+
+/** সেকশন সেপারেটর/শিরোনাম ("PHYSICS", "A", পরীক্ষা-টাইটেল ইত্যাদি) — প্রশ্ন নয় */
 export function isSectionSeparator(text: string): boolean {
   const t = text.trim();
   if (!t || t.includes("\t")) return false;
+  if (isExamTitleLine(t)) return true;
   if (t.length <= 3) return true;
   return /^[A-Za-z][A-Za-z0-9 .\-]{1,29}$/.test(t) && t === t.toUpperCase();
 }
+
+/** সিরিয়ালের পরে সরাসরি ক্রমবাচক-সাফিক্স ("৪৫তম বিসিএস…" — টাইটেল, প্রশ্ন নয়) */
+const ORDINAL_AFTER_RE = /^\s*(?:তম|শে|য়|র্থ|ঠ|ই|ম(?=[\s।,]|$))/;
 
 export function isQuestionStart(si: SerialPrefix, hasRunTab: boolean, nextText: string | null): boolean {
   // সিলিং = MAX_SERIAL_NUMBER (৪-ডিজিট, SERIAL_RE-এর {1,4}-এর সাথে সামঞ্জস্য) —
   // টেক্সট-পার্সারের (parser.ts) সাথে ইউনিফাইড; আগে এখানে 5000 ছিল (Task 21-a)
   if (si.num > MAX_SERIAL_NUMBER) return false;
+  // সাল-গার্ড (parser.ts-এর সাথে সামঞ্জস্য): "2016 সালের ফলাফল…" — সিরিয়াল নয়
+  if (si.num >= 1900 && si.num <= 2100) {
+    const head = si.after.trimStart().slice(0, 10).toLowerCase();
+    if (head.includes("সাল") || head.includes("year")) return false;
+  }
+  // ক্রমবাচক-গার্ড: সেপারেটর-হীন সিরিয়ালের পরে সরাসরি "তম/শে/য়…" — টাইটেল
+  if (!si.separator && ORDINAL_AFTER_RE.test(si.after)) return false;
   // টিয়ার ১: সিরিয়ালের পরে ট্যাব আছে (ইউজারের ফরম্যাট: "32.<tab>প্রশ্ন")
   if (hasRunTab) return true;
   // টিয়ার ২: পরের নন-এম্পটি প্যারা অপশন-লেড (ট্যাব/ক খ গ ঘ মার্কার)
@@ -218,7 +247,7 @@ export function isQuestionStart(si: SerialPrefix, hasRunTab: boolean, nextText: 
   return false;
 }
 
-// ---------- অপশন ও উত্তর ডিটেকশন (প্রিভিউয়ের জন্য) ----------
+// ---------- অপশন ও উত্তর/ব্যাখ্যা ডিটেকশন (প্রিভিউয়ের জন্য) ----------
 
 export interface OptionPreview {
   /** ফাইলে যেমন আছে সেরকম লেবেল ("K" বা "ক" বা "a") */
@@ -226,8 +255,25 @@ export interface OptionPreview {
   text: string;
 }
 
-const ANSWER_RE =
-  /(?:Dt|Cvw|wU|উঃ|উত্তর|Ans?\.?|Answer)\s*[:.]?\s*([KLMNklmnকখগঘa-dA-D1-4])\s*$/;
+/**
+ * লাইনের শেষে উত্তর-মার্কার + অক্ষর: "Dt K" / "D: L + N" / "উত্তর: খ" / "Ans. C"।
+ * — বেয়ার "D" = Bijoy (SutonnyMJ)-এ "উ" — শুধু কোলন/ডট-সহ গৃহীত (D: K)
+ * — একাধিক উত্তরও ধরা পড়ে: "D: L + N", "উত্তর: ক, খ"
+ */
+const ANSWER_TAIL_RE =
+  /(?:Dt|Cvw|wU|উঃ|উত্তর|উওর|Ans?\.?|Answer|D(?=\s*[:.]))\s*[:.]?\s*([KLMNklmnকখগঘa-dA-D1-4](?:\s*[+&,/]\s*[KLMNklmnকখগঘa-dA-D1-4])*)\s*$/;
+
+/**
+ * অক্ষর-হীন ঝুলন্ত উত্তর-মার্কার (ফাইলের টাইপো): "…\tDt" / "…\tD: -"।
+ * উত্তর-অক্ষর নেই — শুধু অপশন-টেক্সট থেকে কেটে ফেলা হয় (উত্তর null থাকে)।
+ * লাইন-শুরু বা ট্যাবের পরে হতে হবে — "No Answer"-জাতীয় অপশন রক্ষা পায়।
+ */
+const ANSWER_DANGLING_RE =
+  /(?:^|\t)(?:Dt|Cvw|wU|উঃ|উত্তর|উওর|Ans?\.?|Answer|D(?=\s*[:.]))\s*[:.]?\s*[-–—]?\s*$/;
+
+/** লাইন-শুরুর ব্যাখ্যা-মার্কার: Bijoy "e¨vL¨v:" / Unicode "ব্যাখ্যা:" / "সমাধান:" */
+export const BEKKHA_LINE_RE =
+  /^\s*(?:e¨vL¨v|ব্যাখ্যা|সমাধান|explanation)\s*[:.\-—]?/i;
 
 const OPTION_FAMILIES: string[][] = [
   ["K", "L", "M", "N"], // Bijoy (SutonnyMJ): ক খ গ ঘ
@@ -236,13 +282,63 @@ const OPTION_FAMILIES: string[][] = [
   ["A", "B", "C", "D"],
 ];
 
-export function scanOptions(blockText: string, serialRaw: string): { options: OptionPreview[]; answer: string | null; qText: string } {
+/**
+ * প্রশ্ন-ব্লকের জয়েন্ট টেক্সট থেকে অপশন/উত্তর/ব্যাখ্যা আলাদা করে।
+ * কাজের ক্রম:
+ *   ① ব্যাখ্যা-মার্কার-লাইন ("e¨vL¨v:" / "ব্যাখ্যা:") থেকে ব্লক-শেষ = ব্যাখ্যা —
+ *      অপশনের টেক্সটে আর লেগে থাকবে না
+ *   ② উত্তর: অপশন-অঞ্চলের শেষতম লাইনের শেষে মার্কার+অক্ষর (গ্লুড "…sand\tD: L + N"
+ *      বা একা-লাইন "D: K") — মার্কারটা কেটে বাদ; একা-লাইন হলে পুরো লাইন বাদ
+ *   ③ ফ্যামিলি-স্ক্যানে (K/L/M/N, ক/খ/গ/ঘ, a-d) অপশন ভাগ
+ */
+export function scanOptions(blockText: string, serialRaw: string): { options: OptionPreview[]; answer: string | null; qText: string; bekkha: string | null } {
   const si = blockText.indexOf(serialRaw);
   const body = si >= 0 ? blockText.slice(si + serialRaw.length) : blockText;
 
-  const am = ANSWER_RE.exec(body);
-  const answer = am ? am[1] : null;
+  // ---- ① ব্যাখ্যা-বিভাজন ----
+  const rawLines = body.split("\n");
+  let bekkhaAt = -1;
+  for (let i = 0; i < rawLines.length; i++) {
+    if (BEKKHA_LINE_RE.test(rawLines[i])) {
+      bekkhaAt = i;
+      break;
+    }
+  }
+  const regionLines = bekkhaAt >= 0 ? rawLines.slice(0, bekkhaAt) : rawLines;
+  let bekkha: string | null = null;
+  if (bekkhaAt >= 0) {
+    const first = rawLines[bekkhaAt].replace(BEKKHA_LINE_RE, "");
+    bekkha = [first, ...rawLines.slice(bekkhaAt + 1)].join("\n").trim() || null;
+  }
 
+  // ---- ② উত্তর-কাটা ----
+  let answer: string | null = null;
+  const cutAnswerLine = (i: number, m: RegExpExecArray) => {
+    if (regionLines[i].slice(0, m.index).trim() === "") {
+      regionLines.splice(i, 1); // একা-উত্তর-লাইন — পুরোটাই বাদ
+    } else {
+      regionLines[i] = regionLines[i].slice(0, m.index).trimEnd(); // অপশনের শেষে গ্লুড
+    }
+  };
+  for (let i = regionLines.length - 1; i >= 0; i--) {
+    const m = ANSWER_TAIL_RE.exec(regionLines[i]);
+    if (!m) continue;
+    answer = m[1] ?? null;
+    cutAnswerLine(i, m);
+    break;
+  }
+  if (answer === null) {
+    // ঝুলন্ত মার্কার ("…\tDt" / "…\tD: -") — শুধু টেক্সট পরিষ্কার, উত্তর nullই
+    for (let i = regionLines.length - 1; i >= 0; i--) {
+      const m = ANSWER_DANGLING_RE.exec(regionLines[i]);
+      if (!m) continue;
+      cutAnswerLine(i, m);
+      break;
+    }
+  }
+  const region = regionLines.join("\n");
+
+  // ---- ③ ফ্যামিলি-স্ক্যান ----
   let best: { labels: string[]; idxs: number[] } | null = null;
   for (const family of OPTION_FAMILIES) {
     const labels: string[] = [];
@@ -251,7 +347,7 @@ export function scanOptions(blockText: string, serialRaw: string): { options: Op
     for (const label of family) {
       let found = -1;
       for (const sep of [".", "।", ")", ":"]) {
-        const at = body.indexOf(label + sep, pos);
+        const at = region.indexOf(label + sep, pos);
         if (at >= 0 && (found === -1 || at < found)) found = at;
       }
       if (found === -1) break;
@@ -265,21 +361,18 @@ export function scanOptions(blockText: string, serialRaw: string): { options: Op
   }
 
   const options: OptionPreview[] = [];
-  let qText = body.trim();
+  let qText = region.trim();
   if (best) {
     const { labels, idxs } = best;
-    qText = body.slice(0, idxs[0]).trim();
+    qText = region.slice(0, idxs[0]).trim();
     for (let i = 0; i < labels.length; i++) {
       const start = idxs[i] + labels[i].length + 1; // লেবেল + সেপারেটর বাদ
-      const end = i + 1 < labels.length ? idxs[i + 1] : body.length;
-      let text = body.slice(start, end).trim();
-      if (i === labels.length - 1 && answer) {
-        text = text.replace(/(?:Dt|Cvw|wU|উঃ|উত্তর|Ans?\.?|Answer)\s*[:.]?\s*[KLMNklmnকখগঘa-dA-D1-4]\s*$/, "").trim();
-      }
+      const end = i + 1 < labels.length ? idxs[i + 1] : region.length;
+      const text = region.slice(start, end).trim();
       options.push({ label: labels[i], text });
     }
   }
-  return { options, answer, qText };
+  return { options, answer, qText, bekkha };
 }
 
 // ---------- প্রশ্ন মডেল ----------
@@ -301,6 +394,8 @@ export interface DocxQuestion {
   qText: string;
   options: OptionPreview[];
   answer: string | null;
+  /** ব্লকের ব্যাখ্যা-অংশের টেক্সট ("e¨vL¨v:"/"ব্যাখ্যা:" মার্কার বাদে) — না থাকলে null */
+  bekkha: string | null;
   hasUnicode: boolean;
 }
 
@@ -308,6 +403,8 @@ export interface SerialIssue {
   index: number;
   expected: number;
   found: number;
+  /** found===1 মানে নতুন সেকশন/পরীক্ষা শুরু — সত্যিকারের ভাঙা নয় */
+  restart: boolean;
 }
 
 export interface DocxParseResult {
@@ -360,7 +457,7 @@ export function parseDocxXml(xml: string): DocxParseResult {
 
   const pushQuestion = (c: Cur) => {
     const text = c.texts.join("\n");
-    const { options, answer, qText } = scanOptions(text, c.si.raw);
+    const { options, answer, qText, bekkha } = scanOptions(text, c.si.raw);
     const q: DocxQuestion = {
       id: questions.length,
       serial: c.si.num,
@@ -375,6 +472,7 @@ export function parseDocxXml(xml: string): DocxParseResult {
       qText,
       options,
       answer,
+      bekkha,
       hasUnicode: /[\u0980-\u09FF]/.test(text),
     };
     questions.push(q);
@@ -417,8 +515,10 @@ export function parseDocxXml(xml: string): DocxParseResult {
     for (let i = 1; i < questions.length; i++) {
       const expected = questions[i - 1].serial + 1;
       const found = questions[i].serial;
-      if (found !== expected) issues.push({ index: i, expected, found });
-      if (issues.length >= 30) break;
+      if (found !== expected) {
+        issues.push({ index: i, expected, found, restart: found === 1 && expected > 1 });
+        if (issues.length >= 30) break;
+      }
     }
     serial = { status: issues.length ? "broken" : "ok", startAt: questions[0].serial, issues };
   }

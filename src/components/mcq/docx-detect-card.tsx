@@ -64,7 +64,9 @@ export function DocxDetectCard({
   const questions = parse.questions;
   const stats = useMemo(() => {
     const withOptions = questions.filter((q) => q.options.length >= 2).length;
-    return { total: questions.length, withOptions };
+    const withAnswer = questions.filter((q) => q.answer).length;
+    const withBekkha = questions.filter((q) => q.bekkha).length;
+    return { total: questions.length, withOptions, withAnswer, withBekkha };
   }, [questions]);
 
   const serialEncLabel = questions.length
@@ -109,7 +111,7 @@ export function DocxDetectCard({
       </CardHeader>
       <CardContent className="space-y-5">
         {/* স্ট্যাটস */}
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
           <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
             <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{stats.total}</div>
             <div className="text-xs text-muted-foreground">মোট প্রশ্ন ডিটেক্ট</div>
@@ -117,6 +119,14 @@ export function DocxDetectCard({
           <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
             <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{stats.withOptions}</div>
             <div className="text-xs text-muted-foreground">অপশনসহ প্রশ্ন</div>
+          </div>
+          <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
+            <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{stats.withAnswer}</div>
+            <div className="text-xs text-muted-foreground">উত্তরসহ প্রশ্ন</div>
+          </div>
+          <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
+            <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{stats.withBekkha}</div>
+            <div className="text-xs text-muted-foreground">ব্যাখ্যাসহ প্রশ্ন</div>
           </div>
           <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
             <div className="mt-1 text-[13px] font-semibold leading-snug">{serialEncLabel}</div>
@@ -200,64 +210,85 @@ export function DocxDetectCard({
         )}
 
         {/* সিরিয়াল স্ট্যাটাস */}
-        {serial && (
-          <div
-            className={`rounded-xl border p-4 ${
-              serial.status === "ok"
-                ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30"
-                : "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30"
-            }`}
-          >
-            <div className="flex flex-wrap items-center gap-3">
-              {serial.status === "ok" ? (
-                <CheckCircle2 className="h-6 w-6 shrink-0 text-emerald-600" />
-              ) : (
-                <AlertTriangle className="h-6 w-6 shrink-0 text-amber-600" />
-              )}
-              <div className="min-w-0 flex-1">
+        {serial && (() => {
+          const restartOnly =
+            serial.status === "broken" &&
+            serial.issues.length > 0 &&
+            serial.issues.every((is) => is.restart);
+          return (
+            <div
+              className={`rounded-xl border p-4 ${
+                serial.status === "ok"
+                  ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30"
+                  : restartOnly
+                    ? "border-sky-300 bg-sky-50 dark:border-sky-800 dark:bg-sky-950/30"
+                    : "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30"
+              }`}
+            >
+              <div className="flex flex-wrap items-center gap-3">
                 {serial.status === "ok" ? (
-                  <>
-                    <div className="font-semibold text-emerald-800 dark:text-emerald-300">
-                      ✅ সিরিয়াল ঠিক আছে — শাফল করার জন্য রেডি!
-                    </div>
-                    <div className="mt-0.5 text-sm text-emerald-700/80 dark:text-emerald-400/80">
-                      {questions.length} টি প্রশ্ন পরপর সাজানো ({serial.startAt} থেকে শুরু)।
-                    </div>
-                  </>
+                  <CheckCircle2 className="h-6 w-6 shrink-0 text-emerald-600" />
+                ) : restartOnly ? (
+                  <ListChecks className="h-6 w-6 shrink-0 text-sky-600" />
                 ) : (
-                  <>
-                    <div className="font-semibold text-amber-800 dark:text-amber-300">
-                      ⚠️ সিরিয়ালে {Math.min(serial.issues.length, 30)} টি জায়গায় সমস্যা (ডুপ্লিকেট/লাফ)
-                    </div>
-                    <div className="mt-1 text-sm text-amber-700/90 dark:text-amber-400/90">
-                      {serial.issues.slice(0, 3).map((is, i) => (
-                        <div key={i}>
-                          প্রশ্ন #{is.index + 1}: নম্বর {is.expected} হওয়ার কথা, পাওয়া গেছে {is.found}
-                        </div>
-                      ))}
-                      {serial.issues.length > 3 && <div>...আরও {serial.issues.length - 3} টি</div>}
-                    </div>
-                  </>
+                  <AlertTriangle className="h-6 w-6 shrink-0 text-amber-600" />
                 )}
-              </div>
-            </div>
-
-            {serial.status === "broken" && (
-              <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-amber-200 pt-3 dark:border-amber-800">
-                <Button size="sm" className="gap-2 bg-amber-600 hover:bg-amber-700" onClick={onSerialFix} disabled={fixing}>
-                  <Download className="h-4 w-4" />
-                  {fixing ? "বানানো হচ্ছে..." : "🔧 সিরিয়াল ঠিক করে .docx ডাউনলোড (১..N)"}
-                </Button>
-                <div className="flex items-center gap-2">
-                  <Switch id="docx-allow-broken" checked={allowBroken} onCheckedChange={onAllowBrokenChange} />
-                  <Label htmlFor="docx-allow-broken" className="cursor-pointer text-sm">
-                    যেভাবে আছে তেভাবে চালান
-                  </Label>
+                <div className="min-w-0 flex-1">
+                  {serial.status === "ok" ? (
+                    <>
+                      <div className="font-semibold text-emerald-800 dark:text-emerald-300">
+                        ✅ সিরিয়াল ঠিক আছে — শাফল করার জন্য রেডি!
+                      </div>
+                      <div className="mt-0.5 text-sm text-emerald-700/80 dark:text-emerald-400/80">
+                        {questions.length} টি প্রশ্ন পরপর সাজানো ({serial.startAt} থেকে শুরু)।
+                      </div>
+                    </>
+                  ) : restartOnly ? (
+                    <>
+                      <div className="font-semibold text-sky-800 dark:text-sky-300">
+                        📂 এক ফাইলে একাধিক সেকশন/পরীক্ষা — মাঝে {serial.issues.length} জায়গায় নম্বর ১ থেকে আবার শুরু
+                      </div>
+                      <div className="mt-0.5 text-sm text-sky-700/90 dark:text-sky-400/90">
+                        এটা ভুল না — প্রতিটি সেকশনের নিজের নম্বর ({serial.startAt} থেকে শুরু)। শাফল করতে নিচের
+                        "যেভাবে আছে তেভাবে চালান" চালু করুন।
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="font-semibold text-amber-800 dark:text-amber-300">
+                        ⚠️ সিরিয়ালে {Math.min(serial.issues.length, 30)} টি জায়গায় সমস্যা (ডুপ্লিকেট/লাফ)
+                      </div>
+                      <div className="mt-1 text-sm text-amber-700/90 dark:text-amber-400/90">
+                        {serial.issues.slice(0, 3).map((is, i) => (
+                          <div key={i}>
+                            প্রশ্ন #{is.index + 1}: নম্বর {is.expected} হওয়ার কথা, পাওয়া গেছে {is.found}
+                            {is.restart ? " (নতুন সেকশন)" : ""}
+                          </div>
+                        ))}
+                        {serial.issues.length > 3 && <div>...আরও {serial.issues.length - 3} টি</div>}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
-            )}
-          </div>
-        )}
+
+              {serial.status === "broken" && (
+                <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-amber-200 pt-3 dark:border-amber-800">
+                  <Button size="sm" className="gap-2 bg-amber-600 hover:bg-amber-700" onClick={onSerialFix} disabled={fixing}>
+                    <Download className="h-4 w-4" />
+                    {fixing ? "বানানো হচ্ছে..." : "🔧 সিরিয়াল ঠিক করে .docx ডাউনলোড (১..N)"}
+                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Switch id="docx-allow-broken" checked={allowBroken} onCheckedChange={onAllowBrokenChange} />
+                    <Label htmlFor="docx-allow-broken" className="cursor-pointer text-sm">
+                      যেভাবে আছে তেভাবে চালান
+                    </Label>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* সিলেকশন টুলবার */}
         <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-muted/40 p-3">
@@ -323,6 +354,11 @@ export function DocxDetectCard({
                     <span className={q.serialEnc === "bijoy" || q.serialEnc === "en" ? "tokfont-bijoy ml-0.5" : "ml-0.5"}>
                       {q.answer}
                     </span>
+                  </Badge>
+                )}
+                {q.bekkha && (
+                  <Badge variant="outline" className="ml-1 h-5 px-1.5 text-[10px]">
+                    ব্যাখ্যা ✓
                   </Badge>
                 )}
                 {q.paras.length > 1 && (

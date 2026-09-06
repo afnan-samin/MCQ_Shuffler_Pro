@@ -67,23 +67,24 @@ export const DEFAULT_PART_SELECTION: PartSel = {
 
 // ---------- প্যাটার্ন ----------
 
-/** উত্তর-টোকেন (docx-xml-এর ANSWER_RE-এর সাথে সামঞ্জস্যপূর্ণ) */
-const ANSWER_TOK = "(?:Dt|Cvw|wU|উঃ|উত্তরমালা|উত্তর|Ans?\\.?|Answer)";
-/** লাইন-শুরুতে উত্তর-টোকেন ("উত্তর: ক", "উঃ খ", "Dt. K") */
+/** উত্তর-টোকেন (docx-xml-এর ANSWER_TAIL_RE-এর সাথে সামঞ্জস্যপূর্ণ)।
+ * বেয়ার "D" = Bijoy "উ" — শুধু কোলন/ডট-সহ ("D: K") */
+const ANSWER_TOK = "(?:Dt|Cvw|wU|উঃ|উত্তরমালা|উত্তর|Ans?\\.?|Answer|D(?=\\s*[:.]))";
+/** অক্ষর-গ্রুপ: একাধিক উত্তরও ("D: L + N", "উত্তর: ক, খ") */
+const LETTER_GROUP = "([KLMNklmnকখগঘa-dA-D1-4](?:\\s*[+&,/]\\s*[KLMNklmnকখগঘa-dA-D1-4])*)";
+/** লাইন-শুরুতে উত্তর-টোকেন ("উত্তর: ক", "উঃ খ", "Dt. K", "D: L + N") */
 const ANSWER_LINE_RE = new RegExp(`^\\s*${ANSWER_TOK}\\s*[:.]?`, "i");
 /** লাইন-শেষে অক্ষর-উত্তর ("… উঃ ক" / "উত্তর: খ") */
-const ANSWER_END_RE = new RegExp(
-  `${ANSWER_TOK}\\s*[:.]?\\s*([KLMNklmnকখগঘa-dA-D])\\s*$`
-);
+const ANSWER_END_RE = new RegExp(`${ANSWER_TOK}\\s*[:.]?\\s*${LETTER_GROUP}\\s*$`);
 /** পুরো লাইনটাই সিরিয়াল+অক্ষর ("১২. ক" — উত্তরমালা-স্টাইল) */
 const ALL_DIGITS_CLASS = "0-9০-৯ø«ˆµ∏Ï¾˜Ùœ";
 const NOT_DIGIT_LOOKAHEAD = `(?![${ALL_DIGITS_CLASS}])`;
 const SERIAL_LETTER_RE = new RegExp(
   `^\\s*[${ALL_DIGITS_CLASS}]{1,4}\\s*[.।):|\\-–—]\\s*([KLMNklmnকখগঘa-dA-D])\\s*$`
 );
-/** পুরো লাইনটাই উত্তর-টোকেন+অক্ষর ("উঃ ক", "Dt. K", "উত্তর: খ") */
+/** পুরো লাইনটাই উত্তর-টোকেন+অক্ষর ("উঃ ক", "Dt. K", "D: L + N") */
 const ANSWER_WHOLE_RE = new RegExp(
-  `^\\s*${ANSWER_TOK}\\s*[:.]?\\s*([KLMNklmnকখগঘa-dA-D])\\s*$`
+  `^\\s*${ANSWER_TOK}\\s*[:.]?\\s*${LETTER_GROUP}\\s*$`
 );
 /** এক লাইনে একাধিক "১. ক ২. খ" জোড়া → উত্তরমালা। সেপারেটর বাধ্যতমক +
  * অক্ষরের পরে ডিজিট থাকলে সেটা সংখ্যা-রেঞ্জ ("22-23") — জোড়া নয়। */
@@ -95,8 +96,8 @@ const SERIAL_LETTER_PAIR_RE = new RegExp(
 /** অপশন-লেড (উত্তর নয়): "ক)" "K." "a)" "(গ)" বা ট্যাব-লেড */
 const OPTION_LEAD_RE =
   /^\s*(?:[KLMNklmn]\s*[.।):]|[কখগঘ]\s*[.।):]|[a-dA-D]\s*[.):]|[([]\s*[কখগঘa-dA-D]\s*[)\]])/;
-/** ব্যাখ্যা/রেফারেন্স প্রিফিক্স (Unicode — রঙ-হেডারই Bijoy ফাইলের মূল ভরসা) */
-const BEKKHA_PREFIX_RE = /^\s*(?:ব্যাখ্যা|সমাধান|explanation)\s*[:.\-—]?/i;
+/** ব্যাখ্যা/রেফারেন্স প্রিফিক্স — Bijoy "e¨vL¨v" সহ (docx-xml BEKKHA_LINE_RE-এর সাথে একই তালিকা) */
+const BEKKHA_PREFIX_RE = /^\s*(?:e¨vL¨v|ব্যাখ্যা|সমাধান|explanation)\s*[:.\-—]?/i;
 const REFERENCE_PREFIX_RE =
   /^\s*(?:রেফারেন্স|উদ্দীপক|reference|stimulus)\s*[:.\-—]?/i;
 
@@ -188,6 +189,8 @@ export interface RdQuestion {
   qText: string;
   options: OptionPreview[];
   answer: string | null;
+  /** ব্লকের ব্যাখ্যা-অংশের টেক্সট (মার্কার বাদে) — না থাকলে null */
+  bekkha: string | null;
   hasUnicode: boolean;
 }
 
@@ -219,7 +222,9 @@ function nextNonEmpty(texts: string[], from: number): string | null {
 
 /**
  * গার্ডেড প্রশ্ন-শুরু: সিরিয়াল-প্রিফিক্স থাকতেই হবে, কিন্তু
- * ① উত্তর/ব্যাখ্যা/রেফারেন্স/অপশন সেকশনের ভিতরে "১২. ক"-টাইপ লাইন প্রশ্ন নয়
+ * ① উত্তর/ব্যাখ্যা/রেফারেন্স/অপশন সেকশনের ভিতরে "১২. ক"-টাইপ লাইন প্রশ্ন নয় —
+ *    তবে জোরালো প্রমাণ (ট্যাব+লেখা, বা পরের প্যারা অপশন-লেড) থাকলে প্রশ্নই —
+ *    প্রতি-প্রশ্নের ব্যাখ্যার পরের প্রশ্ন এভাবেই ধরা পড়ে
  * ② এক লাইনে একাধিক সিরিয়াল+অক্ষর জোড়া থাকলে উত্তরমালা — প্রশ্ন নয়
  * ③ ট্যাব/পরের-অপশন-লেড/যথেষ্ট লম্বা টেক্সট — যেকোনো একটা হলে প্রশ্ন
  */
@@ -232,11 +237,12 @@ function isQuestionStartPara(
 ): boolean {
   if (si.num > MAX_SERIAL_NUMBER) return false;
   if (countSerialLetterPairs(t) >= 2) return false;
-  if (section === "answer" || section === "bekkha" || section === "reference" || section === "options") {
-    return false;
-  }
   const afterTrim = si.after.trim();
   const nextOpt = nextText !== null && isOptionLine(nextText);
+  const strongEvidence = (hasTab && afterTrim.length >= 1) || nextOpt;
+  if (section === "answer" || section === "bekkha" || section === "reference" || section === "options") {
+    return strongEvidence;
+  }
   if (hasTab && afterTrim.length >= 1) return true;
   if (nextOpt) return true;
   if (afterTrim.length >= 6 && (!si.separator || !/^[0-9০-৯]/.test(si.after))) return true;
@@ -304,6 +310,16 @@ export function parseRedownloadXml(xml: string): RdParseResult {
       lastKind = "answer";
       continue;
     }
+    // ব্যাখ্যা/রেফারেন্স চলমান — অপশন-লেড কনটিনিউয়েশনও ("\t†hgb : i. …") একই অংশ;
+    // সিরিয়াল-লেড হলে পরের প্রশ্ন — গার্ড স্কিপ
+    if (
+      (lastKind === "bekkha" || lastKind === "reference") &&
+      !detectSerialPrefix(t) &&
+      (isOptionLine(t) || OPTION_LEAD_RE.test(t))
+    ) {
+      kinds[i] = lastKind;
+      continue;
+    }
     if (isOptionLine(t)) {
       kinds[i] = "options";
       lastKind = "options";
@@ -322,6 +338,14 @@ export function parseRedownloadXml(xml: string): RdParseResult {
       continue;
     }
 
+    // সেকশন-সেপারেটর/পরীক্ষা-টাইটেল ("46Zg wewmGm…", "PHYSICS") — কনটেক্সট রিসেট
+    if (isSectionSeparator(t)) {
+      kinds[i] = "other";
+      section = null;
+      lastKind = null;
+      continue;
+    }
+
     // সিরিয়াল-প্রিফিক্স দিয়ে শুরু — প্রশ্ন-শুরু কি না?
     const si = detectSerialPrefix(t);
     if (si) {
@@ -335,6 +359,7 @@ export function parseRedownloadXml(xml: string): RdParseResult {
         isQStart[i] = true;
         kinds[i] = "question";
         lastKind = "question";
+        section = null; // নতুন প্রশ্ন — সেকশন-কনটেক্সট শেষ
         continue;
       }
       // সিরিয়াল আছে কিন্তু প্রশ্ন-শুরু না — ধারাবাহিকতার লাইন
@@ -354,7 +379,7 @@ export function parseRedownloadXml(xml: string): RdParseResult {
   const pushBlock = (c: CurBlock) => {
     const id = questions.length;
     const blockText = c.texts.join("\n");
-    const { options, answer, qText } = scanOptions(blockText, c.si.raw);
+    const { options, answer, qText, bekkha } = scanOptions(blockText, c.si.raw);
     const slicedKinds = kinds.slice(c.start, c.end + 1);
     const q: RdQuestion = {
       id,
@@ -371,6 +396,7 @@ export function parseRedownloadXml(xml: string): RdParseResult {
       qText,
       options,
       answer,
+      bekkha,
       hasUnicode: /[\u0980-\u09FF]/.test(blockText),
     };
     questions.push(q);
@@ -390,19 +416,20 @@ export function parseRedownloadXml(xml: string): RdParseResult {
       continue;
     }
 
-    if (isSectionSeparator(t)) {
+    if (isQStart[i]) {
+      if (cur) pushBlock(cur);
+      const si = detectSerialPrefix(t)!;
+      cur = { start: i, end: i, si, texts: [t] };
+      continue;
+    }
+
+    // সেকশন-সেপারেটর — শুধু অন্যান্য-কাইন্ড প্যারা (অপশন/উত্তর/ব্যাখ্যা প্যারা প্রশ্ন-ব্লক ভাঙবে না)
+    if (kinds[i] === "other" && isSectionSeparator(t)) {
       if (cur) {
         pushBlock(cur);
         cur = null;
       }
       separators.push(t.trim());
-      continue;
-    }
-
-    if (isQStart[i]) {
-      if (cur) pushBlock(cur);
-      const si = detectSerialPrefix(t)!;
-      cur = { start: i, end: i, si, texts: [t] };
       continue;
     }
 
