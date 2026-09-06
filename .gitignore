@@ -57,3 +57,4 @@ server.log
 tool-results/
 scripts/*.png
 scripts/tmp-e2e/
+.gh-pages-deploy/

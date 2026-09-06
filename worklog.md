@@ -511,3 +511,21 @@ Work Log:
 Stage Summary:
 - নতুন ফ্লো লাইভ: আগে ফাইল → ৩ মোড → ডাউনলোডের পরে বাকি ২ মোডে সরাসরি ফাইল-বহন → সেখানেও ডাউনলোড; একক ফাইল = এক বাটন, একাধিক = .docx+ZIP
 - ব্যাকআপ সম্পন্ন: MCQ_Shuffler_Pro repo-তে পুরো কোড (deploy.yml ছাড়া); workflow-পুশের জন্য workflow-scope টোকেন দরকার
+
+---
+Task ID: 31-live
+Agent: Main Agent (Super Z)
+Task: লাইভ লিংক — নতুন repo-তে Pages ডিপ্লয় (ইউজারের প্রশ্ন: "live link koi?")
+
+Work Log:
+- স্টেট-চেক: টোকেন ghp_2bSB… এখন 401 Bad credentials (আগের সেশনে push-এর সময় কাজ করছিল; git history/working tree-তে টোকেন নেই — লিক নয়, GitHub/ইউজার-সাইড revoke)
+- রিমোট যাচাই: afnan-samin/MCQ_Shuffler_Pro main @ 52976fb (deploy.yml-বিহীন) push হয়ে আছে; শুধু main branch; Pages 404 (চালু নেই)
+- লোকাল main এগিয়ে আছে: fcb52c9 (deploy.yml ফেরত) + b6c5bbe (worklog) — push করা হয়নি
+- STATIC_EXPORT=1 NEXT_PUBLIC_BASE_PATH=/MCQ_Shuffler_Pro বিল্ড → .next-static/ (2.9MB, base path যাচাই ✓)
+- scripts/deploy-pages.sh নতুন: টোকেন-আর্গুমেন্ট নিয়ে gh-pages orphan branch push → Pages API POST/PUT (gh-pages root) → লাইভ URL পোল → লিংক প্রিন্ট; টোকেন কোনো ফাইলে জমে না
+- হাইজিন: .git/config থেকে মৃত টোকেন সরানো; .gh-pages-deploy/ gitignore
+
+Stage Summary:
+- ব্লকার: লাইভ করতে বৈধ টোকেন লাগবে — ইউজারের কাছে নতুন classic PAT (repo scope) চাওয়া হয়েছে
+- টোকেন পাওয়া মাত্র: bash scripts/deploy-pages.sh <token> → https://afnan-samin.github.io/MCQ_Shuffler_Pro/ লাইভ
+- পুরনো ভার্সন আপাতত লাইভ আছে: https://afnan-samin.github.io/fix_mcq/
