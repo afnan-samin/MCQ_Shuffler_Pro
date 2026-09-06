@@ -529,3 +529,22 @@ Stage Summary:
 - ব্লকার: লাইভ করতে বৈধ টোকেন লাগবে — ইউজারের কাছে নতুন classic PAT (repo scope) চাওয়া হয়েছে
 - টোকেন পাওয়া মাত্র: bash scripts/deploy-pages.sh <token> → https://afnan-samin.github.io/MCQ_Shuffler_Pro/ লাইভ
 - পুরনো ভার্সন আপাতত লাইভ আছে: https://afnan-samin.github.io/fix_mcq/
+
+---
+Task ID: 32
+Agent: Main Agent (Super Z)
+Task: UX রিফাইন — মোড-সিলেক্টের পর ৩ মোড-বাটন লুকানো (পেছনে + আরও-ফাইল বার), নমুনা ফাইল সম্পূর্ণ বাদ, শাফলে max ১০ ফাইল
+
+Work Log:
+- ইউজার-ফিডব্যাক ৩টি: ১) মোড সিলেক্টের পর ৩টা মোড আর দেখাতে হবে না — ওই জায়গায় আরও-ফাইল অপশন + back বাটন; ২) "নমুনা Bijoy .docx (HSC Physics)" ফিচার/ফাইল প্রজেক্ট থেকে বাদ; ৩) শাফল মোডে min ১ / max ১০ ফাইল
+- নতুন কম্পোনেন্ট mode-work-bar.tsx (ModeWorkBar): কাজ-চলাকালীন উপরের বার — "← পেছনে" (মোড-বাছাইয়ে ফেরা), মোড-নাম, "আরও ফাইল" বাটন (hidden input accept=.docx multiple), শাফলে বাংলা-ডিজিট কাউন্ট চিপ (X/১০), পূর্ণ হলে যোগ-বাটন ডিজেবলড; data-testid (mode-work-bar / mode-work-bar-input)
+- page.tsx: flowStep স্টেট ("select" | "work") — select ধাপে StagedFilesCard + ModeTabs (৩ মোড-বাটন শুধু এখানেই); work ধাপে ModeWorkBar + মোড UI; changeMode → flowStep work; runTextParse প্রশ্ন পেলে সরাসরি shuffle work-এ; backToModes
+- handleShuffleFiles(files, append=false) রিরাইট: parseShuffleFile হেল্পার এক্সট্র্যাক্ট; append=true হলে একক docx → ShuffleItemState promote করে নতুন ফাইল পিছে যোগ; SHUFFLE_MAX_FILES=10 — বেশি দিলে প্রথম ১০ নেওয়া + destructive টোস্ট; handleAddMoreFiles → serial/rd append, shuffle append
+- সিদ্ধান্ত: InputCard-এর ড্রপজোন replace-ই থাকবে (পুরনো সেমান্টিকস, e2e অক্ষত) — append শুধু ওয়ার্ক-বার বাটনে
+- নমুনা বাদ: public/sample/hsc27-physics-bijoy.docx + src/lib/mcq/sample.ts → scripts/fixtures/ (git mv); upload-first-card + input-card থেকে নমুনা-বাটন/onSample/SAMPLE_DOCX_URL বাদ; টেস্ট-স্ক্রিপ্ট পাথ আপডেট (test-docx/test-color-serial/test-redownload/e2e-multi-file/e2e-shuffle-headers/test-mcq)
+- e2e আপডেট: e2e-mode-tabs নতুন ফ্লোতে ১১ ধাপে রিরাইট (ট্যাব-লুকানো চেক, ওয়ার্ক-বার, আরও-ফাইল append, পেছনে→ট্যাব, multi=merge+ZIP, single=এক বাটন); e2e-shuffle-limit.ts নতুন (১১ ফাইল → টোস্ট + ১০/১০ + বাটন-ডিজেবল + ৯/১০ এ চালু); e2e-multi-file/e2e-shuffle-headers এ ট্যাব-ক্লিক → পেছনে-ফেরা-ধাপ; serial-file-input testid (ওয়ার্ক-বারের ইনপুট vs কার্ডের ইনপুট পার্থক্য)
+- ভেরিফিকেশন: ইউনিট ৩৪৬/৩৪৬ (test-mcq ৭১, test-docx ৪৮, test-color-serial ১২৯, test-multi-docx ৫৭, test-redownload ৪১); tsc ০; eslint ক্লিন; e2e ৪টি সব-পাস কনসোল-এরর শূন্য; STATIC_EXPORT বিল্ড ক্লিন (.next-static এ sample নেই)
+
+Stage Summary:
+- নতুন UX লাইভ-প্রস্তুত: আপলোড → মোড-বাছাই (৩ বাটন) → মোডে ঢুকলেই বার (পেছনে + আরও ফাইল) → ডাউনলোড → বাকি ২ মোড; নমুনা ফিচার সম্পূর্ণ বাদ; শাফলে ১..১০ ফাইল এনফোর্সড
+- কমিট 1a6e52a (লোকাল, push অপেক্ষমান — টোকেন মৃত; নতুন টোকেন পেলে scripts/deploy-pages.sh দিয়ে gh-pages + Pages লাইভ হবে)
