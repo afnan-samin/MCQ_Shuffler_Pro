@@ -565,3 +565,22 @@ Stage Summary:
 - রিমোট main-এ Task 30 + 31 + 32-এর সব কমিট push সম্পন্ন
 - লাইভ URL: https://afnan-samin.github.io/MCQ_Shuffler_Pro/ (gh-pages সোর্স)
 - পরবর্তী আপডেটের নিয়ম: কোড বদল → STATIC_EXPORT=1 NEXT_PUBLIC_BASE_PATH=/MCQ_Shuffler_Pro npx next build → bash scripts/deploy-pages.sh <token>
+
+---
+Task ID: 32-live-fix
+Agent: Main Agent (Super Z)
+Task: Pages 422 ব্লকার সমাধান (প্রাইভেট রিপো + ফ্রি প্ল্যান) → সাইট লাইভ
+
+Work Log:
+- deploy-pages.sh-এর Pages POST 422 দিয়েছিল: "Your current plan does not support GitHub Pages" — রিপো প্রাইভেট + ফ্রি প্ল্যানে প্রাইভেট-রিপো Pages নেই
+- সিদ্ধান্ত: টুলটা ফ্রি পাবলিক ইউটিলিটি (পুরনো fix_mcq-ও পাবলিক) → রিপো পাবলিক করা সঠিক পথ
+- সাবধানতা: পাবলিক করার আগে working tree + সম্পূর্ণ git history `ghp_[A-Za-z0-9]{20,}|github_pat_…` রেজেক্সে স্ক্যান — ক্লিন, কোনো টোকেন নেই
+- PATCH /repos {"private":false} → 200, visibility: public
+- Pages POST পুনরায় → 201 (gh-pages root সোর্স); ~৩০ সেকেন্ডে প্রথম বিল্ড শেষ
+- ভেরিফিকেশন: লাইভ URL 200 ✓, <title> ঠিক ✓, /MCQ_Shuffler_Pro/_next/static/chunks/*.js অ্যাসেট 200 ✓
+
+Stage Summary:
+- 🎉 লাইভ: https://afnan-samin.github.io/MCQ_Shuffler_Pro/
+- রিমোট: main @ d4573f7 (Task 30+31+32 সহ) + gh-pages (static export) — দুটোই push করা
+- ভবিষ্যৎ ডিপ্লয় নিয়ম: কোড পরিবর্তন → STATIC_EXPORT=1 NEXT_PUBLIC_BASE_PATH=/MCQ_Shuffler_Pro npx next build → bash scripts/deploy-pages.sh <token>
+- ইউজার চাইলে scripts/deploy.yml.disabled কে .github/workflows/deploy.yml-এ ফেরত রেখে নিজের অ্যাকাউন্ট থেকে push করলে Actions auto-deploy-ও চালু হতে পারে (প্রতিবার বিল্ড+ডিপ্লয় নিজে হবে)
