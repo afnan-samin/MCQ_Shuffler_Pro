@@ -34,30 +34,187 @@ export interface RefToken {
  */
 const REF_BRACKET_RE = /\[([^\[\]\n]{2,80})\]|\(([^\(\)\n]{2,80})\)/g;
 
-/** বছর-রেঞ্জ: 22-23, 2019-20, 24-25, 03-04 (EN ডিজিট) */
-const YEAR_RANGE_RE = /(?:^|[^\d])(?:\d{2}|\d{4})\s*[-–—]\s*(?:\d{2}|\d{4})(?:[^\d]|$)/;
-/** code:22 / code: 22-23 স্টাইল — অক্ষর-কোড + কোলন + ডিজিট */
-const COLON_CODE_RE = /^[A-Za-z\u0980-\u09FF][^:\d]{0,30}:\s*\d/;
-/** প্রচলিত কীওয়ার্ড (Unicode + Bijoy ASCII রেন্ডারিং) */
-const KEYWORD_RE = /(বোর্ড|সাল|বর্ষ|প্রশ্নব্যাংক|পরীক্ষা|wefxK|cÖhyw³|fvl\b|board|year|exam|university|projukti)/i;
+/**
+ * ডিজিট-ক্লাস — English (0-9) + বাংলা ইউনিকোড (০-৯) + Bijoy ASCII ডিজিট
+ * (SutonnyMJ এনকোডিং: ø«ˆµ∏Ï¾˜Ùœ = ০-৯, docx-xml.ts থেকে মিলিয়ে)
+ */
+const DIG_CL = "0-9\u09E6-\u09EFø«ˆµ∏Ï¾˜Ùœ";
+
+/** বছর-রেঞ্জ: 22-23, 2019-20, ২০-২১, '21-22, ø«-«ˆ — তিন এনকোডিং-ই */
+const YEAR_RANGE_RE = new RegExp(
+  `(?:^|[^${DIG_CL}])(?:['’′]?[${DIG_CL}]{2}|[${DIG_CL}]{4})\\s*[-–—]\\s*(?:['’′]?[${DIG_CL}]{2}|[${DIG_CL}]{4})(?:[^${DIG_CL}]|$)`
+);
+/** একক বছর: 2019 / ২০১৭ / '22 (রেঞ্জ ছাড়া) — শুধু অ্যাব্রেভ/কীওয়ার্ডের সাথে গৃহীত */
+const SINGLE_YEAR_RE = new RegExp(
+  `(?:^|[^${DIG_CL}])(?:[${DIG_CL}]{4}|['’′][${DIG_CL}]{2})(?:[^${DIG_CL}]|$)`
+);
+/** code:22 / code: 22-23 স্টাইল — অক্ষর-কোড + কোলন + ডিজিট (তিন এনকোডিং-ই) */
+const COLON_CODE_RE = new RegExp(
+  `^[A-Za-z\u0980-\u09FF][^:${DIG_CL}]{0,30}:\\s*[${DIG_CL}]`
+);
+/** প্রচলিত কীওয়ার্ড (Unicode + Bijoy ASCII রেন্ডারিং) — ব্র্যাকেট-ভেতরে একাই যথেষ্ট */
+const KEYWORD_RE = /(বোর্ড|সাল|বর্ষ|প্রশ্নব্যাংক|প্রশ্ন\s*ব্যাংক|পরীক্ষা|ভার্সি|বিশ্ববিদ্যালয়|মেডিকেল|মেডিক্যাল|নার্সিং|মাদ্রাসা|কারিগরি|কলেজ|বিসিএস|প্রাইমারি|নিয়োগ|বার্ষিক|wefxK|cÖhyw³|fvl\b|board|year|exam|university|varsity|college|medical|nursing|admission|projukti)/i;
+/**
+ * প্রতিষ্ঠান-অ্যাব্রেভ (WEAK টিয়ার) — একা যথেষ্ট নয়; ব্র্যাকেট-ভেতরে
+ * একক-বছরের সাথে গৃহীত হয় ("[BUET 2019]", "[ঢাবি ২০১৭]")
+ */
+const ABBR_RE = /\b(?:DU|JU|CU|RU|KU|BU|BAU|AUST|NSU|BRAC|IUT|EWU|DIU|JUST|SUST|BUET|CUET|RUET|KUET|MBBS|BCS|HSC|SSC|USTC)\b|ঢাবি|জাবি|চবি|রাবি|খুবি|শাবি|সমবি|বুয়েট|কুয়েট|রুয়েট|চুয়েট|সাস্ট/;
+
+/** প্রকৃত অক্ষর (ডিজিট বাদ) — খাঁটি-সংখ্যা ব্র্যাকেট "(২০-২৫)" রেফারেন্স নয় */
+const LETTER_RE = /[A-Za-z\u00C0-\u024F\u0980-\u09E5\u09F0-\u09FF]/;
 
 /**
  * ব্র্যাকেটের ভেতরের লেখা রেফারেন্স কি না।
- * শর্ত: ভেতরে অন্তত ১টা অক্ষর আছে, এবং (বছর-রেঞ্জ | কোলন-কোড | কীওয়ার্ড)।
- * বিশুদ্ধ সংখ্যা/গণিত — "(0-5)", "(273-373)", "(NH4)" — রেফারেন্স নয়।
+ * শর্ত: ভেতরে অন্তত ১টা প্রকৃত অক্ষর (ডিজিট নয়), এবং (বছর-রেঞ্জ |
+ * কোলন-কোড | কীওয়ার্ড | একক-বছর+অ্যাব্রেভ)। বিশুদ্ধ সংখ্যা/গণিত —
+ * "(0-5)", "(273-373)", "(NH4)", "(২০-২৫)" — রেফারেন্স নয়।
  */
 function innerIsReference(inner: string): boolean {
   const t = inner.trim();
-  if (!t || !/[A-Za-z\u0980-\u09FF]/.test(t)) return false; // অন্তত ১ অক্ষর
+  if (!t || !LETTER_RE.test(t)) return false; // অন্তত ১ প্রকৃত অক্ষর
   if (YEAR_RANGE_RE.test(t)) return true; // অক্ষর থাকায় বিশুদ্ধ-রেঞ্জ আগেই বাদ
   if (COLON_CODE_RE.test(t)) return true;
-  return KEYWORD_RE.test(t) && t.length <= 40;
+  if (KEYWORD_RE.test(t) && t.length <= 40) return true;
+  // একক-বছর + প্রতিষ্ঠান-অ্যাব্রেভ — "[BUET 2019]", "[ঢাবি ২০১৭]"
+  if (SINGLE_YEAR_RE.test(t) && ABBR_RE.test(t) && t.length <= 40) return true;
+  return false;
+}
+
+// ---------- ব্র্যাকেট-ছাড়া রেফারেন্স (স্ট্যান্ডঅ্যালোন লাইন / লাইন-শেষের ট্যাগ) ----------
+// "ঢাকা বোর্ড ২০১৭", "DU '21-22", "ঢাবি ১৯-২০, জাবি ২০-২১", "BUET 19-20"
+// শেপ-গার্ড: কঠোর লেক্সিকন-শেপ (কীওয়ার্ড-প্রথম + বছর-শেষ, অজানা শব্দ নিষেধ) —
+// ব্যাখ্যার গদ্য ("…1967 সালে", "(1716-1771) GKRb …") কখনোই ধরা পড়ে না।
+
+/**
+ * লাইন-শুরুর অপশন/উত্তর/ব্যাখ্যা-লিড — এমন লাইনে ব্র্যাকেট-ছাড়া ডিটেকশন বন্ধ
+ * (অপশন-টেক্সট নিজেই "ঢাকা বোর্ড ২০১৭" হতে পারে — মুছে ফেলা যাবে না)
+ */
+const NONQ_LEAD_RE =
+  /^\s*(?:[কখগঘ]\s*[.।:)\-–—]|[a-dA-DKLMN]\s*[.।:)\-–—]|(?:i{1,3}|iv|v)\s*[.।)]|Dt?\s*[:.]|Ans\b|উত্তর|Cvw|সমাধান|e¨vL¨v|ব্যাখ্যা|explanation)/i;
+
+/** ব্র্যাকেট-ছাড়া ইউনিটে STRONG কীওয়ার্ড — বাংলা/Bijoy (একক-বছরে শুধু এই টিয়ার চলে) */
+const BL_STRONG_BN_RE =
+  /^(?:বোর্ড|পরীক্ষা|ভার্সি|বিশ্ববিদ্যালয়|মেডিকেল|মেডিক্যাল|নার্সিং|মাদ্রাসা|কারিগরি|কলেজ|বিসিএস|প্রাইমারি|নিয়োগ|বার্ষিক|প্রশ্নব্যাংক|প্রশ্ন\s*ব্যাংক|wefxK|cÖhyw³)$/;
+/** STRONG English — রেঞ্জ-বছরসহ ইউনিটে চলে (একক-বছরে গদ্য-ঝুঁকি বলে নিষেধ) */
+const BL_STRONG_EN_RE = /^(?:board|exam|university|varsity|college|medical|nursing|admission)$/i;
+/** WEAK অ্যাব্রেভ — রেঞ্জ/কোলন-বছরসহ ইউনিটে চলে */
+const BL_WEAK_RE =
+  /^(?:DU|JU|CU|RU|KU|BU|BAU|AUST|NSU|BRAC|IUT|EWU|DIU|JUST|SUST|BUET|CUET|RUET|KUET|MBBS|BCS|HSC|SSC|USTC|ঢাবি|জাবি|চবি|রাবি|খুবি|শাবি|সমবি|বুয়েট|কুয়েট|রুয়েট|চুয়েট|সাস্ট)$/i;
+/** স্থান-নাম ফিলার ("ঢাকা বোর্ড ২০১৭"-এর "ঢাকা") — শুধু কীওয়ার্ডের সাথে */
+const BL_PLACE_RE =
+  /^(?:ঢাকা|রাজশাহী|চট্টগ্রাম|কুমিল্লা|যশোর|বরিশাল|সিলেট|দিনাজপুর|ময়মনসিংহ|মোমেনশাহী|ঢা\.?|রা\.?|চ\.?|সি\.?|কু\.?|দি\.?)$/;
+/** স্পষ্ট লেবেল-শব্দ ("রেফারেন্স: ঢাবি ১৯-২০"-এর লেবেল) */
+const BL_LABEL_RE = /^(?:রেফারেন্স|রেফ|উৎস|ref|refs|source)$/i;
+
+/** পূর্ণ বছর-টোকেন: 2019, ২০-২১, '21-22, ২০১৭, ø«-«ˆ */
+const YEAR_TOK_RE = new RegExp(
+  `^['’′]?[${DIG_CL}]{2,4}(?:\\s*[-–—]\\s*['’′]?[${DIG_CL}]{2,4})?$`
+);
+
+const YTOK = "year" as const;
+type WordCls = "kw-bn" | "kw-en" | "kw-weak" | "place" | "label" | typeof YTOK | null;
+
+function classifyBareWord(w: string): WordCls {
+  const t = w.replace(/[.।]+$/, "").trim();
+  if (!t) return null;
+  if (YEAR_TOK_RE.test(t)) return YTOK;
+  if (BL_STRONG_BN_RE.test(t)) return "kw-bn";
+  if (BL_STRONG_EN_RE.test(t)) return "kw-en";
+  if (BL_WEAK_RE.test(t)) return "kw-weak";
+  if (BL_PLACE_RE.test(t)) return "place";
+  if (BL_LABEL_RE.test(t)) return "label";
+  // হাইফেন-যৌগিক ("DU-cÖhyw³") — উপ-টোকেন ভেঙে দেখা হয়; সবাই লেক্সিকন/
+  // বছর হলে চলবে, অন্তত একটা কীওয়ার্ড লাগবে
+  if (/[-–—_/]/.test(t)) {
+    const subs = t.split(/[-–—_/]+/).filter(Boolean);
+    if (!subs.length) return null;
+    let kw = false;
+    for (const s of subs) {
+      const cls = classifyBareWord(s);
+      if (cls === null) return null;
+      if (cls === YTOK) continue;
+      if (cls.startsWith("kw")) kw = true;
+    }
+    return kw ? "kw-weak" : null;
+  }
+  return null;
+}
+
+/**
+ * এক ইউনিট (কমা-বিভাজিত অংশ) রেফারেন্স-শেপ কি না:
+ * ≥১ বছর + ≥১ কীওয়ার্ড, কীওয়ার্ড-প্রথম বছর-পরে নয়, অজানা শব্দ নেই।
+ * একক-বছর হলে কীওয়ার্ড STRONG-BN টিয়ারে হতে হবে (গদ্য-ঝুঁকি বন্ধ)।
+ */
+function bareUnitOk(unit: string): boolean {
+  const words = unit.split(/\s+|\s*:\s*/).filter(Boolean);
+  if (!words.length || words.length > 5) return false;
+  let kw = false;
+  let kwBn = false;
+  let hasYear = false;
+  let hasRange = false;
+  for (const w of words) {
+    const cls = classifyBareWord(w);
+    if (cls === YTOK) {
+      if (/[-–—]/.test(w)) hasRange = true;
+      if (hasYear) return false; // দুই বছর-টোকেন = অস্পষ্ট
+      hasYear = true;
+      continue;
+    }
+    if (cls === null) return false; // অজানা শব্দ — গদ্য, ভাঙবে
+    if (hasYear) return false; // কীওয়ার্ড/স্থান বছরের পরে = গদ্য-শেপ
+    if (cls === "kw-bn") { kw = true; kwBn = true; }
+    else if (cls === "kw-en" || cls === "kw-weak") kw = true;
+  }
+  if (!hasYear || !kw) return false;
+  if (!hasRange && !kwBn) return false; // একক-বছর → শুধু বাংলা-STRONG কীওয়ার্ড
+  return true;
+}
+
+/** পুরো কোর (কমা-চেইনসহ) রেফারেন্স-শেপ কি না */
+function bareRefCoreOk(core: string): boolean {
+  const s = core.trim().replace(/[.,;:।|]+$/, "").trim();
+  if (s.length < 4 || s.length > 64) return false;
+  if (!LETTER_RE.test(s)) return false;
+  const units = s.split(/\s*[,;/&]+\s*/).filter(Boolean);
+  if (!units.length) return false;
+  return units.every(bareUnitOk);
+}
+
+/**
+ * লাইনে ব্র্যাকেট-ছাড়া রেফারেন্স-টোকেন — ① পুরো লাইন (স্ট্যান্ডঅ্যালোন লাইন)
+ * ② লাইনের শেষে স্পেস/পাংকচুয়েশন-বিচ্ছিন্ন ঝোলা ট্যাগ। পাওয়া না গেলে null।
+ */
+function findBareRefToken(line: string): RefToken | null {
+  let end = line.length;
+  while (end > 0 && /\s/.test(line[end - 1])) end--;
+  if (end < 4) return null;
+  // ① পুরো লাইন
+  if (bareRefCoreOk(line.slice(0, end))) {
+    const t = line.slice(0, end).trim().replace(/[.,;:।|]+$/, "").trim();
+    const pad = line.slice(0, end).length - line.slice(0, end).trimStart().length;
+    return { start: pad, end: pad + t.length, text: t };
+  }
+  // ② শেষের ঝোলা ট্যাগ — সবচেয়ে বড় (সবচেয়ে আগের) ম্যাচটা নেওয়া হয়
+  const minStart = Math.max(1, end - 72);
+  for (let i = minStart; i < end; i++) {
+    if (!/[\s?:।!.,;—–-]/.test(line[i - 1])) continue;
+    const cand = line.slice(i, end);
+    if (bareRefCoreOk(cand)) {
+      const trimmed = cand.trim();
+      const pad = cand.length - trimmed.length;
+      const t = trimmed.replace(/[.,;:।|]+$/, "").trim();
+      return { start: i + pad, end: i + pad + t.length, text: t };
+    }
+  }
+  return null;
 }
 
 /**
  * এক লাইনের রেফারেন্স টোকেনগুলো — শুধু লাইনের শেষ-প্রান্তের ব্র্যাকেট ধরে
  * (ট্রেইলিং স্পেস/ডট/দাঁড়ি সহ), পাশাপাশি স্পেস-দূরত্বে বসা চেইন
  * ("…[Xvwe: 19-20] [JU: 20-21]") ধরা হয়। মাঝ-লাইনের ব্র্যাকেট অস্পৃশ্য।
+ * ব্র্যাকেট না পেলে ব্র্যাকেট-ছাড়া ফরম্যাট দেখা হয় (অপশন/উত্তর/ব্যাখ্যা-লিডের
+ * লাইনে বন্ধ — অপশন-টেক্সট রক্ষা)।
  */
 export function findRefTokens(line: string): RefToken[] {
   const all: Array<{ start: number; end: number; inner: string }> = [];
@@ -66,7 +223,14 @@ export function findRefTokens(line: string): RefToken[] {
   while ((m = REF_BRACKET_RE.exec(line))) {
     all.push({ start: m.index, end: m.index + m[0].length, inner: m[1] ?? m[2] });
   }
-  if (!all.length) return [];
+  if (!all.length) {
+    // ব্র্যাকেট নেই — ব্র্যাকেট-ছাড়া ফরম্যাট (লাইন/লাইন-শেষ)
+    if (!NONQ_LEAD_RE.test(line)) {
+      const bare = findBareRefToken(line);
+      if (bare) return [bare];
+    }
+    return [];
+  }
 
   // শেষ টোকেন থেকে শুরু করে চেইন তৈরি — প্রতিটির পরের ফাঁক হতে হবে
   // শুধু স্পেস/ট্যাব/ডট/দাঁড়ি, আর প্রতিটির ভেতর রেফারেন্স-স্বীকৃত
@@ -82,6 +246,11 @@ export function findRefTokens(line: string): RefToken[] {
     if (!prev || !/^\s*$/.test(line.slice(prev.end, cand.start))) break;
     tailOk = () => true; // চেইনের ভেতরের টোকেনের পরে টোকেনই আছে — টেইল যাচাই নেই
     idx--;
+  }
+  // ব্র্যাকেট-টোকেন না পেলে ব্র্যাকেট-ছাড়া ফরম্যাট (লাইন/লাইন-শেষ)
+  if (!out.length && !NONQ_LEAD_RE.test(line)) {
+    const bare = findBareRefToken(line);
+    if (bare) return [bare];
   }
   return out;
 }
@@ -171,7 +340,16 @@ function stripParaRefs(clone: Element): {
     // টোকেনের আগের ফাঁকা-জায়গাও মুছি (প্রশ্নের শেষ "?" অক্ষত রেখে)
     let start = t.start;
     while (start > 0 && /[ \t]/.test(joined[start - 1])) start--;
-    spans.push({ start, end: t.end, text: "" });
+    // টোকেনের পরের ঝোলা পাংকচুয়েশন/স্পেসও মুছি ("…[CU: 22-23]।" → "…।" না রেখে;
+    // ব্র্যাকেট-ছাড়া পুরো-লাইন টোকেনে দাঁড়িসহ মুছলে প্যারা ফাঁকা হয়ে drop হবে)
+    let end = t.end;
+    while (end < joined.length && /[.,;:।|\s]/.test(joined[end])) end++;
+    spans.push({ start, end, text: "" });
+  }
+  // ওভারল্যাপ ছাঁটা — আগের স্প্যানের এক্সটেনশন পরের টোকেন খেয়ে ফেললে
+  spans.sort((a, b) => a.start - b.start);
+  for (let i = 0; i < spans.length - 1; i++) {
+    if (spans[i].end > spans[i + 1].start) spans[i].end = spans[i + 1].start;
   }
   replaceJoinedSpans(stream, spans);
   const after = stream

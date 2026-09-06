@@ -60,6 +60,63 @@ for (const [line, expected] of positives) {
   ok(toks.length === 2, "চেইন: পাশাপাশি ২ টোকেন ধরা হয়");
 }
 
+// ---------- ১খ. মাল্টি-ফরম্যাট এক্সটেনশন (Task 33-সম্পূর্ণ) ----------
+
+console.log("\n── মাল্টি-ফরম্যাট এক্সটেনশন ──");
+
+// নতুন ব্র্যাকেট-ফরম্যাট: বাংলা-ডিজিট রেঞ্জ, একক-বছর+অ্যাব্রেভ, Bijoy-ডিজিট
+const barePositives: Array<[string, string]> = [
+  // ব্র্যাকেটের ভেতরে বাংলা-ডিজিট রেঞ্জ
+  ["প্রশ্ন? [ঢাবি ২০-২১]", "[ঢাবি ২০-২১]"],
+  ["প্রশ্ন? [BUET 2019]", "[BUET 2019]"],
+  ["প্রশ্ন? (মেডিকেল ২০২০)", "(মেডিকেল ২০২০)"],
+  ["প্রশ্ন? [wefxK ø«-«ˆ]", "[wefxK ø«-«ˆ]"],
+  // ব্র্যাকেট-ছাড়া স্ট্যান্ডঅ্যালোন লাইন
+  ["ঢাকা বোর্ড ২০১৭", "ঢাকা বোর্ড ২০১৭"],
+  ["ঢাবি ১৯-২০, জাবি ২০-২১", "ঢাবি ১৯-২০, জাবি ২০-২১"],
+  ["BUET 19-20", "BUET 19-20"],
+  ["DU '21-22", "DU '21-22"],
+  ["রেফারেন্স: ঢাবি ১৯-২০", "রেফারেন্স: ঢাবি ১৯-২০"],
+  ["wefxK ø«-«ˆ", "wefxK ø«-«ˆ"],
+  ["DU-cÖhyw³ 21-22", "DU-cÖhyw³ 21-22"],
+  // প্রশ্ন-লাইনের শেষে ঝোলা ট্যাগ (ব্র্যাকেট-ছাড়া)
+  ["প্রশ্নের সঠিক উত্তর কোনটি? ঢাকা বোর্ড ২০১৭", "ঢাকা বোর্ড ২০১৭"],
+  ["প্রশ্ন? DU '21-22", "DU '21-22"],
+  ["১. প্রশ্ন কি? ঢাবি ২০-২১।", "ঢাবি ২০-২১"],
+  ["Which is correct? university exam 19-20", "university exam 19-20"],
+];
+for (const [line, expected] of barePositives) {
+  const toks = findRefTokens(line);
+  ok(
+    toks.length === 1 && toks[0].text === expected,
+    `মাল্টি-ফরম্যাট পজিটিভ: ${expected}`
+  );
+}
+
+// নতুন নেগেটিভ — ব্র্যাকেট-ছাড়া গার্ডের যাচাই
+const bareNegatives = [
+  "K. 1 billion year\tL. 1000 year", // অপশন-লিড + বছর-প্রথম
+  "ক. ঢাকা বোর্ড ২০১৭", // অপশন-টেক্সট রক্ষা
+  "খ) ঢাবি ১৯-২০", // অপশন-টেক্সট রক্ষা
+  "ব্যাখ্যা: তিনি ১৯৬৭ সালে জন্মগ্রহণ করেন", // ব্যাখ্যা-লিড
+  "e¨vL¨v: 'Hamlet' bvUKwUi Kvwnwbi ¯'vb n‡jv †WbgvK©| 1967 mv‡j", // Doc1-রিয়াল
+  "Thomas Gray (1716-1771) GKRb weL¨vZ Bs‡iwR Kwe", // Doc1-রিয়াল
+  "BUET 2019", // অ্যাব্রেভ+একক-বছর, ব্র্যাকেট ছাড়া = অনুমোদিত নয়
+  "ঢাকা ২০১৭", // স্থান-নাম ছাড়া কীওয়ার্ড নেই
+  "board 2017", // English কীওয়ার্ড+একক-বছর = গদ্য-ঝুঁকি
+  "তাপমাত্রা (২০-২৫) রেঞ্জ", // খাঁটি-সংখ্যা ব্র্যাকেট (বাংলা ডিজিট)
+  "সংখ্যা (ø«-«ˆ) রেঞ্জ", // খাঁটি-সংখ্যা ব্র্যাকেট (Bijoy ডিজিট)
+  "in the year 1972-73", // ইংরেজি গদ্যের শেষে রেঞ্জ
+];
+let bareNegOk = true;
+for (const n of bareNegatives) {
+  if (findRefTokens(n).length !== 0) {
+    bareNegOk = false;
+    console.error("    ভুল ধরা পড়েছে:", n);
+  }
+}
+ok(bareNegOk, "মাল্টি-ফরম্যাট নেগেটিভ: অপশন/ব্যাখ্যা/গদ্য/খাঁটি-সংখ্যা অস্পৃশ্য");
+
 // নেগেটিভ — রেফারেন্স নয়
 const negatives = [
   "অপশন (NH4)2HPO4 ধরনের রাসায়নিক",
@@ -222,6 +279,45 @@ if (base) {
   const keepT = bodyTexts(keepXml).join("|");
   const stripT = bodyTexts(stripXml).join("|");
   ok(keepT === stripT, "রেফারেন্স-শূন্য ফাইলে strip ≡ keep");
+}
+
+// ৩ছ. ব্র্যাকেট-ছাড়া রেফারেন্স — প্রশ্ন-লাইনের ঝোলা ট্যাগ + স্ট্যান্ডঅ্যালোন লাইন
+{
+  // অপশন বাংলা-লেবেলে (ক/খ/গ/ঘ) — ট্যাব-হীন ASCII "K. …" সেপারেটর-গার্ডে যায় (প্রি-একজিস্টিং)
+  const mini = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="${W_NS}"><w:body>
+<w:p><w:r><w:t>1. বিশুদ্ধ উত্তর কোনটি? ঢাকা বোর্ড ২০১৭</w:t></w:r></w:p>
+<w:p><w:r><w:t>ঢাবি ১৯-২০, জাবি ২০-২১</w:t></w:r></w:p>
+<w:p><w:r><w:t>ক. 250 K</w:t></w:r></w:p>
+<w:p><w:r><w:t>খ. 0 K</w:t></w:r></w:p>
+<w:p><w:r><w:t>গ. 100 K</w:t></w:r></w:p>
+<w:p><w:r><w:t>ঘ. 373 K</w:t></w:r></w:p>
+<w:p><w:r><w:t>Dt ক</w:t></w:r></w:p>
+<w:sectPr/>
+</w:body></w:document>`;
+  const parse = parseDocxXml(mini);
+  ok(parse.questions.length === 1, "ব্র্যাকেট-ছাড়া: সিনথেটিক পার্স ১ প্রশ্ন");
+  ok(parse.questions[0].options.length === 4, "ব্র্যাকেট-ছাড়া: ৪ অপশন ডিটেক্ট");
+  const rep = analyzeRefReport(parse.questions);
+  ok(!!rep && rep.questionCount === 1, "ব্র্যাকেট-ছাড়া: রিপোর্টে ১ প্রশ্নে রেফারেন্স");
+  const ids = [parse.questions.map((q) => q.id)];
+
+  const stripXml = buildShuffledXml(mini, parse.questions, ids, { renumber: true, includeSetHeader: false, refMode: "strip" });
+  const stripT = bodyTexts(stripXml);
+  ok(!stripT.some((t) => t.includes("ঢাকা বোর্ড")), "strip: ঝোলা ট্যাগ মুছেছে");
+  ok(!stripT.some((t) => t.includes("ঢাবি")), "strip: স্ট্যান্ডঅ্যালোন রেফ-লাইন বাদ");
+  const q1 = stripT.find((t) => /^\s*1\s*[.।|]/.test(t));
+  ok(!!q1 && q1.includes("বিশুদ্ধ উত্তর কোনটি?"), "strip: প্রশ্ন-টেক্সট অক্ষত (ট্যাগ-পরবর্তী)");
+  ok(stripT.some((t) => /Dt\s+ক/.test(t)), "strip: উত্তর-মার্কার অক্ষত");
+  ok(stripT.some((t) => /^\s*ক\s*[.।)]/.test(t)), "strip: অপশন-রো অক্ষত");
+
+  const endXml = buildShuffledXml(mini, parse.questions, ids, { renumber: true, includeSetHeader: false, refMode: "endline" });
+  const endT = bodyTexts(endXml);
+  const qEnd = endT.find((t) => /^\s*1\s*[.।|]/.test(t));
+  ok(!!qEnd && !qEnd.includes("ঢাকা বোর্ড"), "endline: প্রশ্ন-লাইনে ট্যাগ নেই");
+  const endLine = endT.find((t) => t.includes("ঢাবি ১৯-২০"));
+  ok(!!endLine && endLine.includes("ঢাকা বোর্ড ২০১৭"), "endline: দুই টোকেনই ব্লক-শেষের এক লাইনে");
+  ok(endT.some((t) => /Dt\s+ক/.test(t)), "endline: উত্তর-মার্কার অক্ষত");
 }
 
 // ---------- ফলাফল ----------
