@@ -3,7 +3,7 @@
 // রান: bun run scripts/test-color-serial.ts
 // ============================================================
 
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { JSDOM } from "jsdom";
 import JSZip from "jszip";
 
@@ -252,59 +252,65 @@ console.log("\n== ৩) applyColorSerialXml — সার্জিক্যাল
 // ============================================================
 console.log("\n== ৪) আসল Agri ফাইল ==");
 const AGRI = "upload/Agri MCQ Botany 997 mcq - Copy - type serial.docx";
-const zip = await JSZip.loadAsync(readFileSync(AGRI));
-const agriXml = await zip.file("word/document.xml")!.async("string");
-const anA = analyzeColorDocx(agriXml);
+const agriMissing = !existsSync(AGRI);
+if (agriMissing) {
+  console.log("  (স্কিপ: Agri ফিক্সচার নেই — প্রাইভেসি-আনট্র্যাকে সরানো হয়েছে)");
+}
+const zip = agriMissing ? null : await JSZip.loadAsync(readFileSync(AGRI));
+const agriXml = zip ? await zip.file("word/document.xml")!.async("string") : "";
+const anA = agriMissing ? { colors: [], shadedCount: 0 } as never : analyzeColorDocx(agriXml);
+if (!agriMissing) {
 
-ok(anA.colors.length === 2, "২টা রঙ: 000000 + D0CECE");
-const cBlack = anA.colors.find((c) => c.key === "000000");
-const cGray = anA.colors.find((c) => c.key === "D0CECE");
-ok(cBlack?.name === "B1" && cBlack.sections === 126, "000000 = B1, ১২৬ Type-হেডার");
-ok(cGray?.name === "কাস্টম রঙ" && cGray.sections === 9, "D0CECE = কাস্টম, ৯টা অধ্যায়-হেডার");
-ok(anA.questionCount === 435, "৪৩৫ প্রশ্ন ডিটেক্ট (আগে ৩৮৩ ছিল — pipe যোগে পূর্ণ)");
+  ok(anA.colors.length === 2, "২টা রঙ: 000000 + D0CECE");
+  const cBlack = anA.colors.find((c) => c.key === "000000");
+  const cGray = anA.colors.find((c) => c.key === "D0CECE");
+  ok(cBlack?.name === "B1" && cBlack.sections === 126, "000000 = B1, ১২৬ Type-হেডার");
+  ok(cGray?.name === "কাস্টম রঙ" && cGray.sections === 9, "D0CECE = কাস্টম, ৯টা অধ্যায়-হেডার");
+  ok(anA.questionCount === 435, "৪৩৫ প্রশ্ন ডিটেক্ট (আগে ৩৮৩ ছিল — pipe যোগে পূর্ণ)");
 
-// B1 প্ল্যান: ১২৬টা Type-সেকশন, প্রতিটায় ১ থেকে
-{
-  const plan = planSerialByColor(anA, { kind: "color", key: "000000" });
-  ok(plan.size === 435, "B1 প্ল্যানে ৪৩৫টা প্রশ্নই নম্বর পায় (প্রতিটা Type-এর ভিতরে)");
-  // প্রতিটা Type-সেকশনের প্রথম প্রশ্ন = ১
-  let firstOfSection: number[] = [];
-  let seen = 0;
-  for (const p of anA.paras) {
-    if (p.colorKey === "000000") { seen = 0; continue; }
-    if (p.colorKey === null && plan.has(p.idx)) {
-      seen++;
-      if (seen === 1) firstOfSection.push(plan.get(p.idx)!);
+  // B1 প্ল্যান: ১২৬টা Type-সেকশন, প্রতিটায় ১ থেকে
+  {
+    const plan = planSerialByColor(anA, { kind: "color", key: "000000" });
+    ok(plan.size === 435, "B1 প্ল্যানে ৪৩৫টা প্রশ্নই নম্বর পায় (প্রতিটা Type-এর ভিতরে)");
+    // প্রতিটা Type-সেকশনের প্রথম প্রশ্ন = ১
+    let firstOfSection: number[] = [];
+    let seen = 0;
+    for (const p of anA.paras) {
+      if (p.colorKey === "000000") { seen = 0; continue; }
+      if (p.colorKey === null && plan.has(p.idx)) {
+        seen++;
+        if (seen === 1) firstOfSection.push(plan.get(p.idx)!);
+      }
     }
+    ok(firstOfSection.length === 122 && firstOfSection.every((n) => n === 1), "১২২টা প্রশ্ন-যুক্ত Type-সেকশনের প্রথম প্রশ্ন = ১ (৪টা খালি সেকশন বাদ)");
   }
-  ok(firstOfSection.length === 122 && firstOfSection.every((n) => n === 1), "১২২টা প্রশ্ন-যুক্ত Type-সেকশনের প্রথম প্রশ্ন = ১ (৪টা খালি সেকশন বাদ)");
+
+  // D0CECE (অধ্যায়) প্ল্যান: ৭টা প্রকৃত অধ্যায় + ২ খালি → ৪৩৫ প্রশ্ন, অধ্যায়ে ১ থেকে
+  {
+    const plan = planSerialByColor(anA, { kind: "color", key: "D0CECE" });
+    ok(plan.size === 435, "অধ্যায়-প্ল্যানেও সব ৪৩৫ প্রশ্ন নম্বর পায়");
+  }
+
+  // apply + পুনঃযাচাই: B1 প্ল্যান অ্যাপ্লাই করে আবার প্ল্যান বসালে হুবহু এক হয় (idempotent)
+  {
+    const plan = planSerialByColor(anA, { kind: "color", key: "000000" });
+    const outXml = applyColorSerialXml(agriXml, plan);
+    const anB = analyzeColorDocx(outXml);
+    ok(anB.questionCount === 435, "আউটপুটেও ৪৩৫ প্রশ্ন");
+    ok(anB.colors.length === 2 && anB.colors.find((c) => c.key === "000000")!.sections === 126, "আউটপুটে রঙ/হেডার অক্ষত");
+    const plan2 = planSerialByColor(anB, { kind: "color", key: "000000" });
+    let same = true;
+    for (const [idx, n] of plan) if (plan2.get(idx) !== n) { same = false; break; }
+    ok(same, "আউটপুটে আবার প্ল্যান করলে হুবহু এক (idempotent) — অর্থাৎ সিরিয়াল ঠিকমতো বসেছে");
+    // pipe সেপ সব ডট হয়েছে কিনা
+    const pipes = anB.paras.filter((p) => p.isQuestion && /^\s*[0-9০-৯ø«ˆµ∏Ï¾˜Ùœ]+\s*\|/.test(p.text)).length;
+    ok(pipes === 0, "আউটপুটে pipe-সেপারেটর শূন্য (সব ডট-স্টাইল)");
+  }
+
+  // ফাইল সাইজ স্যানিটি: XML দৈর্ঘ্য প্রায় সমান (শুধু ডিজিট/সেপ বদলায়)
+  console.log(`\n  (XML সাইজ: আসল ${agriXml.length} → আউটপুট ${applyColorSerialXml(agriXml, planSerialByColor(anA, { kind: "color", key: "000000" })).length})`);
+
 }
-
-// D0CECE (অধ্যায়) প্ল্যান: ৭টা প্রকৃত অধ্যায় + ২ খালি → ৪৩৫ প্রশ্ন, অধ্যায়ে ১ থেকে
-{
-  const plan = planSerialByColor(anA, { kind: "color", key: "D0CECE" });
-  ok(plan.size === 435, "অধ্যায়-প্ল্যানেও সব ৪৩৫ প্রশ্ন নম্বর পায়");
-}
-
-// apply + পুনঃযাচাই: B1 প্ল্যান অ্যাপ্লাই করে আবার প্ল্যান বসালে হুবহু এক হয় (idempotent)
-{
-  const plan = planSerialByColor(anA, { kind: "color", key: "000000" });
-  const outXml = applyColorSerialXml(agriXml, plan);
-  const anB = analyzeColorDocx(outXml);
-  ok(anB.questionCount === 435, "আউটপুটেও ৪৩৫ প্রশ্ন");
-  ok(anB.colors.length === 2 && anB.colors.find((c) => c.key === "000000")!.sections === 126, "আউটপুটে রঙ/হেডার অক্ষত");
-  const plan2 = planSerialByColor(anB, { kind: "color", key: "000000" });
-  let same = true;
-  for (const [idx, n] of plan) if (plan2.get(idx) !== n) { same = false; break; }
-  ok(same, "আউটপুটে আবার প্ল্যান করলে হুবহু এক (idempotent) — অর্থাৎ সিরিয়াল ঠিকমতো বসেছে");
-  // pipe সেপ সব ডট হয়েছে কিনা
-  const pipes = anB.paras.filter((p) => p.isQuestion && /^\s*[0-9০-৯ø«ˆµ∏Ï¾˜Ùœ]+\s*\|/.test(p.text)).length;
-  ok(pipes === 0, "আউটপুটে pipe-সেপারেটর শূন্য (সব ডট-স্টাইল)");
-}
-
-// ফাইল সাইজ স্যানিটি: XML দৈর্ঘ্য প্রায় সমান (শুধু ডিজিট/সেপ বদলায়)
-console.log(`\n  (XML সাইজ: আসল ${agriXml.length} → আউটপুট ${applyColorSerialXml(agriXml, planSerialByColor(anA, { kind: "color", key: "000000" })).length})`);
-
 // ============================================================
 console.log("\n== ৫) রিগ্রেশন: অধ্যায়ের রঙ বদলানো ফাইল (আসল Chemistry-ফাইল সিনারিও) ==");
 // অধ্যায়-১ = B6 (0D0D0D), অধ্যায়-২…৩ = B1 (000000); Type = A4, Varsity = A3
@@ -461,7 +467,7 @@ console.log("\n== ৭) stripShadedParasXml (শাফল মোডে হেড�
   ok(parsed1.questions.length === 3, `স্ট্রিপ-এর পরে পার্সে ৩ প্রশ্ন, পাওয়া গেল ${parsed1.questions.length}`);
 
   // আসল ফাইল ১: Agri (9 ধূসর অধ্যায় + 126 কালো Type হেডার, ৪৩৫ প্রশ্ন)
-  try {
+  if (!agriMissing) try {
     const agriFile = "upload/Agri MCQ Botany 997 mcq - Copy - type serial.docx";
     const agriZip = await JSZip.loadAsync((await import("node:fs")).readFileSync(agriFile));
     const agriXml = await agriZip.file("word/document.xml")!.async("string");
@@ -578,7 +584,7 @@ ok(isNonMcqText("অধ্যায়-" + "ক".repeat(60)), "৬৭ অক্�
 }
 
 // ---- আসল ফাইল: Agri (রঙ-স্ট্রিপের পরে ঠিক ১টা "Aa¨vq-8" থাকে) ----
-try {
+if (!agriMissing) try {
   const stShade = stripShadedParasXml(agriXml);
   ok(stShade.texts.length === stShade.removed && stShade.removed === 135, `Agri: রঙ-স্ট্রিপ ১৩৫টা (texts অ্যারেও ${stShade.texts.length})`);
   const stPat = stripNonMcqLinesXml(stShade.xml);

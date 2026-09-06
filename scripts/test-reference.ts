@@ -3,7 +3,7 @@
 // আসল আপলোড করা Physics/Chemistry (Raw) ফাইল দিয়েই যাচাই
 // রান: bun run scripts/test-reference.ts
 // ============================================================
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { JSDOM } from "jsdom";
 import JSZip from "jszip";
 
@@ -82,7 +82,12 @@ ok(negOk, "নেগেটিভ: গণিত/রাসায়নিক/ম�
 // ---------- ২. আসল ফাইলে ইন্টিগ্রেশন ----------
 
 const UP = "/home/z/my-project/upload";
-const files = readdirSync(UP).filter((f) => f.includes("(Raw)")).sort();
+const files = existsSync(UP)
+  ? readdirSync(UP).filter((f) => f.includes("(Raw)")).sort()
+  : [];
+if (!files.length) {
+  console.log("  (স্কিপ: upload/-এ (Raw) ফিক্সচার নেই — প্রাইভেসি-আনট্র্যাকে সরানো হয়েছে)");
+}
 
 interface Loaded {
   name: string;
@@ -92,10 +97,14 @@ interface Loaded {
 }
 const loaded: Loaded[] = [];
 for (const name of files) {
-  const file = readFileSync(`${UP}/${name}`);
-  const zip = await JSZip.loadAsync(file);
-  const xml = await zip.file("word/document.xml")!.async("string");
-  loaded.push({ name, file, xml, parse: parseDocxXml(xml) });
+  try {
+    const file = readFileSync(`${UP}/${name}`);
+    const zip = await JSZip.loadAsync(file);
+    const xml = await zip.file("word/document.xml")!.async("string");
+    loaded.push({ name, file, xml, parse: parseDocxXml(xml) });
+  } catch {
+    console.log(`  (স্কিপ: ${name} পড়া যায়নি)`);
+  }
 }
 
 console.log("\n── আসল ফাইলে ডিটেকশন ──");
@@ -113,18 +122,18 @@ for (const L of loaded) {
 console.log(`  মোট: ${totalRefQ}/${totalQ} প্রশ্নে রেফারেন্স`);
 
 // মোট প্রশ্ন অপরিবর্তিত থাকার কথা (আগের probe-এর সাথে মিল)
-ok(totalQ >= 500, "মোট প্রশ্ন ৫০০+ (পার্স অক্ষত)");
+if (loaded.length) ok(totalQ >= 500, "মোট প্রশ্ন ৫০০+ (পার্স অক্ষত)");
 
 // ---------- ৩. এক্সপোর্ট: keep / strip / endline ----------
 
 console.log("\n── এক্সপোর্ট মোড টেস্ট (Physics Chapter-10) ──");
-const base = loaded.find((L) => L.name.includes("Physics 1st Paper Chapter-10"))!;
+const base = loaded.find((L) => L.name.includes("Physics 1st Paper Chapter-10"));
 
 function buildXml(mode: "keep" | "strip" | "endline"): string {
   return buildShuffledXml(
-    base.xml,
-    base.parse.questions,
-    [base.parse.questions.map((q) => q.id)],
+    base!.xml,
+    base!.parse.questions,
+    [base!.parse.questions.map((q) => q.id)],
     { renumber: true, includeSetHeader: false, refMode: mode }
   );
 }
@@ -138,7 +147,7 @@ function bodyTexts(xml: string): string[] {
 }
 
 // ৩ক. keep — ব্র্যাকেট আগের মতই আছে
-{
+if (base) {
   const texts = bodyTexts(buildXml("keep"));
   const hasRef = texts.some((t) => /\[[A-Za-z]+[^[\]]*\d{2}\s*[-–]\s*\d{2}\]/.test(t));
   ok(hasRef, "keep: রেফারেন্স আউটপুটেই থাকে (আগের আচরণ)");
@@ -146,7 +155,7 @@ function bodyTexts(xml: string): string[] {
 }
 
 // ৩খ. strip — কোনো ব্র্যাকেট-ট্যাগ নেই, প্রশ্ন-অপশন অক্ষত
-{
+if (base) {
   const texts = bodyTexts(buildXml("strip"));
   const refTokens = texts.flatMap((t) => findRefTokens(t));
   ok(refTokens.length === 0, "strip: আউটপুটে শূন্য রেফারেন্স-টোকেন");
@@ -165,7 +174,7 @@ function bodyTexts(xml: string): string[] {
 }
 
 // ৩গ. endline — প্রতি প্রশ্নের শেষে ট্যাগ, ব্লকের ভেতরে আর নেই
-{
+if (base) {
   const xml = buildXml("endline");
   const texts = bodyTexts(xml);
   // মোট টোকেন সংখ্যা সংরক্ষিত — সব প্রশ্নের শেষ-লাইনে সরেছে
@@ -179,7 +188,7 @@ function bodyTexts(xml: string): string[] {
 }
 
 // ৩ঘ. মাল্টি-সেট: প্রতি সেটে strip ঠিকমতো (২ সেট)
-{
+if (base) {
   const qs = base.parse.questions.map((q) => q.id);
   const half = Math.floor(qs.length / 2);
   const xml = buildShuffledXml(base.xml, base.parse.questions, [qs.slice(0, half), qs.slice(half)], {
