@@ -548,3 +548,20 @@ Work Log:
 Stage Summary:
 - নতুন UX লাইভ-প্রস্তুত: আপলোড → মোড-বাছাই (৩ বাটন) → মোডে ঢুকলেই বার (পেছনে + আরও ফাইল) → ডাউনলোড → বাকি ২ মোড; নমুনা ফিচার সম্পূর্ণ বাদ; শাফলে ১..১০ ফাইল এনফোর্সড
 - কমিট 1a6e52a (লোকাল, push অপেক্ষমান — টোকেন মৃত; নতুন টোকেন পেলে scripts/deploy-pages.sh দিয়ে gh-pages + Pages লাইভ হবে)
+
+---
+Task ID: 32-live
+Agent: Main Agent (Super Z)
+Task: নতুন টোকেনে push + GitHub Pages লাইভ ডিপ্লয় + লাইভ-লিংক শেয়ার
+
+Work Log:
+- নতুন টোকেন (ghp_2Ujd…) যাচাই: HTTP 200, user=afnan-samin; scope: repo (workflow নেই)
+- টোকেনে workflow scope না থাকায় .github/workflows/deploy.yml push করা যেত না → scripts/deploy.yml.disabled-এ সরানো (ইউজার নিজের অ্যাকাউন্ট থেকে চাইলে ফেরত .github/workflows/-এ রেখে push করতে পারবে — তখন Actions auto-deploy চালু হবে)
+- .next-static স্যানিটি-চেক: sample ডিরেক্টরি নেই ✓, index.html-এ MCQ_Shuffler_Pro/_next base path ✓ (Task 32 কমিটের বিল্ডই — অ্যাপ-কোড পরিবর্তন নেই)
+- push: টোকেন URL-এ ইনলাইন (config-এ সংরক্ষণ নেই) → main push
+- deploy: bash scripts/deploy-pages.sh <token> — orphan gh-pages + .nojekyll → Pages API (source: gh-pages root) → লাইভ-পোল
+
+Stage Summary:
+- রিমোট main-এ Task 30 + 31 + 32-এর সব কমিট push সম্পন্ন
+- লাইভ URL: https://afnan-samin.github.io/MCQ_Shuffler_Pro/ (gh-pages সোর্স)
+- পরবর্তী আপডেটের নিয়ম: কোড বদল → STATIC_EXPORT=1 NEXT_PUBLIC_BASE_PATH=/MCQ_Shuffler_Pro npx next build → bash scripts/deploy-pages.sh <token>
