@@ -733,3 +733,22 @@ Stage Summary:
 - লাইভ: https://afnan-samin.github.io/MCQ_Shuffler_Pro/ (কমিট fd5ce07)
 - টোকেন ghp_lQZP… কাজ শেষ — ইউজারকে রিভোক করতে বলতে হবে
 - ⚠️ push/deploy বাধাগ্রস্ত: টোকেন ghp_lQZP… API-তে 401 — GitHub অটো-রিভোক করেছে (চ্যাটে লিক)। কমিট fd5ce07 + worklog লোকাল main-এ রেডি; নতুন টোকেন (classic, repo scope) পেলেই push + deploy-pages.sh চালানো হবে
+
+---
+Task ID: 37
+Agent: Main Agent (Super Z)
+Task: ইউজার-রিপোর্ট — "পেছনে" বাটন হোমে না গিয়ে শুধু ৩ মোড-বাটন দেখায়; লেখা বাদ দিয়ে শুধু অ্যারো রাখা; then push (নতুন টোকেন)
+
+Work Log:
+- আচরণ-বদল: backToModes → backToHome (page.tsx) — পেছনে এখন ফুল-রিসেট করে হোমে (ধাপ ১: আপলোড-কার্ড) ফেরে; ৩ মোড-বাটন-স্টেপ আর দেখায় না। রিসেট: stagedFiles/docx/parsed/shuffleItems/shuffleMultiSets/selected/allowBroken/serialDocs/serialSchemes/serialPaste/serialPasteText/rdDocs/rdSel + resetResults; ড্রাফট-টেক্সট (rawText/localStorage) রক্ষা
+- UI: ModeWorkBar-এর পেছনে-বাটন এখন শুধু ArrowLeft আইকন (aria-label "পেছনে — হোমে ফিরুন" + title tooltip); "পেছনে" লেখা বাদ; স্টেল হিন্ট "মোড বদলাতে…" → "হোমে ফিরতে অ্যারো চাপুন"
+- নিরাপত্তা: ModeWorkBar-এর busy-প্রপে ১৪টা অ্যাসিঙ্ক-ফ্ল্যাগ যোগ (detecting/shuffling/multi*/serial*/rdMerged/rdZip/fixing) — চলমান অপারেশনের মাঝে পেছনে/আরও-ফাইল বন্ধ থাকে (রেসে ডেটা-রিসেট-পরে লোডার ল্যান্ড হওয়া ঠেকাই)
+- E2E: নতুন scripts/e2e-back-home.ts (ডামি-docx জেনারেটর — ফিক্সচার-মুক্ত, রানেবল): অ্যারো-বাটনে লেখা নেই + পেছনে→হোম + মোড-বাটন ০ + রি-স্টেজ OK — ফুল-পাস JS-এরর শূন্য; ৪ স্ক্রিপ্ট আপডেট (e2e-modes A10 + B-সেকশন স্টেজ-যোগ, e2e-mode-tabs ধাপ ৯, e2e-multi-file, e2e-shuffle-headers) — পুরনো "পেছনে→মোড-বাছাই" প্রত্যাশা নতুন ফ্লোতে রূপান্তর
+- ভেরিফিকেশন: tsc 0, eslint ক্লিন, ইউনিট ৪৩৩/৪৩৩ (৭১+৪৮+১০৪+৬৫+৪১+৪৩+৫৪+৭), e2e-back-home পাস
+- কমিট e0d990f; push (নতুন টোকেন) + STATIC_EXPORT বিল্ড + deploy-pages.sh → লাইভ
+
+Stage Summary:
+- পেছনে = হোমে ফেরা + সব রিসেট (ইউজারের চাওয়া মতো); বাটনে শুধু অ্যারো
+- মোড-সুইচ এখন ডাউনলোড-কার্ডের NextModesCard ("এই ফাইলগুলো দিয়ে আরও কাজ করুন") বা হোম থেকে নতুন স্টেজ-এ
+- লাইভ: https://afnan-samin.github.io/MCQ_Shuffler_Pro/ (কমিট e0d990f)
+- টোকেন ghp_f0fn… কাজ শেষ — ইউজারকে রিভোক করতে বলতে হবে
