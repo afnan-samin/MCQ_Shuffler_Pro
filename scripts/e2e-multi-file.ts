@@ -41,12 +41,11 @@ page.on("console", (m) => {
 await page.goto("http://localhost:3000", { waitUntil: "networkidle" });
 
 // ================== সিরিয়াল মোড — মাল্টি-ফাইল ==================
+// নতুন ফ্লো: আগে ৩ ফাইল আপলোড → সিরিয়াল মোড-বাটনে ক্লিকেই সব বহন
+await page.waitForSelector("#step-upload", { timeout: 30000 });
+await page.setInputFiles("#step-upload input[type='file']", [CHEM, HSC, NOCOLOR]);
 await page.waitForSelector('[role="tablist"]', { timeout: 30000 });
 await page.click('button[role="tab"]:has-text("MCQ সিরিয়াল")');
-await page.waitForSelector("text=MCQ সিরিয়াল — ফাইল আপলোড", { timeout: 30000 });
-
-// ---- ১. একসাথে ৩ ফাইল আপলোড → লিস্ট + মাল্টি ডাউনলোড কার্ড ----
-await page.locator('input[type="file"]').first().setInputFiles([CHEM, HSC, NOCOLOR]);
 await page.waitForSelector("text=সব ফাইল একসাথে সিরিয়াল করুন", { timeout: 120000 });
 const nameCount = await page.locator("span.flex-1.truncate").count();
 if (nameCount !== 3) throw new Error(`লিস্টে ৩ টা নাম দরকার, পাওয়া গেছে ${nameCount}`);

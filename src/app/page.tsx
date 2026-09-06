@@ -54,6 +54,8 @@ import { ColorSerialCard } from "@/components/mcq/color-serial-card";
 import { ModeTabs, type McqMode } from "@/components/mcq/mode-tabs";
 import { SerialInputCard } from "@/components/mcq/serial-input-card";
 import { SerialPasteCard } from "@/components/mcq/serial-paste-card";
+import { NextModesCard } from "@/components/mcq/next-modes-card";
+import { StagedFilesCard, UploadFirstCard } from "@/components/mcq/upload-first-card";
 import {
   BlockedLinesCard,
   ColorShuffleInfoCard,
@@ -141,8 +143,12 @@ interface RdDocState {
 }
 
 export default function Home() {
-  // ---- মোড (শাফল / সিরিয়াল — উপরের দুই বাটন) ----
+  // ---- মোড (শাফল / সিরিয়াল / রিডাউনলোড — আপলোডের পরে দেখা যায়) ----
   const [mode, setMode] = useState<McqMode>("shuffle");
+
+  // ---- স্টেজড ফাইল — আপলোড হয়েছে, কিন্তু এখনো কোনো মোডে খোলা হয়নি ----
+  // ইউজার যেকোনো মোডে ক্লিক করলে এই ফাইলগুলো ওই মোডে লোড হয়ে যায়
+  const [stagedFiles, setStagedFiles] = useState<File[] | null>(null);
 
   // ---- ইনপুট (text mode) ----
   const [rawText, setRawText] = useState("");
@@ -224,6 +230,21 @@ export default function Home() {
   const rdTotalQuestions = rdDocs.reduce((a, d) => a + d.parse.questions.length, 0);
   const rdSelTotal = rdDocs.reduce((a, d) => a + (rdSel[d.id]?.size ?? 0), 0);
 
+  // ---- ফ্লো-গেট: কোনো ইনপুট নেই → আগে আপলোড-কার্ড; ইনপুট আছে → ৩ মোড-বাটন ----
+  const hasAnyInput =
+    !!stagedFiles?.length ||
+    !!docx ||
+    !!shuffleItems ||
+    serialDocs.length > 0 ||
+    !!serialPaste ||
+    rdDocs.length > 0 ||
+    !!(parsed && parsed.questions.length > 0);
+
+  // ---- প্রতি মোডের ফাইল-সংখ্যা (NextModesCard-এ দেখানোর জন্য) ----
+  const shuffleFileCount = shuffleItems ? shuffleItems.length : docx ? 1 : 0;
+  const serialFileCount = serialDocs.length;
+  const rdFileCount = rdDocs.length;
+
   const resultsRef = useRef<HTMLDivElement>(null);
 
   // শেষ ব্যবহৃত মোড মনে রাখা
@@ -239,6 +260,56 @@ export default function Home() {
     try {
       localStorage.setItem(MODE_KEY, m);
     } catch {}
+    carryToMode(m, mode);
+  };
+
+  // ================== মোডের মাঝে ফাইল বহন (carry-over) ==================
+
+  /** মোডে এখন কাজের ডেটা আছে কি না (আছে হলে ছুঁই না — ইউজারের কাজ নষ্ট হবে না) */
+  const modeHasContent = (m: McqMode): boolean =>
+    m === "shuffle"
+      ? !!(docx || shuffleItems || (parsed && parsed.questions.length > 0))
+      : m === "serial"
+        ? serialDocs.length > 0 || !!serialPaste
+        : rdDocs.length > 0;
+
+  /** মোডে থাকা ফাইলগুলো (File অবজেক্ট) — অন্য মোডে বহনের জন্য */
+  const filesOfMode = (m: McqMode): File[] =>
+    m === "shuffle"
+      ? shuffleItems
+        ? shuffleItems.map((i) => i.file)
+        : docx
+          ? [docx.file]
+          : []
+      : m === "serial"
+        ? serialDocs.map((d) => d.file)
+        : rdDocs.map((d) => d.file);
+
+  /** ফাইল একটা মোডে লোড — প্রতিটা মোডের নিজের লোডার ব্যবহার করে */
+  const loadIntoMode = (m: McqMode, files: File[]) => {
+    if (m === "shuffle") handleShuffleFiles(files);
+    else if (m === "serial") loadSerialFiles(files, false);
+    else loadRedownloadFiles(files, false);
+  };
+
+  /**
+   * মোড-সুইচে ফাইল বহন:
+   * ১) টার্গেট মোডে কাজ থাকলে কিছুই করা হয় না
+   * ২) স্টেজ করা ফাইল থাকলে সেগুলোই টার্গেটে লোড হয়
+   * ৩) নাহলে সোর্স মোডের ফাইল খালি টার্গেটে বহন হয়
+   */
+  const carryToMode = (target: McqMode, source: McqMode) => {
+    if (modeHasContent(target)) return;
+    if (stagedFiles && stagedFiles.length) {
+      const files = stagedFiles;
+      setStagedFiles(null);
+      loadIntoMode(target, files);
+      return;
+    }
+    if (source !== target) {
+      const files = filesOfMode(source);
+      if (files.length) loadIntoMode(target, files);
+    }
   };
 
   // প্রথম লোডে সেভ করা টেক্সট রিস্টোর
@@ -703,6 +774,7 @@ export default function Home() {
   const openInSerialMode = () => {
     if (!docx?.colorAn) return;
     const id = nextMultiId();
+    setStagedFiles(null);
     setSerialDocs([
       {
         id,
@@ -1305,7 +1377,7 @@ export default function Home() {
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-bold tracking-tight md:text-2xl">MCQ Shuffler Pro</h1>
             <p className="text-xs text-muted-foreground md:text-sm">
-              দুই আলাদা মোড — 🔀 শাফল+সেট তৈরি ও 🔢 রঙ-অনুযায়ী সিরিয়াল • .docx ফরম্যাট হুবহু প্রিজার্ভ (ট্যাব, ইকুয়েশন, Bijoy)
+              ফাইল আপলোড করুন, তারপর ৩টা মোড — 🔀 শাফল+সেট • 🔢 রঙ-সিরিয়াল • 📥 রিডাউনলোড — যেকোনো মোডে কাজ শেষে ফাইল নিয়ে অন্য মোডে সরাসরি কাজ করুন • .docx হুবহু প্রিজার্ভ
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -1321,9 +1393,28 @@ export default function Home() {
 
       {/* মেইন */}
       <main className="mx-auto w-full max-w-5xl flex-1 space-y-5 px-3 py-6 sm:px-4">
-        {/* মোড-বাটন — শাফল আর সিরিয়ালের কাজ সম্পূর্ণ আলাদা */}
-        <ModeTabs mode={mode} onChange={changeMode} />
+        {!hasAnyInput ? (
+          /* ধাপ ১ — কোনো ইনপুট নেই: আগে ফাইল আপলোড (মোড-বাটন এখনো দেখায় না) */
+          <UploadFirstCard
+            onFiles={(fs) => setStagedFiles(fs)}
+            onTextFileLoaded={loadAndDetect}
+            rawText={rawText}
+            onTextChange={handleTextChange}
+            onDetect={handleDetect}
+            onSample={handleSample}
+            busy={detecting}
+          />
+        ) : (
+          <>
+            {/* স্টেজ হওয়া ফাইল — মোড-বাটনে ক্লিক করলেই ওই মোডে চলে যাবে */}
+            {stagedFiles && <StagedFilesCard files={stagedFiles} onClear={() => setStagedFiles(null)} />}
 
+            {/* মোড-বাটন — শাফল, সিরিয়াল, রিডাউনলোড */}
+            <ModeTabs mode={mode} onChange={changeMode} />
+
+            {/* স্টেজ খালি হলেই মোডের কাজের জায়গা দেখা যায় */}
+            {!stagedFiles && (
+              <>
         {mode === "redownload" ? (
           <>
             <RedownloadInputCard
@@ -1378,7 +1469,10 @@ export default function Home() {
                   onDownloadZip={handleRdZip}
                   mergedBusy={rdMergedBusy}
                   zipBusy={rdZipBusy}
+                  fileCount={rdDocs.length}
                 />
+
+                <NextModesCard current="redownload" filesCount={rdFileCount} onOpen={changeMode} />
               </>
             )}
           </>
@@ -1450,8 +1544,15 @@ export default function Home() {
                   onDownloadZip={handleSerialMultiZip}
                   mergedBusy={serialMergedBusy}
                   zipBusy={serialZipBusy}
+                  fileCount={serialDocs.length}
                 />
+                <NextModesCard current="serial" filesCount={serialFileCount} onOpen={changeMode} />
               </>
+            )}
+
+            {/* ঠিক ১ ফাইল — ডাউনলোড-কার্ডের নিচেই বাকি মোডে ফাইল নিয়ে যাওয়ার বাটন */}
+            {serialDocs.length === 1 && (
+              <NextModesCard current="serial" filesCount={serialFileCount} onOpen={changeMode} />
             )}
           </>
         ) : (
@@ -1524,9 +1625,12 @@ export default function Home() {
                       onDownloadZip={handleMultiZipDownload}
                       mergedBusy={multiMergedBusy}
                       zipBusy={multiZipBusy}
+                      fileCount={shuffleItems.length}
                     />
                   )}
                 </div>
+
+                <NextModesCard current="shuffle" filesCount={shuffleFileCount} onOpen={changeMode} />
               </>
             ) : docx ? (
               <>
@@ -1588,6 +1692,8 @@ export default function Home() {
                     />
                   )}
                 </div>
+
+                <NextModesCard current="shuffle" filesCount={shuffleFileCount} onOpen={changeMode} />
               </>
             ) : (
               <>
@@ -1640,6 +1746,13 @@ export default function Home() {
                     />
                   )}
                 </div>
+
+                {/* টেক্সট-ফ্লোতে ফাইল নেই — NextModesCard নিজেই null রেন্ডার করে */}
+                <NextModesCard current="shuffle" filesCount={shuffleFileCount} onOpen={changeMode} />
+              </>
+            )}
+              </>
+            )}
               </>
             )}
           </>

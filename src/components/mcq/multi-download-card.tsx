@@ -23,6 +23,8 @@ export interface MultiDownloadCardProps {
   mergedBusy?: boolean;
   zipBusy?: boolean;
   disabled?: boolean;
+  /** ফাইল সংখ্যা — ঠিক ১ হলে ZIP বাটন লুকায়, একটাই ডাউনলোড বাটন দেখায় */
+  fileCount?: number;
 }
 
 /** মাল্টি-ফাইল ডাউনলোড কার্ড — এক .docx-এ মার্জ বা ZIP-এ আলাদা আলাদা */
@@ -38,7 +40,9 @@ export function MultiDownloadCard({
   mergedBusy = false,
   zipBusy = false,
   disabled = false,
+  fileCount,
 }: MultiDownloadCardProps) {
+  const single = fileCount === 1;
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -87,9 +91,9 @@ export function MultiDownloadCard({
           </div>
         )}
 
-        {/* দুই বড় ডাউনলোড বাটন */}
-        <div className="grid gap-3 sm:grid-cols-2">
-          {/* মার্জ করা এক .docx — প্রাইমারি সবুজ */}
+        {/* ডাউনলোড বাটন — এক ফাইল হলে একটাই, একাধিক হলে .docx + ZIP দুটোই */}
+        <div className={single ? "grid gap-3" : "grid gap-3 sm:grid-cols-2"}>
+          {/* এক .docx ডাউনলোড — প্রাইমারি সবুজ */}
           <Button
             type="button"
             onClick={onDownloadMerged}
@@ -102,31 +106,35 @@ export function MultiDownloadCard({
               </span>
             ) : (
               <span className="flex items-center gap-2 text-sm font-semibold">
-                <FileText /> এক ফাইলে ডাউনলোড (.docx)
+                <FileText /> {single ? "ডাউনলোড করুন (.docx)" : "এক ফাইলে ডাউনলোড (.docx)"}
               </span>
             )}
-            <span className="text-xs opacity-80">সব ফাইল পরপর — ফাইলের মাঝে পেজ ব্রেক</span>
+            <span className="text-xs opacity-80">
+              {single ? "একটি ফাইল — সরাসরি ডাউনলোড হবে" : "সব ফাইল পরপর — ফাইলের মাঝে পেজ ব্রেক"}
+            </span>
           </Button>
 
-          {/* ZIP ডাউনলোড — আউটলাইন */}
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onDownloadZip}
-            disabled={disabled || zipBusy}
-            className="h-auto flex-col items-center gap-1 rounded-xl p-4"
-          >
-            {zipBusy ? (
-              <span className="flex items-center gap-2 text-sm font-semibold">
-                <Loader2 className="animate-spin" /> ZIP হচ্ছে...
-              </span>
-            ) : (
-              <span className="flex items-center gap-2 text-sm font-semibold">
-                <Archive /> আলাদা আলাদা ডাউনলোড (.zip)
-              </span>
-            )}
-            <span className="text-xs text-muted-foreground opacity-80">এক ক্লিকে ZIP — ভিতরে সবগুলো ফাইল আলাদা</span>
-          </Button>
+          {/* ZIP ডাউনলোড — আউটলাইন (একাধিক ফাইলেই শুধু) */}
+          {!single && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onDownloadZip}
+              disabled={disabled || zipBusy}
+              className="h-auto flex-col items-center gap-1 rounded-xl p-4"
+            >
+              {zipBusy ? (
+                <span className="flex items-center gap-2 text-sm font-semibold">
+                  <Loader2 className="animate-spin" /> ZIP হচ্ছে...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2 text-sm font-semibold">
+                  <Archive /> আলাদা আলাদা ডাউনলোড (.zip)
+                </span>
+              )}
+              <span className="text-xs text-muted-foreground opacity-80">এক ক্লিকে ZIP — ভিতরে সবগুলো ফাইল আলাদা</span>
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

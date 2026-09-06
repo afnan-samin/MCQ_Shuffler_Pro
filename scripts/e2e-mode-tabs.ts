@@ -1,9 +1,8 @@
-// Browser E2E: মোড-ট্যাব (শাফল / সিরিয়াল) — আলাদা ওয়ার্কফ্লো ভেরিফিকেশন
+// Browser E2E: নতুন ফ্লো — আগে আপলোড → ৩ মোড → কাজ → ডাউনলোডের পরে বাকি মোডে ফাইল-বহন
 // রান: bun run scripts/e2e-mode-tabs.ts
 import { chromium } from "playwright";
 
 const CHEM = "/home/z/my-project/upload/Final Chemistry 1st paper only varsity Question (1-5).docx";
-const HSC = "/home/z/my-project/public/sample/hsc27-physics-bijoy.docx";
 const NOCOLOR = "/home/z/my-project/upload/color-free-test.docx";
 
 const browser = await chromium.launch();
@@ -16,23 +15,29 @@ page.on("console", (m) => {
 
 await page.goto("http://localhost:3000", { waitUntil: "networkidle" });
 
-// ---- ১. দুইটা মোড-বাটন; ডিফল্ট = শাফল ----
-await page.waitForSelector('[role="tablist"]', { timeout: 30000 });
-const shuffleSel = await page.getAttribute('button[role="tab"]:has-text("MCQ শাফল")', "aria-selected");
-const serialSel = await page.getAttribute('button[role="tab"]:has-text("MCQ সিরিয়াল")', "aria-selected");
-if (shuffleSel !== "true" || serialSel !== "false") throw new Error(`ডিফল্ট মোড ভুল: shuffle=${shuffleSel} serial=${serialSel}`);
-console.log("✓ দুই মোড-বাটন আছে; ডিফল্ট = শাফল");
+// ---- ১. প্রথমে আপলোড-কার্ড; মোড-ট্যাব এখনো নেই ----
+await page.waitForSelector("#step-upload", { timeout: 30000 });
+const tabsBefore = await page.locator('button[role="tab"]:has-text("MCQ শাফল")').count();
+if (tabsBefore !== 0) throw new Error("আপলোডের আগেই মোড-ট্যাব দেখা যাচ্ছে!");
+console.log("✓ প্রথমে শুধু আপলোড-কার্ড — মোড-ট্যাব লুকানো");
 
-// ---- ২. সিরিয়াল মোড: রঙ-ফাইল আপলোড → চিপ → B1 ডাউনলোড ----
+// ---- ২. ফাইল আপলোড → স্টেজ-কার্ড + ৩ মোড-ট্যাব দেখা যায় ----
+await page.setInputFiles("#step-upload input[type='file']", CHEM);
+await page.waitForSelector("text=ফাইল প্রস্তুত — এখন মোড বেছে নিন", { timeout: 30000 });
+await page.waitForSelector('button[role="tab"]:has-text("MCQ রিডাউনলোড")', { timeout: 15000 });
+const tabCount = await page.locator('button[role="tab"]:has-text("MCQ")').count();
+if (tabCount !== 3) throw new Error(`৩ মোড-বাটন নেই: ${tabCount}`);
+console.log("✓ আপলোডের পরে স্টেজ-কার্ড + ৩টা মোড-বাটন");
+
+// ---- ৩. সিরিয়াল মোডে ক্লিক → স্টেজ ফাইল নিজেই চলে যায় ----
 await page.click('button[role="tab"]:has-text("MCQ সিরিয়াল")');
-await page.waitForSelector("text=MCQ সিরিয়াল — ফাইল আপলোড", { timeout: 15000 });
-await page.setInputFiles('input[type="file"]', CHEM);
 await page.waitForSelector("text=রঙ-ভিত্তিক সিরিয়াল", { timeout: 120000 });
 for (const chip of ["A3", "A4", "B1", "B6"]) {
   await page.waitForSelector(`button:has-text("${chip}")`, { timeout: 20000 });
 }
-console.log("✓ সিরিয়াল মোডে রঙ-ফাইল → A3/A4/B1/B6 চিপ");
+console.log("✓ মোড-ক্লিকেই স্টেজ-ফাইল সিরিয়াল মোডে লোড → A3/A4/B1/B6 চিপ");
 
+// ---- ৪. B1 ডাউনলোড ----
 await page.click('button:has-text("B1")');
 const [dl1] = await Promise.all([
   page.waitForEvent("download", { timeout: 180000 }),
@@ -42,46 +47,36 @@ await page.waitForSelector("text=রঙ-অনুযায়ী সিরিয
 if (!dl1.suggestedFilename().includes("color serial - B1")) throw new Error("B1 ফাইলনাম ভুল: " + dl1.suggestedFilename());
 console.log("✓ সিরিয়াল মোড B1 ডাউনলোড OK:", dl1.suggestedFilename());
 
-// ---- ৩. শাফল মোডে রঙ-ফাইল → ইনফো-কার্ড (ব্লক নেই) + হাত-অফ ----
-await page.click('button[role="tab"]:has-text("MCQ শাফল")');
-await page.waitForSelector("text=প্রশ্ন দিন — ফাইল আপলোড বা পেস্ট", { timeout: 15000 });
-await page.setInputFiles('input[type="file"]', HSC);
+// ---- ৫. ডাউনলোড-কার্ডের পরে বাকি ২ মোড দেখা যায় ----
+await page.waitForSelector("text=এই ফাইলগুলো দিয়ে আরও কাজ করুন", { timeout: 15000 });
+const nextShuffle = await page.locator('button:has-text("MCQ শাফল")').count();
+const nextRd = await page.locator('button:has-text("MCQ রিডাউনলোড")').count();
+if (nextShuffle < 2 || nextRd < 1) throw new Error(`নেক্সট-মোড বাটন নেই: shuffle=${nextShuffle} rd=${nextRd}`);
+console.log("✓ ডাউনলোডের পরে বাকি ২ মোডের বাটন দেখা যাচ্ছে");
+
+// ---- ৬. নেক্সট-মোড বাটনে ক্লিক → ফাইল শাফল মোডে বহন ----
+await page.locator('button:has-text("MCQ শাফল"):below(:text("এই ফাইলগুলো দিয়ে আরও কাজ করুন"))').first().click();
 await page.waitForSelector("text=শাফলে হেডার বাদ যাবে", { timeout: 120000 });
-const blockedCnt = await page.locator("text=শাফল মোডে করা যাবে না").count();
-if (blockedCnt !== 0) throw new Error("পুরনো ব্লকিং-নোটিস এখনো আসছে!");
 await page.waitForSelector('button:has-text("শাফল করুন ও সেট তৈরি করুন")', { timeout: 60000 });
-console.log("✓ শাফল মোডে রঙ-ফাইল → ইনফো-কার্ড, শাফল-ফ্লো চালু (ব্লক নেই)");
+console.log("✓ ফাইল শাফল মোডে সরাসরি বহন → ইনফো-কার্ড + শাফল-ফ্লো চালু");
 
-await page.click('button:has-text("সিরিয়াল মোডে খুলুন")');
-await page.waitForSelector("text=রঙ-ভিত্তিক সিরিয়াল", { timeout: 15000 });
-const serialSel2 = await page.getAttribute('button[role="tab"]:has-text("MCQ সিরিয়াল")', "aria-selected");
-if (serialSel2 !== "true") throw new Error("হাত-অফে সিরিয়াল মোডে যায়নি");
-console.log("✓ হাত-অফ: ফাইলসহ সিরিয়াল মোডে পৌঁছেছে (আবার আপলোড লাগেনি)");
+// ---- ৭. শাফল মোড থেকে রিডাউনলোডে বহন (ট্যাব দিয়ে) ----
+await page.click('button[role="tab"]:has-text("MCQ রিডাউনলোড")');
+await page.waitForSelector("text=নতুন ফাইলে কী কী থাকবে", { timeout: 120000 });
+console.log("✓ ট্যাব-ক্লিকেই ফাইল রিডাউনলোড মোডে বহন");
 
-// ---- ৪. সিরিয়াল মোডে রঙহীন ফাইল → একটানা সিরিয়াল ----
-await page.setInputFiles('input[type="file"]', NOCOLOR);
-await page.waitForSelector("text=এই ফাইলে রঙ-হেডার পাওয়া যায়নি", { timeout: 60000 });
-const [dl2] = await Promise.all([
-  page.waitForEvent("download", { timeout: 120000 }),
-  page.click('button:has-text("একটানা ১..N সিরিয়াল করে .docx ডাউনলোড")'),
-]);
-await page.waitForSelector("text=রঙ-অনুযায়ী সিরিয়াল করা .docx ডাউনলোড হয়েছে", { timeout: 60000 });
-if (!dl2.suggestedFilename().includes("continuous")) throw new Error("continuous ফাইলনাম ভুল: " + dl2.suggestedFilename());
-console.log("✓ রঙহীন ফাইল → নো-কালার কার্ড + একটানা সিরিয়াল ডাউনলোড OK:", dl2.suggestedFilename());
+// ---- ৮. একক ফাইলে একটাই ডাউনলোড বাটন (ZIP নেই) ----
+const singleBtn = await page.locator('button:has-text("ডাউনলোড করুন (.docx)")').count();
+const zipBtn = await page.locator('button:has-text("আলাদা আলাদা ডাউনলোড (.zip)")').count();
+if (singleBtn !== 1 || zipBtn !== 0) throw new Error(`একক-ফাইল ডাউনলোড ভুল: single=${singleBtn} zip=${zipBtn}`);
+console.log("✓ একক ফাইল → একটাই ডাউনলোড বাটন, ZIP বাটন নেই");
 
-// ---- ৫. মোড মনে থাকে (reload) ----
+// ---- ৯. reload → ইনপুট রিসেট → আবার আপলোড-কার্ড থেকে শুরু (নতুন ফ্লোর আচরণ) ----
 await page.reload({ waitUntil: "networkidle" });
-const serialSel3 = await page.getAttribute('button[role="tab"]:has-text("MCQ সিরিয়াল")', "aria-selected");
-if (serialSel3 !== "true") throw new Error("reload-এর পরে মোড মনে নেই");
-console.log("✓ reload-এর পরেও সিরিয়াল মোড সক্রিয় (মনে রাখে)");
-
-// ---- ৬. শাফল মোড অক্ষত: রঙহীন docx → শাফল ফ্লো (HSC নমুনা রঙ-স্ট্রাকচার্ড তাই সেটা নয়) ----
-await page.click('button[role="tab"]:has-text("MCQ শাফল")');
-await page.setInputFiles('input[type="file"]', NOCOLOR);
-await page.waitForSelector("text=টি প্রশ্ন", { timeout: 60000 });
-const noticeCount = await page.locator("text=সিরিয়াল মোডে খুলুন").count();
-if (noticeCount !== 0) throw new Error("রঙহীন ফাইলে নোটিস এসেছে?");
-console.log("✓ শাফল মোডে রঙহীন docx → সাধারণ শাফল ফ্লো (নোটিস নেই)");
+await page.waitForSelector("#step-upload", { timeout: 30000 });
+const tabsAfterReload = await page.locator('button[role="tab"]:has-text("MCQ শাফল")').count();
+if (tabsAfterReload !== 0) throw new Error("reload-এর পরে ইনপুট ছাড়াই মোড-ট্যাব দেখা যাচ্ছে!");
+console.log("✓ reload → ফ্রেশ শুরু: আবার আপলোড-কার্ড (মোড-ট্যাব লুকানো)");
 
 await page.screenshot({ path: "scripts/e2e-mode-tabs.png", fullPage: false });
 console.log("\nJS errors:", errors.length ? errors : "শূন্য ✓");

@@ -19,11 +19,12 @@ page.on("console", (m) => {
 });
 
 await page.goto("http://localhost:3000", { waitUntil: "networkidle" });
+
+// ---- ১. আগে আপলোড (নতুন ফ্লো) → শাফল মোডে বহন → রঙ-ফাইল (HSC নমুনা, ৬টা B1 হেডার, ৬০ প্রশ্ন) ----
+await page.waitForSelector("#step-upload", { timeout: 30000 });
+await page.setInputFiles("#step-upload input[type='file']", HSC);
 await page.waitForSelector('[role="tablist"]', { timeout: 30000 });
 await page.click('button[role="tab"]:has-text("MCQ শাফল")');
-
-// ---- ১. শাফল মোডে রঙ-ফাইল (HSC নমুনা, ৬টা B1 হেডার, ৬০ প্রশ্ন) → ইনফো কার্ড, ব্লক নেই ----
-await page.setInputFiles('input[type="file"]', HSC);
 await page.waitForSelector("text=শাফলে হেডার বাদ যাবে", { timeout: 60000 });
 const blockedCount = await page.locator("text=শাফল মোডে করা যাবে না").count();
 if (blockedCount !== 0) throw new Error("পুরনো ব্লকিং-নোটিস এখনো আসছে!");
