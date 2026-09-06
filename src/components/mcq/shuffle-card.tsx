@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Lock, Shuffle } from "lucide-react";
+import { Lock, Shuffle, Tags } from "lucide-react";
 import type { Distribution } from "@/lib/mcq/set-engine";
+import type { RefMode, RefReport } from "@/lib/mcq/reference";
 
 interface ShuffleCardProps {
   enabled: boolean;
@@ -21,6 +22,10 @@ interface ShuffleCardProps {
   onShuffleWithinChange: (v: boolean) => void;
   onShuffle: () => void;
   shuffling: boolean;
+  /** ডিটেক্ট হওয়া রেফারেন্স-রিপোর্ট — null হলে সেকশন লুকানো */
+  refReport: RefReport | null;
+  refMode: RefMode;
+  onRefModeChange: (m: RefMode) => void;
 }
 
 const QUICK_SETS = [3, 4, 5, 10];
@@ -37,6 +42,9 @@ export function ShuffleCard({
   onShuffleWithinChange,
   onShuffle,
   shuffling,
+  refReport,
+  refMode,
+  onRefModeChange,
 }: ShuffleCardProps) {
   const isOriginal = distribution === "original";
   const perSet = setCount > 0 ? Math.floor(selectedCount / setCount) : 0;
@@ -152,6 +160,52 @@ export function ShuffleCard({
               <p className="text-xs text-muted-foreground">বন্ধ রাখলে সেটের ভেতরে প্রশ্নগুলো অরিজিনাল সিরিয়ালেই থাকবে</p>
             </div>
             <Switch id="shuffle-within" checked={shuffleWithin} onCheckedChange={onShuffleWithinChange} />
+          </div>
+        )}
+
+        {/* রেফারেন্স-ট্যাগ হ্যান্ডলিং — ডিটেক্ট হলেই দেখাবে */}
+        {refReport && (
+          <div className="space-y-3 rounded-xl border border-violet-200 bg-violet-50/60 p-3 dark:border-violet-900 dark:bg-violet-950/30">
+            <div className="flex items-start gap-2">
+              <Tags className="mt-0.5 h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" />
+              <div>
+                <Label className="font-medium">
+                  রেফারেন্স ট্যাগ আলাদা করুন
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-semibold text-violet-700 dark:text-violet-400">{refReport.questionCount}</span> টি প্রশ্নে
+                  সোর্স-ট্যাগ পাওয়া গেছে (যেমন {refReport.samples.slice(0, 2).join(", ")}) — ভার্সিটি/বোর্ড/বছর যেভাবেই লেখা থাকুক, ধরা পড়ে।
+                </p>
+              </div>
+            </div>
+            <RadioGroup
+              value={refMode}
+              onValueChange={(v) => onRefModeChange(v as RefMode)}
+              className="gap-2"
+              data-testid="ref-mode-group"
+            >
+              <div className="flex items-start gap-2">
+                <RadioGroupItem value="keep" id="ref-keep" className="mt-0.5" />
+                <Label htmlFor="ref-keep" className="cursor-pointer text-sm leading-snug flex-col items-start gap-0.5">
+                  <span className="font-medium">যেমন আছে তেমন রাখুন</span>
+                  <span className="block text-xs text-muted-foreground">প্রশ্নের সাথেই রেফারেন্স থাকবে (বর্তমান আচরণ)</span>
+                </Label>
+              </div>
+              <div className="flex items-start gap-2">
+                <RadioGroupItem value="strip" id="ref-strip" className="mt-0.5" />
+                <Label htmlFor="ref-strip" className="cursor-pointer text-sm leading-snug flex-col items-start gap-0.5">
+                  <span className="font-medium">রেফারেন্স বাদ দিন — ক্লিন প্রশ্নপত্র</span>
+                  <span className="block text-xs text-muted-foreground">সব [সোর্স] ট্যাগ মুছে যাবে; প্রশ্ন-অপশন হুবহু অক্ষত</span>
+                </Label>
+              </div>
+              <div className="flex items-start gap-2">
+                <RadioGroupItem value="endline" id="ref-endline" className="mt-0.5" />
+                <Label htmlFor="ref-endline" className="cursor-pointer text-sm leading-snug flex-col items-start gap-0.5">
+                  <span className="font-medium">প্রশ্নের শেষে আলাদা লাইনে সরান</span>
+                  <span className="block text-xs text-muted-foreground">ট্যাগ প্রশ্ন-ব্লকের একেবারে নিচে নিজের লাইনে বসবে</span>
+                </Label>
+              </div>
+            </RadioGroup>
           </div>
         )}
 

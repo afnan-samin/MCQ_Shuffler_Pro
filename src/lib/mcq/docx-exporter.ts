@@ -15,11 +15,17 @@ import {
   renumberSerialPara,
   type DocxQuestion,
 } from "./docx-xml";
+import {
+  buildRefEditedMap,
+  type RefMode,
+} from "./reference";
 import { downloadBlob } from "./exporter";
 
 export interface ShuffleExportOptions {
   renumber: boolean;
   includeSetHeader: boolean;
+  /** রেফারেন্স-ট্যাগ ([CU-A: 22-23] স্টাইল) কী হবে — ডিফল্ট "keep" (আগের আচরণ) */
+  refMode?: RefMode;
 }
 
 /** সেটের English নাম — আউটপুটে কোনো Unicode না ঢোকে বলে "Set A" স্টাইল */
@@ -95,6 +101,22 @@ export function buildShuffledXml(
   const sectPr = kids.find((k) => k.localName === "sectPr") ?? null;
   const byId = new Map(questions.map((q) => [q.id, q]));
 
+  // রেফারেন্স-মোড (keep বাদে) — প্রতি প্রশ্নের edited-ব্লক একবারই বানাই,
+  // প্রতিটি সেট এখান থেকে আবার ক্লোন নেয় (রিনাম্বার-মিউটেশন আইসোলেটেড থাকে)
+  const refMode: RefMode = opts.refMode ?? "keep";
+  const editedMap =
+    refMode === "keep"
+      ? null
+      : buildRefEditedMap(doc, questions, refMode, (q) => {
+          const els: Element[] = [];
+          for (let i = q.blockStart; i <= q.blockEnd; i++) {
+            const src = kids[i];
+            if (!src || src.localName === "sectPr") continue;
+            els.push(src);
+          }
+          return els;
+        });
+
   // body খালি করি — এলিমেন্টগুলো kids অ্যারেতে ধরা আছে, সেখান থেকেই ক্লোন হবে
   while (body.firstChild) body.removeChild(body.firstChild);
 
@@ -105,15 +127,23 @@ export function buildShuffledXml(
     setIds.forEach((qid, qi) => {
       const q = byId.get(qid);
       if (!q) return;
+      const edited = editedMap?.get(q.id) ?? null;
+      let rel = -1;
       for (let i = q.blockStart; i <= q.blockEnd; i++) {
         const src = kids[i];
         if (!src || src.localName === "sectPr") continue;
-        const clone = src.cloneNode(true) as Element;
+        rel++;
+        const origin = edited ? edited.elems[rel] : null;
+        if (edited && origin === null) continue; // রেফারেন্স-মোডে বাদ-পড়া খালি প্যারা
+        const clone = (origin ?? src).cloneNode(true) as Element;
         // position-based রিনাম্বার: সেটে যে পজিশনে থাকে সেটাই তার নতুন নম্বর (১, ২, ৩…)
         if (opts.renumber && i === q.blockStart) {
           renumberSerialPara(clone, qi + 1);
         }
         body.appendChild(clone);
+      }
+      if (edited) {
+        for (const extra of edited.extra) body.appendChild(extra.cloneNode(true));
       }
     });
   });
@@ -161,11 +191,13 @@ export async function downloadSerialFixedDocx(params: {
   xml: string;
   questions: DocxQuestion[];
   baseName: string;
+  refMode?: RefMode;
 }): Promise<void> {
   const allIds = params.questions.map((q) => q.id);
   const newXml = buildShuffledXml(params.xml, params.questions, [allIds], {
     renumber: true,
     includeSetHeader: false,
+    refMode: params.refMode,
   });
   const blob = await zipWithXml(params.originalFile, newXml);
   downloadBlob(blob, `${params.baseName} (serial fixed).docx`);

@@ -584,3 +584,24 @@ Stage Summary:
 - রিমোট: main @ d4573f7 (Task 30+31+32 সহ) + gh-pages (static export) — দুটোই push করা
 - ভবিষ্যৎ ডিপ্লয় নিয়ম: কোড পরিবর্তন → STATIC_EXPORT=1 NEXT_PUBLIC_BASE_PATH=/MCQ_Shuffler_Pro npx next build → bash scripts/deploy-pages.sh <token>
 - ইউজার চাইলে scripts/deploy.yml.disabled কে .github/workflows/deploy.yml-এ ফেরত রেখে নিজের অ্যাকাউন্ট থেকে push করলে Actions auto-deploy-ও চালু হতে পারে (প্রতিবার বিল্ড+ডিপ্লয় নিজে হবে)
+
+---
+Task ID: 33
+Agent: Main Agent (Super Z)
+Task: রেফারেন্স-ট্যাগ আলাদা করার ফিচার (ইউজার: "ei file golo teke reference alada krte partecena.. egolo o add kre daw sorter mdde")
+
+Work Log:
+- আপলোড করা ১৫টা Physics/Chemistry (Raw) ফাইল স্ক্যান → ৭১৫ ভ্যারিয়েশনের ব্র্যাকেট-রেফারেন্স: [CU-A: 22-23], [DU-Projukti: 24-25], [Xvwe (cÖhyw³): 21-22] (নেস্টেড!), (DU-cÖhyw³: 21-22), [BAU-03-04], [BRUR; 16-17], মাল্টি-সোর্স [CU-A: 22-23; CoU: 19-20], ইনলাইন + স্ট্যান্ডঅ্যালোন-লাইন দুই অবস্থানেই
+- নতুন src/lib/mcq/reference.ts: findRefTokens (লাইন-শেষ + স্পেস-চেইন, নেস্টিং-সাপোর্ট রেজেক্স, বছর-রেঞ্জ/কোলন-কোড/কীওয়ার্ড নিয়ম; (NH4)/(0-5)/(273-373) জাতীয় গণিত-ব্র্যাকেট নেগেটিভ-গার্ড), analyzeQRefs/analyzeRefReport, buildRefEditedBlock/Map (strip: টোকেন-মুছে খালি প্যারা বাদ; endline: ব্লক-শেষে এক লাইনে সরে — pPr/rPr কপি করে ফন্ট প্রিজার্ভ)
+- docx-xml.ts: collectParaTs + replaceJoinedSpans এক্সপোজড
+- docx-exporter.ts: ShuffleExportOptions.refMode ("keep" ডিফল্ট) — buildRefEditedMap প্রতি প্রশ্নে একবার edited-ব্লক ক্যাশ করে, প্রতি সেট সেখান থেকে ক্লোন (রিনাম্বার-মিউটেশন আইসোলেটেড); downloadSerialFixedDocx-এও refMode
+- page.tsx: refMode স্টেট + docxRefReport (সিলেক্টেড প্রশ্নে) / multiRefReport useMemo — ৩টা ShuffleCard রেন্ডারে props; ৪টা এক্সপোর্ট-কলে refMode
+- shuffle-card.tsx: ভায়োলেট "রেফারেন্স ট্যাগ আলাদা করুন" সেকশন — ডিটেক্ট হলেই দেখায় (রিপোর্ট + নমুনা), RadioGroup: যেমন আছে / বাদ দিন (ক্লিন প্রশ্নপত্র) / শেষে আলাদা লাইনে; data-testid=ref-mode-group
+- টেস্ট: scripts/test-reference.ts (৪৫ — ইউনিট পজিটিভ/নেগেটিভ/চেইন + আসল ১৫ ফাইলে ডিটেকশন ৭৩৬/৭৫১ প্রশ্ন + keep/strip/endline এক্সপোর্ট + মাল্টি-সেট + রেফারেন্স-শূন্য ফাইলে strip≡keep); scripts/e2e-reference.ts (৬ — ব্রাউজারে আসল ফাইল আপলোড → সেকশন → strip ডাউনলোড → আউটপুটে শূন্য ট্যাগ)
+- 🐛 ক্যাচ-ফিক্স: q.paras-টেক্সটে \t আছে কিন্তু w:t-জয়েন্ট টেক্সটে নেই → ওই offset-এ ডিলিট করলে XML ম্যাংলড (strip-এ ১০ উত্তর, endline-এ সব ব্লক ভাঙত) → stripParaRefs এখন ক্লোনের নিজের জয়েন্ট-টেক্সটেই টোকেন খোঁজে; ব্রাউজার keep-vs-strip তুলনায় Dt-টেক্সট ৫০/৫০ উভয়েই — রিগ্রেশন-শূন্য নিশ্চিত
+- ভেরিফিকেশন: tsc ০, eslint ক্লিন, ইউনিট ৩৯১ (৭১+৪৮+১২৯+৫৭+৪১+৪৫), e2e ৫টি সব-পাস কনসোল-এরর শূন্য
+
+Stage Summary:
+- শাফল মোডে রেফারেন্স-ট্যাগ ([সোর্স: বছর] যেভাবেই লেখা হোক) ডিটেক্ট → ৩ মোডে আলাদা: রাখা/বাদ/শেষ-লাইনে; মাল্টি-ফাইল মার্জ/ZIP/সিরিয়াল-ফিক্স সব এক্সপোর্টে খাটে
+- ইউজারের ১৫টা র-ফাইলে ৭৩৬/৭৫১ প্রশ্নের ট্যাগ ধরা পড়ে (বাকিগুলোতে ট্যাগই নেই)
+- ডিপ্লয় অবশিষ্ট: কমিটের পর STATIC_EXPORT বিল্ড → deploy-pages.sh

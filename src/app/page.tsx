@@ -69,6 +69,7 @@ import {
   downloadShuffledDocx,
   englishSetName,
 } from "@/lib/mcq/docx-exporter";
+import { analyzeRefReport, type RefMode, type RefReport } from "@/lib/mcq/reference";
 import { downloadBlob } from "@/lib/mcq/exporter";
 import { RedownloadInputCard } from "@/components/mcq/redownload-input-card";
 import { RedownloadPartsCard } from "@/components/mcq/redownload-parts-card";
@@ -176,6 +177,8 @@ export default function Home() {
   const [distribution, setDistribution] = useState<Distribution>("interleaved");
   const [shuffleWithin, setShuffleWithin] = useState(true);
   const [shuffling, setShuffling] = useState(false);
+  // রেফারেন্স-ট্যাগ ([CU-A: 22-23] স্টাইল) কী করা হবে — ডিফল্ট রাখা
+  const [refMode, setRefMode] = useState<RefMode>("keep");
 
   // ---- রেজাল্ট ----
   const [sets, setSets] = useState<McqQuestion[][] | null>(null);
@@ -235,6 +238,18 @@ export default function Home() {
   );
   const rdTotalQuestions = rdDocs.reduce((a, d) => a + d.parse.questions.length, 0);
   const rdSelTotal = rdDocs.reduce((a, d) => a + (rdSel[d.id]?.size ?? 0), 0);
+
+  // ---- রেফারেন্স-ট্যাগ রিপোর্ট (শাফল মোডের ডাউনলোড-কার্ডে সেকশন) ----
+  // সিঙ্গেল docx ফ্লো: সিলেক্ট করা প্রশ্নগুলোতেই দেখায়; মাল্টি ফ্লো: সব প্রশ্ন
+  const docxRefReport = useMemo<RefReport | null>(() => {
+    if (!docx?.parse) return null;
+    const pool = docx.parse.questions.filter((q) => selected.has(q.id));
+    return analyzeRefReport(pool);
+  }, [docx, selected]);
+  const multiRefReport = useMemo<RefReport | null>(() => {
+    if (!shuffleItems?.length) return null;
+    return analyzeRefReport(shuffleItems.flatMap((it) => it.parse.questions));
+  }, [shuffleItems]);
 
   // ---- ফ্লো-গেট: কোনো ইনপুট নেই → আগে আপলোড-কার্ড; ইনপুট আছে → ৩ মোড-বাটন ----
   const hasAnyInput =
@@ -855,7 +870,7 @@ export default function Home() {
         sets: setsDocx,
         baseName: docx.baseName,
         suffix: doRenumber ? " (shuffled, renumbered)" : " (shuffled, original serial)",
-        opts: { renumber: doRenumber, includeSetHeader: true },
+        opts: { renumber: doRenumber, includeSetHeader: true, refMode },
       });
       toast({
         title: "✅ Word ফাইল ডাউনলোড হয়েছে",
@@ -879,6 +894,7 @@ export default function Home() {
         xml: docx.xml,
         questions: docx.parse.questions,
         baseName: docx.baseName,
+        refMode,
       });
       toast({
         title: "🔧 সিরিয়াল ঠিক করা .docx ডাউনলোড হয়েছে",
@@ -1330,6 +1346,7 @@ export default function Home() {
         const xml = buildShuffledXml(it.xml, it.parse.questions, shuffleMultiSets[i] ?? [], {
           renumber,
           includeSetHeader: true,
+          refMode,
         });
         items.push({ xml, file: await replaceDocumentXml(it.file, xml) });
       }
@@ -1359,6 +1376,7 @@ export default function Home() {
         const xml = buildShuffledXml(it.xml, it.parse.questions, shuffleMultiSets[i] ?? [], {
           renumber,
           includeSetHeader: true,
+          refMode,
         });
         out.push({ name: `${it.baseName} (shuffled).docx`, blob: await replaceDocumentXml(it.file, xml) });
       }
@@ -1704,6 +1722,9 @@ export default function Home() {
                   onShuffleWithinChange={setShuffleWithin}
                   onShuffle={handleShuffle}
                   shuffling={multiShuffling}
+                  refReport={multiRefReport}
+                  refMode={refMode}
+                  onRefModeChange={setRefMode}
                 />
 
                 <div ref={resultsRef} className="scroll-mt-4">
@@ -1766,6 +1787,9 @@ export default function Home() {
                   onShuffleWithinChange={setShuffleWithin}
                   onShuffle={handleShuffle}
                   shuffling={shuffling}
+                  refReport={docxRefReport}
+                  refMode={refMode}
+                  onRefModeChange={setRefMode}
                 />
 
                 <div ref={resultsRef} className="scroll-mt-4">
@@ -1815,6 +1839,9 @@ export default function Home() {
                   onShuffleWithinChange={setShuffleWithin}
                   onShuffle={handleShuffle}
                   shuffling={shuffling}
+                  refReport={null}
+                  refMode={refMode}
+                  onRefModeChange={setRefMode}
                 />
 
                 <div ref={resultsRef} className="scroll-mt-4">

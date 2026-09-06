@@ -441,6 +441,31 @@ export async function loadDocxXml(file: Blob): Promise<string> {
   return entry.async("string");
 }
 
+// ---------- রেফারেন্স-মডিউলের জন্য এক্সপোজড হেল্পার ----------
+
+/** প্যারার w:t-স্ট্রিম + জয়েন্ট টেক্সট + রান-বাউন্ডারি — reference.ts-এর স্প্যান-এডিটে লাগে */
+export function collectParaTs(p: Element): { stream: Element[]; joined: string; segEnds: number[] } {
+  const stream: Element[] = [];
+  collectTs(p, stream);
+  const texts = stream.map((t) => t.textContent ?? "");
+  const joined = texts.join("");
+  const segEnds: number[] = [];
+  let acc = 0;
+  for (const t of texts) {
+    acc += t.length;
+    segEnds.push(acc);
+  }
+  return { stream, joined, segEnds };
+}
+
+/** জয়েন্ট-টেক্সট অফসেট-স্প্যান রিপ্লেস (text: "" হলে ডিলিট) — reference.ts ব্যবহার করে */
+export function replaceJoinedSpans(
+  stream: Element[],
+  spans: Array<{ start: number; end: number; text: string }>
+): void {
+  replaceSpans(stream, spans);
+}
+
 // ---------- রিনাম্বার ইঞ্জিন ----------
 
 /** w:t এলিমেন্টগুলো ডকুমেন্ট-অর্ডারে সংগ্রহ (m:t বাদ) */
