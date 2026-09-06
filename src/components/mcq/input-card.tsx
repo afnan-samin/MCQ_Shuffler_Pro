@@ -6,14 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { FileText, FileUp, Loader2, Search, Sparkles, ClipboardPaste } from "lucide-react";
-import { withBase } from "@/lib/base-path";
+import { FileText, FileUp, Loader2, Search, ClipboardPaste } from "lucide-react";
 
 interface InputCardProps {
   rawText: string;
   onTextChange: (t: string) => void;
   onDetect: () => void;
-  onSample: () => void;
   /** .docx আপলোড — XML হুবহু প্রিজার্ভ পাইপলাইনে যাবে */
   onDocxFile: (f: File) => void;
   /** একাধিক .docx — মাল্টি-ফাইল পাইপলাইনে যাবে; দিলে input-এ multiple চালু হয় */
@@ -26,13 +24,10 @@ interface InputCardProps {
   docxLoading: boolean;
 }
 
-const SAMPLE_DOCX_URL = withBase("/sample/hsc27-physics-bijoy.docx");
-
 export function InputCard({
   rawText,
   onTextChange,
   onDetect,
-  onSample,
   onDocxFile,
   onDocxFiles,
   onTextFileLoaded,
@@ -80,22 +75,6 @@ export function InputCard({
       return;
     }
     setUploadError("সাপোর্টেড ফাইল: .docx বা .txt");
-  };
-
-  const handleSampleDocx = async () => {
-    setUploadError(null);
-    setUploadName("hsc27-physics-bijoy.docx");
-    try {
-      const res = await fetch(SAMPLE_DOCX_URL);
-      if (!res.ok) throw new Error();
-      const blob = await res.blob();
-      const file = new File([blob], "hsc27-physics-bijoy.docx", {
-        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      });
-      onDocxFile(file);
-    } catch {
-      setUploadError("নমুনা ফাইল লোড করা যায়নি");
-    }
   };
 
   const lineCount = rawText ? rawText.split("\n").filter((l) => l.trim()).length : 0;
@@ -156,11 +135,6 @@ export function InputCard({
                 সাপোর্টেড: .docx (ফরম্যাট হুবহু থাকবে), .txt — একসাথে একাধিক .docx সিলেক্ট করা যাবে। আপলোডের পরেই ডিটেক্টর অটো চলবে।
               </span>
             </button>
-            <div className="text-center">
-              <Button variant="link" size="sm" className="h-auto gap-1 p-0 text-xs text-emerald-700 dark:text-emerald-400" onClick={handleSampleDocx} disabled={busy}>
-                <Sparkles className="h-3.5 w-3.5" /> নমুনা Bijoy .docx (HSC Physics) দিয়ে দেখুন
-              </Button>
-            </div>
             <input
               ref={fileRef}
               type="file"
@@ -211,9 +185,6 @@ a) Beijing  b) Tokyo  c) Seoul  d) Bangkok`}
           >
             {detecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
             {detecting ? "ডিটেক্ট হচ্ছে..." : "🔍 প্রশ্ন ডিটেক্ট করুন (পেস্ট মোড)"}
-          </Button>
-          <Button variant="outline" onClick={onSample} className="gap-2">
-            <Sparkles className="h-4 w-4" /> নমুনা টেক্সট লোড করুন
           </Button>
           {rawText.trim() && (
             <Badge variant="secondary" className="gap-1">

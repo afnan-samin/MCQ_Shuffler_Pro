@@ -31,7 +31,7 @@ function ok(cond: boolean, name: string) {
 }
 
 // ---- লোড ----
-const FILE = "public/sample/hsc27-physics-bijoy.docx";
+const FILE = "scripts/fixtures/hsc27-physics-bijoy.docx";
 const buf = readFileSync(FILE);
 const zip = await JSZip.loadAsync(buf);
 const xml = zip.file("word/document.xml")!.async("string") as unknown as Promise<string>;

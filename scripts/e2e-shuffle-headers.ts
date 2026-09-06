@@ -5,7 +5,7 @@ import { chromium } from "playwright";
 import JSZip from "jszip";
 import { readFileSync, mkdirSync } from "node:fs";
 
-const HSC = "/home/z/my-project/public/sample/hsc27-physics-bijoy.docx";
+const HSC = "/home/z/my-project/scripts/fixtures/hsc27-physics-bijoy.docx";
 const NOCOLOR = "/home/z/my-project/upload/color-free-test.docx";
 const OUT_DIR = "/home/z/my-project/scripts/tmp-e2e";
 mkdirSync(OUT_DIR, { recursive: true });
@@ -99,12 +99,13 @@ console.log("✓ ৬০ প্রশ্নের কনটেন্ট (সি�
 await page.click('button:has-text("সিরিয়াল মোডে খুলুন")');
 await page.waitForSelector("text=রঙ-ভিত্তিক সিরিয়াল", { timeout: 20000 });
 await page.waitForSelector('button:has-text("B1")', { timeout: 30000 });
-const serialSel = await page.getAttribute('button[role="tab"]:has-text("MCQ সিরিয়াল")', "aria-selected");
-if (serialSel !== "true") throw new Error("হাত-অফে সিরিয়াল মোডে যায়নি");
+const serialSel = await page.locator('[data-testid="mode-work-bar"]:has-text("MCQ সিরিয়াল")').count();
+if (serialSel !== 1) throw new Error("হাত-অফে সিরিয়াল মোডে যায়নি (ওয়ার্ক-বারে মোড-নাম নেই)");
 console.log("✓ ইনফো-কার্ড হাত-অফ: ফাইলসহ সিরিয়াল মোডে গেছে (B1 চিপ দৃশ্যমান)");
 
 // ---- ৬. সিরিয়াল মোডে রঙহীন ফাইল → অটো নো-কালার কার্ড + একটানা ১..N ----
-await page.setInputFiles('input[type="file"]', NOCOLOR);
+// (সিরিয়াল কার্ডের নিজের ইনপুট — ওয়ার্ক-বারের ইনপুট নয়, ওটা append করে)
+await page.setInputFiles('input[data-testid="serial-file-input"]', NOCOLOR);
 await page.waitForSelector("text=এই ফাইলে রঙ-হেডার পাওয়া যায়নি", { timeout: 60000 });
 const [dl2] = await Promise.all([
   page.waitForEvent("download", { timeout: 120000 }),
@@ -117,8 +118,12 @@ console.log("✓ সিরিয়াল মোডে রঙহীন ফাই
 // ---- ৭. নন-MCQ টেক্সট-প্যাটার্ন ফিচার (Agri ফাইল: ১৩৫ রঙ-হেডার + রঙহীন "Aa¨vq-8") ----
 // ইউজারের নিয়ম: "jeta mcq noi seta jate bad dey" + বাদ-পড়া লাইনের আলাদা লিস্ট
 const AGRI = "/home/z/my-project/upload/Agri MCQ Botany 997 mcq - Copy - type serial.docx";
+// নতুন ফ্লো: কাজের ভিউতে ট্যাব নেই — পেছনে → শাফল ট্যাব
+await page.click('button[aria-label="পেছনে — মোড বাছাই"]');
+await page.waitForSelector('button[role="tab"]:has-text("MCQ শাফল")', { timeout: 15000 });
 await page.click('button[role="tab"]:has-text("MCQ শাফল")');
-await page.setInputFiles('input[type="file"]', AGRI);
+// ইনপুট-কার্ডের নিজের ইনপুট (replace) — ওয়ার্ক-বারের ইনপুট নয় (append)
+await page.setInputFiles('#step-input input[type="file"]', AGRI);
 await page.waitForSelector("text=বাদ পড়া লাইনসমূহ", { timeout: 120000 });
 await page.waitForSelector("text=136 টি (শাফলে যাবে না)", { timeout: 20000 });
 await page.waitForSelector("text=135 রঙ-হেডার", { timeout: 15000 });

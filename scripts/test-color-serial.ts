@@ -485,7 +485,7 @@ console.log("\n== ৭) stripShadedParasXml (শাফল মোডে হেড�
 
   // আসল ফাইল ২: HSC'27 নমুনা (৬টা B1 কালো হেডার, ৬০ প্রশ্ন)
   try {
-    const hscZip = await JSZip.loadAsync((await import("node:fs")).readFileSync("public/sample/hsc27-physics-bijoy.docx"));
+    const hscZip = await JSZip.loadAsync((await import("node:fs")).readFileSync("scripts/fixtures/hsc27-physics-bijoy.docx"));
     const hscXml = await hscZip.file("word/document.xml")!.async("string");
     const anH = analyzeColorDocx(hscXml);
     const stH = stripShadedParasXml(hscXml);
@@ -610,7 +610,7 @@ try {
 
 // ---- আসল ফাইল: HSC নমুনা — প্যাটার্ন-ম্যাচ শূন্য (কোনো ভুল কাটা হয় না) ----
 try {
-  const hscZip2 = await JSZip.loadAsync((await import("node:fs")).readFileSync("public/sample/hsc27-physics-bijoy.docx"));
+  const hscZip2 = await JSZip.loadAsync((await import("node:fs")).readFileSync("scripts/fixtures/hsc27-physics-bijoy.docx"));
   const hscXml2 = await hscZip2.file("word/document.xml")!.async("string");
   const stH2 = stripNonMcqLinesXml(hscXml2);
   ok(stH2.removed.length === 0 && stH2.xml === hscXml2, "HSC নমুনা: প্যাটার্ন-ম্যাচ শূন্য — XML হুবহু অক্ষত");

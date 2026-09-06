@@ -5,7 +5,7 @@ import JSZip from "jszip";
 import fs from "node:fs";
 
 const CHEM = "/home/z/my-project/upload/Final Chemistry 1st paper only varsity Question (1-5).docx";
-const HSC = "/home/z/my-project/public/sample/hsc27-physics-bijoy.docx";
+const HSC = "/home/z/my-project/scripts/fixtures/hsc27-physics-bijoy.docx";
 const NOCOLOR = "/home/z/my-project/upload/color-free-test.docx";
 
 /** ফাইলের সবচেয়ে বড় w:t-টেক্সট — সিরিয়াল-রিনাম্বারে অপরিবর্তিত থাকে বলে মার্কার হিসেবে নিরাপদ */
@@ -103,6 +103,9 @@ await page.waitForSelector("text=রঙ-ভিত্তিক সিরিয়
 console.log("✓ ১ ফাইলে নামলে পুরনো রঙ-চিপ কার্ড ফিরে আসে (রিগ্রেশন OK)");
 
 // ================== শাফল মোড — মাল্টি-ফাইল ==================
+// নতুন ফ্লো: কাজের ভিউতে মোড-ট্যাব থাকে না — আগে "পেছনে" → তারপর মোড-বাটন
+await page.click('button[aria-label="পেছনে — মোড বাছাই"]');
+await page.waitForSelector('button[role="tab"]:has-text("MCQ শাফল")', { timeout: 15000 });
 await page.click('button[role="tab"]:has-text("MCQ শাফল")');
 await page.waitForSelector("text=প্রশ্ন দিন — ফাইল আপলোড বা পেস্ট", { timeout: 30000 });
 await page.locator('input[type="file"]').first().setInputFiles([HSC, NOCOLOR]);

@@ -3,7 +3,7 @@ import { parseMcq, autoFixNumbering } from "../src/lib/mcq/parser";
 import { buildSets, getSetName } from "../src/lib/mcq/set-engine";
 import { classifyWord, analyzeText, splitLineSegments } from "../src/lib/mcq/encoding";
 import { runsForLine, DEFAULT_EXPORT_OPTIONS } from "../src/lib/mcq/exporter";
-import { SAMPLE_MCQ } from "../src/lib/mcq/sample";
+import { SAMPLE_MCQ } from "./fixtures/sample-mcq";
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean, extra?: string) {

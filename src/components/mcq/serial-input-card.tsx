@@ -164,6 +164,7 @@ a) Beijing  b) Tokyo  c) Seoul  d) Bangkok`}
           accept=".docx"
           multiple
           className="hidden"
+          data-testid="serial-file-input"
           onChange={(e) => {
             acceptFiles(e.target.files, false);
             e.target.value = "";

@@ -150,7 +150,7 @@ ok(/>১\.<\/w:t>/.test(outOne.replace("১. পানি", "").replace("১. �
 ok(!outOne.includes("পানির রাসায়নিক"), "১ম প্রশ্ন বাদ");
 
 console.log("\n== ৭) আসল ফাইল (sample Bijoy docx) — হুবহু যাচাই ==");
-const FILE = "public/sample/hsc27-physics-bijoy.docx";
+const FILE = "scripts/fixtures/hsc27-physics-bijoy.docx";
 const buf = readFileSync(FILE);
 const zip = await JSZip.loadAsync(buf);
 const xmlText = await zip.file("word/document.xml")!.async("string");

@@ -56,6 +56,7 @@ import { SerialInputCard } from "@/components/mcq/serial-input-card";
 import { SerialPasteCard } from "@/components/mcq/serial-paste-card";
 import { NextModesCard } from "@/components/mcq/next-modes-card";
 import { StagedFilesCard, UploadFirstCard } from "@/components/mcq/upload-first-card";
+import { ModeWorkBar } from "@/components/mcq/mode-work-bar";
 import {
   BlockedLinesCard,
   ColorShuffleInfoCard,
@@ -82,13 +83,14 @@ import {
   type RdParseResult,
   type WatermarkInfo,
 } from "@/lib/mcq/redownload";
-import { SAMPLE_MCQ } from "@/lib/mcq/sample";
 import { renumberQuestionsByPosition } from "@/lib/mcq/serial-paste";
 import { toast } from "@/hooks/use-toast";
 import { Dices, ShieldCheck, Zap } from "lucide-react";
 
 const STORAGE_KEY = "mcq-shuffler-text";
 const MODE_KEY = "mcq-shuffler-mode";
+/** শাফল মোডে একসাথে সর্বোচ্চ কতটা ফাইল নেওয়া যায় (min ১, max ১০) */
+const SHUFFLE_MAX_FILES = 10;
 
 // মাল্টি-ফাইল লিস্টের আইটেম-id (reorder/remove-এর জন্য স্টেবল কী দরকার)
 let multiIdCounter = 0;
@@ -149,6 +151,10 @@ export default function Home() {
   // ---- স্টেজড ফাইল — আপলোড হয়েছে, কিন্তু এখনো কোনো মোডে খোলা হয়নি ----
   // ইউজার যেকোনো মোডে ক্লিক করলে এই ফাইলগুলো ওই মোডে লোড হয়ে যায়
   const [stagedFiles, setStagedFiles] = useState<File[] | null>(null);
+
+  // ---- ফ্লো-ধাপ: "select" = মোড-বাছাই (৩টা মোড-বাটন শুধু এখানেই), "work" = মোডের ভিতরে কাজ ----
+  // মোডে ঢোকার পর ৩টা মোড-বাটন আর দেখানো হয় না — উপরে থাকে পেছনে + আরও-ফাইল বার
+  const [flowStep, setFlowStep] = useState<"select" | "work">("select");
 
   // ---- ইনপুট (text mode) ----
   const [rawText, setRawText] = useState("");
@@ -261,6 +267,18 @@ export default function Home() {
       localStorage.setItem(MODE_KEY, m);
     } catch {}
     carryToMode(m, mode);
+    setFlowStep("work");
+  };
+
+  /** "পেছনে" — মোড-বাছাইয়ে ফেরা (৩টা মোড-বাটন শুধু সেখানে দেখা যায়); চলমান কাজ অক্ষত থাকে */
+  const backToModes = () => setFlowStep("select");
+
+  /** কাজ-চলাকালীন "আরও ফাইল" — নতুন ফাইল বর্তমান মোডেই যোগ (append) হয় */
+  const handleAddMoreFiles = (files: File[]) => {
+    if (!files.length) return;
+    if (mode === "serial") loadSerialFiles(files, true);
+    else if (mode === "redownload") loadRedownloadFiles(files, true);
+    else handleShuffleFiles(files, true);
   };
 
   // ================== মোডের মাঝে ফাইল বহন (carry-over) ==================
@@ -364,6 +382,14 @@ export default function Home() {
     setParsed(result);
     setSelected(new Set(result.questions.map((q) => q.id)));
     setAllowBroken(false);
+    // পেস্ট/.txt ফ্লো — প্রশ্ন পেলেই সরাসরি শাফল-মোডের কাজের ভিউতে (মোড-বাছাই লাগে না)
+    if (result.questions.length > 0) {
+      setMode("shuffle");
+      setFlowStep("work");
+      try {
+        localStorage.setItem(MODE_KEY, "shuffle");
+      } catch {}
+    }
     announceDetect(result);
   };
 
@@ -396,10 +422,6 @@ export default function Home() {
     } finally {
       setDetecting(false);
     }
-  };
-
-  const handleSample = () => {
-    loadAndDetect(SAMPLE_MCQ);
   };
 
   const handleAutoFix = () => {
@@ -1133,38 +1155,101 @@ export default function Home() {
 
   // ================== SHUFFLE MODE — মাল্টি-ফাইল ==================
 
-  /** একাধিক .docx — প্রতিটা আলাদাভাবে হেডার-স্ট্রিপ + পার্স; ১টা হলে পুরনো একক পাইপলাইন */
-  const handleShuffleFiles = async (files: File[]) => {
-    if (files.length === 1) {
+  /** একটা .docx পড়ে শাফল-আইটেম বানায় (হেডার/নন-MCQ স্ট্রিপ + পার্স) — রিপ্লেস/অ্যাপেন্ড দুই পথেই ব্যবহৃত */
+  const parseShuffleFile = async (f: File): Promise<ShuffleItemState> => {
+    const originalXml = await loadDocxXml(f);
+    let colorAn: ColorAnalysis | null = null;
+    try {
+      colorAn = analyzeColorDocx(originalXml);
+    } catch {}
+    let xml = originalXml;
+    const blocked: BlockedLine[] = [];
+    if (colorAn && colorAn.colors.length > 0) {
+      const st = stripShadedParasXml(originalXml);
+      xml = st.xml;
+      for (const t of st.texts) blocked.push({ text: t, reason: "color" });
+    }
+    const st2 = stripNonMcqLinesXml(xml);
+    xml = st2.xml;
+    blocked.push(...st2.removed);
+    const parse = parseDocxXml(xml);
+    return { id: nextMultiId(), file: f, baseName: f.name.replace(/\.docx$/i, ""), xml, parse, blocked };
+  };
+
+  /**
+   * শাফল মোডে ফাইল লোড — append=false: আগেরটা বদলে নতুনগুলো; append=true: আগের ফাইলের সাথে যোগ।
+   * সীমা: একসাথে সর্বোচ্চ ১০ টি ফাইল (min ১) — বেশি দিলে প্রথম ১০ টি নেওয়া হয়।
+   */
+  const handleShuffleFiles = async (files: File[], append = false) => {
+    if (!files.length) return;
+    const existingCount = shuffleItems ? shuffleItems.length : docx ? 1 : 0;
+    let list = files;
+    if (existingCount + files.length > SHUFFLE_MAX_FILES) {
+      const take = Math.max(0, SHUFFLE_MAX_FILES - (append ? existingCount : 0));
+      list = files.slice(0, take);
+      toast({
+        title: "⚠️ শাফল মোডে সর্বোচ্চ ১০ টি ফাইল",
+        description: take > 0
+          ? `একসাথে ১ থেকে ১০ টি ফাইল নেওয়া যায় — প্রথম ${take} টি নেওয়া হলো, বাকিগুলো বাদ।`
+          : "আগেই ১০ টি ফাইল আছে — নতুন ফাইল যোগ করতে হলে লিস্ট থেকে কিছু বাদ দিন।",
+        variant: "destructive",
+      });
+    }
+    if (!list.length) return;
+
+    // append — আগের একক docx থাকলে items-এ রূপ দিয়ে নতুনগুলো পিছে যোগ
+    const canAppend = !!(shuffleItems?.length || (docx && docx.parse));
+    if (append && canAppend) {
+      setShuffleLoading(true);
+      const base: ShuffleItemState[] = shuffleItems?.length
+        ? [...shuffleItems]
+        : docx && docx.parse
+          ? [{ id: nextMultiId(), file: docx.file, baseName: docx.baseName, xml: docx.xml, parse: docx.parse, blocked: docx.blocked }]
+          : [];
+      const newItems: ShuffleItemState[] = [];
+      const errors: string[] = [];
+      for (const f of list) {
+        try {
+          newItems.push(await parseShuffleFile(f));
+        } catch (e) {
+          errors.push(`${f.name}: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+      const items = [...base, ...newItems];
+      setShuffleItems(items.length ? items : null);
+      setShuffleMultiSets(null);
+      setDocx(null);
+      setParsed(null);
+      resetResults();
+      setSelected(new Set());
+      setShuffleLoading(false);
+      if (newItems.length) {
+        toast({
+          title: `✅ ${newItems.length} টি ফাইল যোগ হয়েছে — এখন মোট ${items.length} টি`,
+          description: "লিস্ট থেকে ক্রম বদলাতে পারবেন — মার্জ/ZIP-এ ঠিক এই ক্রমেই আসবে।",
+        });
+      }
+      if (errors.length) {
+        toast({ title: "কিছু ফাইল পড়া যায়নি", description: errors.join("\n"), variant: "destructive" });
+      }
+      return;
+    }
+
+    if (list.length === 1) {
       setShuffleItems(null);
       setShuffleMultiSets(null);
-      handleDocxFile(files[0]);
+      handleDocxFile(list[0]);
       return;
     }
     setShuffleLoading(true);
     const items: ShuffleItemState[] = [];
     const errors: string[] = [];
     let totalQuestions = 0;
-    for (const f of files) {
+    for (const f of list) {
       try {
-        const originalXml = await loadDocxXml(f);
-        let colorAn: ColorAnalysis | null = null;
-        try {
-          colorAn = analyzeColorDocx(originalXml);
-        } catch {}
-        let xml = originalXml;
-        const blocked: BlockedLine[] = [];
-        if (colorAn && colorAn.colors.length > 0) {
-          const st = stripShadedParasXml(originalXml);
-          xml = st.xml;
-          for (const t of st.texts) blocked.push({ text: t, reason: "color" });
-        }
-        const st2 = stripNonMcqLinesXml(xml);
-        xml = st2.xml;
-        blocked.push(...st2.removed);
-        const parse = parseDocxXml(xml);
-        items.push({ id: nextMultiId(), file: f, baseName: f.name.replace(/\.docx$/i, ""), xml, parse, blocked });
-        totalQuestions += parse.questions.length;
+        const it = await parseShuffleFile(f);
+        items.push(it);
+        totalQuestions += it.parse.questions.length;
       } catch (e) {
         errors.push(`${f.name}: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -1377,7 +1462,7 @@ export default function Home() {
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-bold tracking-tight md:text-2xl">MCQ Shuffler Pro</h1>
             <p className="text-xs text-muted-foreground md:text-sm">
-              ফাইল আপলোড করুন, তারপর ৩টা মোড — 🔀 শাফল+সেট • 🔢 রঙ-সিরিয়াল • 📥 রিডাউনলোড — যেকোনো মোডে কাজ শেষে ফাইল নিয়ে অন্য মোডে সরাসরি কাজ করুন • .docx হুবহু প্রিজার্ভ
+              ফাইল আপলোড করুন → মোড বেছে কাজ করুন (🔀 শাফল+সেট • 🔢 রঙ-সিরিয়াল • 📥 রিডাউনলোড) — পেছনে ফিরে একই ফাইল অন্য মোডে চালান • .docx হুবহু প্রিজার্ভ
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -1401,20 +1486,27 @@ export default function Home() {
             rawText={rawText}
             onTextChange={handleTextChange}
             onDetect={handleDetect}
-            onSample={handleSample}
             busy={detecting}
           />
+        ) : flowStep === "select" ? (
+          /* ধাপ ২ — মোড-বাছাই: ৩টা মোড-বাটন শুধু এই ধাপেই দেখা যায়; মোডে ঢুকলেই আর দেখা যায় না */
+          <>
+            {stagedFiles && stagedFiles.length > 0 && (
+              <StagedFilesCard files={stagedFiles} onClear={() => setStagedFiles(null)} />
+            )}
+            <ModeTabs mode={mode} onChange={changeMode} />
+          </>
         ) : (
           <>
-            {/* স্টেজ হওয়া ফাইল — মোড-বাটনে ক্লিক করলেই ওই মোডে চলে যাবে */}
-            {stagedFiles && <StagedFilesCard files={stagedFiles} onClear={() => setStagedFiles(null)} />}
-
-            {/* মোড-বাটন — শাফল, সিরিয়াল, রিডাউনলোড */}
-            <ModeTabs mode={mode} onChange={changeMode} />
-
-            {/* স্টেজ খালি হলেই মোডের কাজের জায়গা দেখা যায় */}
-            {!stagedFiles && (
-              <>
+            {/* কাজ-চলাকালীন বার — ৩ মোড আর দেখানো হয় না; বাঁয়ে পেছনে, ডানে আরও ফাইল */}
+            <ModeWorkBar
+              mode={mode}
+              onBack={backToModes}
+              onAddFiles={handleAddMoreFiles}
+              busy={shuffleLoading || docxLoading || serialLoading || rdLoading}
+              filesCount={mode === "shuffle" ? shuffleFileCount : mode === "serial" ? serialFileCount : rdFileCount}
+              maxFiles={mode === "shuffle" ? SHUFFLE_MAX_FILES : undefined}
+            />
         {mode === "redownload" ? (
           <>
             <RedownloadInputCard
@@ -1561,7 +1653,6 @@ export default function Home() {
               rawText={rawText}
               onTextChange={handleTextChange}
               onDetect={handleDetect}
-              onSample={handleSample}
               onDocxFile={handleDocxFile}
               onDocxFiles={handleShuffleFiles}
               onTextFileLoaded={loadAndDetect}
@@ -1751,10 +1842,8 @@ export default function Home() {
                 <NextModesCard current="shuffle" filesCount={shuffleFileCount} onOpen={changeMode} />
               </>
             )}
-              </>
-            )}
-              </>
-            )}
+          </>
+        )}
           </>
         )}
       </main>
