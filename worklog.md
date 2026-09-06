@@ -659,3 +659,18 @@ Work Log:
 Stage Summary:
 - Word-corruption মূল-কারণ (merged docx-এ ড্যাংলিং রিলেশনশিপ) ঠিক + ব্রাউজার-রিয়াল রিপ্রো-ম্যাট্রিক্স ও LibreOffice-ভ্যালিডেশন সবুজ; সেট ১–১০; সব নন-ডিফল্ট অপশন-পাথ E2E-যাচাইকৃত; প্রাইভেসি-লিক untrack; ৪০৬ ইউনিট + ৫৫ E2E সবুজ, tsc/eslint ক্লিন
 - অবশিষ্ট: push + STATIC_EXPORT বিল্ড + deploy-pages.sh (নতুন টোকেন) — লাইভ আপডেট
+
+---
+Task ID: 34-deploy
+Agent: Main Agent (Super Z)
+Task: Task 34 push + deploy — লাইভ আপডেট সম্পন্ন
+
+Work Log:
+- কমিট 020ea1d push-এর সময় রিমোটে ইউজারের নিজের "Update README.md" (5d1b4c1 — ডিপ্লয়-সেকশন মুছেছে) পাওয়া যায় → rebase; README-তে ইউজারের ডিলিশনই রাখা হলো (7c32040); main push: 5d1b4c1..7c32040
+- STATIC_EXPORT=1 NEXT_PUBLIC_BASE_PATH=/MCQ_Shuffler_Pro বিল্ড → .next-static → bash scripts/deploy-pages.sh <token> → gh-pages force-push + Pages API → 🎉 লাইভ
+- লাইভ-ভেরিফিকেশন: নতুন chunk (9a63728f…) সার্ভ হচ্ছে, JS-এ "১–১০" আছে / "২–৫০" নেই, রেফারেন্স-ট্যাগ ফিচার (Task 33) এই প্রথম লাইভে, index 200
+- .tmp-token ডিলিট; ইউজারকে টোকেন রিভোক-পরামর্শ দেওয়া হবে (চ্যাটে শেয়ার করায় GitHub যেকোনো সময় অটো-রিভোক করতে পারে)
+
+Stage Summary:
+- লাইভ সাইট এখন Task 34 ফিক্সসহ সর্বশেষ কোড: https://afnan-samin.github.io/MCQ_Shuffler_Pro/
+- রিডিপ্লয়-পদ্ধতি (পরেরবার): STATIC_EXPORT=1 NEXT_PUBLIC_BASE_PATH=/MCQ_Shuffler_Pro npx next build && bash scripts/deploy-pages.sh <token>
