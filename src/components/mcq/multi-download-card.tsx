@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { DownloadFormatToggle } from "@/components/mcq/download-format-toggle";
+import type { DownloadFormat } from "@/lib/mcq/pdf-export";
 import { Archive, FileDown, FileText, Loader2 } from "lucide-react";
 
 /** মার্জ করা .docx-এ সিরিয়াল কোন নিয়মে বসবে */
@@ -25,6 +27,9 @@ export interface MultiDownloadCardProps {
   disabled?: boolean;
   /** ফাইল সংখ্যা — ঠিক ১ হলে ZIP বাটন লুকায়, একটাই ডাউনলোড বাটন দেখায় */
   fileCount?: number;
+  /** "Download as" ফরম্যাট (DOCX ডিফল্ট) — onFormatChange দিলেই টগল রেন্ডার হয় */
+  format?: DownloadFormat;
+  onFormatChange?: (f: DownloadFormat) => void;
 }
 
 /** মাল্টি-ফাইল ডাউনলোড কার্ড — এক .docx-এ মার্জ বা ZIP-এ আলাদা আলাদা */
@@ -41,8 +46,11 @@ export function MultiDownloadCard({
   zipBusy = false,
   disabled = false,
   fileCount,
+  format = "docx",
+  onFormatChange,
 }: MultiDownloadCardProps) {
   const single = fileCount === 1;
+  const isPdf = format === "pdf";
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -91,9 +99,18 @@ export function MultiDownloadCard({
           </div>
         )}
 
+        {/* ফরম্যাট-টগল (DOCX ডিফল্ট / PDF) — ডাউনলোড বাটনের ঠিক উপরে */}
+        {onFormatChange && (
+          <DownloadFormatToggle
+            value={format}
+            onChange={onFormatChange}
+            disabled={disabled || mergedBusy || zipBusy}
+          />
+        )}
+
         {/* ডাউনলোড বাটন — এক ফাইল হলে একটাই, একাধিক হলে .docx + ZIP দুটোই */}
         <div className={single ? "grid gap-3" : "grid gap-3 sm:grid-cols-2"}>
-          {/* এক .docx ডাউনলোড — প্রাইমারি সবুজ */}
+          {/* এক ফাইল ডাউনলোড — প্রাইমারি সবুজ (ফরম্যাট-টগল অনুযায়ী .docx/.pdf) */}
           <Button
             type="button"
             onClick={onDownloadMerged}
@@ -106,11 +123,17 @@ export function MultiDownloadCard({
               </span>
             ) : (
               <span className="flex items-center gap-2 text-sm font-semibold">
-                <FileText /> {single ? "Download (.docx)" : "Download as one file (.docx)"}
+                <FileText /> {single ? `Download (.${isPdf ? "pdf" : "docx"})` : `Download as one file (.${isPdf ? "pdf" : "docx"})`}
               </span>
             )}
             <span className="text-xs opacity-80">
-              {single ? "One file — downloads directly" : "All files in order — page breaks between files"}
+              {single
+                ? isPdf
+                  ? "One file — the DOCX is rendered to PDF in your browser"
+                  : "One file — downloads directly"
+                : isPdf
+                  ? "All files in order — page breaks between files, rendered to PDF"
+                  : "All files in order — page breaks between files"}
             </span>
           </Button>
 

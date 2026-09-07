@@ -23,8 +23,8 @@ import {
   allSetsClipboardText,
   copyToClipboard,
   downloadBlob,
+  buildSetsDocxBlob,
   exportDocHtml,
-  exportDocx,
   printSets,
   DEFAULT_EXPORT_OPTIONS,
   type ExportOptions,
@@ -35,7 +35,7 @@ import {
 import {
   analyzeColorDocx,
   applyColorSerialXml,
-  downloadColorSerialDocx,
+  buildColorSerialDocxBlob,
   planSerialByColor,
   type BlockedLine,
   type ColorAnalysis,
@@ -61,11 +61,12 @@ import {
   NoColorSerialCard,
 } from "@/components/mcq/serial-extra-cards";
 import {
+  buildSerialFixedDocxBlob,
+  buildShuffledDocxBlob,
   buildShuffledXml,
-  downloadSerialFixedDocx,
-  downloadShuffledDocx,
   englishSetName,
 } from "@/lib/mcq/docx-exporter";
+import { docxBlobToPdfBlob, pdfFileNameOf, type DownloadFormat } from "@/lib/mcq/pdf-export";
 import { analyzeRefReport, type RefMode, type RefReport } from "@/lib/mcq/reference";
 import { RedownloadInputCard } from "@/components/mcq/redownload-input-card";
 import { RedownloadPartsCard } from "@/components/mcq/redownload-parts-card";
@@ -96,6 +97,8 @@ const STORAGE_KEY = "mcq-shuffler-text";
 const MODE_KEY = "mcq-shuffler-mode";
 /** আউটপুট ফাইলের ফন্ট-রিম্যাপ সেটিংস — সব মোডের ডাউনলোডে এক সেটিংস (persisted) */
 const FONT_SETTINGS_KEY = "mcq-font-settings";
+/** "Download as" ফরম্যাট-টগলের শেষ পছন্দ (DOCX ডিফল্ট — অনুপস্থিত/ভাঙা মানে DOCX) */
+const DOWNLOAD_FORMAT_KEY = "mcq-download-format";
 // মাল্টি-ফাইল লিস্টের আইটেম-id (reorder/remove-এর জন্য স্টেবল কী দরকার)
 let multiIdCounter = 0;
 const nextMultiId = () => `mf-${++multiIdCounter}-${Date.now().toString(36)}`;
@@ -185,6 +188,9 @@ export default function Home() {
 
   // ---- আউটপুট ফাইলের ফন্ট-রিম্যাপ — ডাউনলোডের সময় document.xml (+styles.xml)-এ প্রয়োগ হয় ----
   const [fontSettings, setFontSettings] = useState<FontSettings>(DEFAULT_FONT_REMAP_SETTINGS);
+
+  // ---- "Download as" ফরম্যাট (DOCX ডিফল্ট / PDF) — সব মোডের সব ডাউনলোডে এক পছন্দ (persisted) ----
+  const [downloadFormat, setDownloadFormat] = useState<DownloadFormat>("docx");
 
   // ---- রেজাল্ট ----
   const [sets, setSets] = useState<McqQuestion[][] | null>(null);
@@ -294,6 +300,15 @@ export default function Home() {
     }
   }, []);
 
+  // ডাউনলোড-ফরম্যাট হাইড্রেট (প্রথম লোডে একবারই) — DOCX ডিফল্ট যখন key অনুপস্থিত
+  useEffect(() => {
+    try {
+      const f = localStorage.getItem(DOWNLOAD_FORMAT_KEY);
+      if (f === "docx" || f === "pdf") setDownloadFormat(f);
+    } catch { // কোটা/প্রাইভেসি-মোড — নীরবে উপেক্ষা
+    }
+  }, []);
+
   /** ফন্ট-সেটিংস কমিট (কার্ডের "Use fonts"/"Reset") — state + localStorage দুটোতেই */
   const updateFontSettings = useCallback((s: FontSettings) => {
     setFontSettings(s);
@@ -302,6 +317,40 @@ export default function Home() {
     } catch { // কোটা/প্রাইভেসি-মোড — নীরবে উপেক্ষা
     }
   }, []);
+
+  /** ডাউনলোড-ফরম্যাট কমিট ("Download as" টগল) — state + localStorage দুটোতেই */
+  const updateDownloadFormat = useCallback((f: DownloadFormat) => {
+    setDownloadFormat(f);
+    try {
+      localStorage.setItem(DOWNLOAD_FORMAT_KEY, f);
+    } catch { // কোটা/প্রাইভেসি-মোড — নীরবে উপেক্ষা
+    }
+  }, []);
+
+  /**
+   * ফরম্যাট-টগল অনুযায়ী চূড়ান্ত ডাউনলোড — DOCX হলে হুবহু আগের ব্লব+নাম
+   * (বাইট-অভিন্ন আচরণ); PDF হলে docx-ব্লবটা ব্রাউজারেই PDF-এ কনভার্ট হয়ে
+   * একই base নামের .pdf হিসেবে নামে (fontSettings আগেই docx-এ প্রয়োগ হয়ে যায়)।
+   */
+  const finalizeDownload = async (docxOut: { blob: Blob; fileName: string }) => {
+    if (downloadFormat === "pdf") {
+      const pdf = await docxBlobToPdfBlob(docxOut.blob, docxOut.fileName);
+      downloadBlob(pdf, pdfFileNameOf(docxOut.fileName));
+    } else {
+      downloadBlob(docxOut.blob, docxOut.fileName);
+    }
+  };
+
+  /** ZIP-এর এন্ট্রি-লিস্ট — DOCX হলে হুবহু আগেরটা; PDF হলে প্রতিটা এন্ট্রি .pdf-এ কনভার্ট
+   * (নামের base একই) — ZIP-এর নিজের নাম/কনভেনশন অপরিবর্তিত থাকে */
+  const finalizeZipEntries = async (entries: Array<{ name: string; blob: Blob }>) => {
+    if (downloadFormat !== "pdf") return entries;
+    const out: Array<{ name: string; blob: Blob }> = [];
+    for (const e of entries) {
+      out.push({ name: pdfFileNameOf(e.name), blob: await docxBlobToPdfBlob(e.blob, e.name) });
+    }
+    return out;
+  };
 
   /** skipCarry=true → carry-over বাইপাস (openInSerialMode নিজেই স্টেট সাজিয়ে রাখে — দুইবার লোড/টোস্ট ঠেকাতে) */
   const changeMode = (m: McqMode, skipCarry = false) => {
@@ -702,16 +751,19 @@ export default function Home() {
         });
         return;
       }
-      await downloadColorSerialDocx({
-        originalFile: serialDoc.file,
-        xml: serialDoc.xml,
-        plan,
-        baseName: serialDoc.baseName,
-        schemeLabel: label,
-        fontSettings,
-      });
+      // ফরম্যাট-টগল অনুযায়ী ডাউনলোড — DOCX হলে হুবহু আগের ব্লব; PDF হলে ব্রাউজারে কনভার্ট
+      await finalizeDownload(
+        await buildColorSerialDocxBlob({
+          originalFile: serialDoc.file,
+          xml: serialDoc.xml,
+          plan,
+          baseName: serialDoc.baseName,
+          schemeLabel: label,
+          fontSettings,
+        })
+      );
       toast({
-        title: "✅ Color-serial .docx downloaded",
+        title: `✅ Color-serial .${downloadFormat === "pdf" ? "pdf" : "docx"} downloaded`,
         description:
           scheme.kind === "continuous"
             ? `${plan.size} question(s) numbered continuously 1,2,3…. Everything else untouched.`
@@ -743,9 +795,9 @@ export default function Home() {
         items.push({ xml, file: await replaceDocumentXml(d.file, xml) });
       }
       const merged = await buildMergedDocxBlob(items, fontSettings);
-      downloadBlob(merged, `${serialDocs[0].baseName} (merged serial).docx`);
+      await finalizeDownload({ blob: merged, fileName: `${serialDocs[0].baseName} (merged serial).docx` });
       toast({
-        title: "✅ Merged .docx downloaded",
+        title: `✅ Merged .${downloadFormat === "pdf" ? "pdf" : "docx"} downloaded`,
         description:
           serialStrategy === "global"
             ? "All files in order with page breaks — one continuous serial start to finish."
@@ -770,7 +822,7 @@ export default function Home() {
         const xml = applyColorSerialXml(d.xml, plan);
         out.push({ name: `${d.baseName} (serial).docx`, blob: await replaceDocumentXml(d.file, xml, fontSettings) });
       }
-      const zip = await buildZipBlob(out);
+      const zip = await buildZipBlob(await finalizeZipEntries(out));
       downloadBlob(zip, "MCQ-serial-files.zip");
       toast({
         title: "✅ ZIP downloaded",
@@ -841,14 +893,16 @@ export default function Home() {
     try {
       const renumbered = renumberQuestionsByPosition(serialPaste.questions, 1);
       // একক সেট → পেজ-হেডার ও সেট-টাইটেল ("সেট A") দুটোই অফ — খালি সিরিয়াল ফাইল
-      await exportDocx([renumbered], {
-        ...DEFAULT_EXPORT_OPTIONS,
-        includeHeader: false,
-        includeSetHeader: false,
-        fileName: `MCQ-Serial-${renumbered.length}q.docx`,
-      }, fontSettings);
+      await finalizeDownload(
+        await buildSetsDocxBlob([renumbered], {
+          ...DEFAULT_EXPORT_OPTIONS,
+          includeHeader: false,
+          includeSetHeader: false,
+          fileName: `MCQ-Serial-${renumbered.length}q.docx`,
+        }, fontSettings)
+      );
       toast({
-        title: "✅ Serial .docx downloaded",
+        title: `✅ Serial .${downloadFormat === "pdf" ? "pdf" : "docx"} downloaded`,
         description: `${renumbered.length} question(s) numbered 1..N by position — order and options exactly intact.`,
       });
     } catch (e) {
@@ -915,18 +969,20 @@ export default function Home() {
     if (!docx?.parse || !setsDocx) return;
     setBusy(doRenumber ? "docx-r" : "docx-o");
     try {
-      await downloadShuffledDocx({
-        originalFile: docx.file,
-        xml: docx.xml,
-        questions: docx.parse.questions,
-        sets: setsDocx,
-        baseName: docx.baseName,
-        suffix: doRenumber ? " (shuffled, renumbered)" : " (shuffled, original serial)",
-        opts: { renumber: doRenumber, includeSetHeader: true, refMode },
-        fontSettings,
-      });
+      await finalizeDownload(
+        await buildShuffledDocxBlob({
+          originalFile: docx.file,
+          xml: docx.xml,
+          questions: docx.parse.questions,
+          sets: setsDocx,
+          baseName: docx.baseName,
+          suffix: doRenumber ? " (shuffled, renumbered)" : " (shuffled, original serial)",
+          opts: { renumber: doRenumber, includeSetHeader: true, refMode },
+          fontSettings,
+        })
+      );
       toast({
-        title: "✅ Word file downloaded",
+        title: downloadFormat === "pdf" ? "✅ PDF file downloaded" : "✅ Word file downloaded",
         description: doRenumber
           ? "One set per page, serials 1,2,3…. Formatting exactly intact."
           : "One set per page, with the questions' original numbers. Formatting exactly intact.",
@@ -942,16 +998,18 @@ export default function Home() {
     if (!docx?.parse) return;
     setFixing(true);
     try {
-      await downloadSerialFixedDocx({
-        originalFile: docx.file,
-        xml: docx.xml,
-        questions: docx.parse.questions,
-        baseName: docx.baseName,
-        refMode,
-        fontSettings,
-      });
+      await finalizeDownload(
+        await buildSerialFixedDocxBlob({
+          originalFile: docx.file,
+          xml: docx.xml,
+          questions: docx.parse.questions,
+          baseName: docx.baseName,
+          refMode,
+          fontSettings,
+        })
+      );
       toast({
-        title: "🔧 Serial-fixed .docx downloaded",
+        title: `🔧 Serial-fixed .${downloadFormat === "pdf" ? "pdf" : "docx"} downloaded`,
         description: "Questions in original order with serials 1..N — formatting exactly intact.",
       });
     } catch (e) {
@@ -1169,7 +1227,7 @@ export default function Home() {
           : await buildMergedDocxBlob(items, fontSettings);
       const name =
         items.length === 1 ? `${items[0].baseName} (redownload).docx` : "MCQ-Redownload-merged.docx";
-      downloadBlob(blob, name);
+      await finalizeDownload({ blob, fileName: name });
       toast({
         title: "✅ Redownload file created",
         description: `Picked parts from ${items.length} file(s) in the new file — tabs, equations, watermark all intact.`,
@@ -1194,7 +1252,7 @@ export default function Home() {
         const blob = await replaceDocumentXml(it.file, it.xml, fontSettings);
         files.push({ name: `${it.baseName} (redownload).docx`, blob });
       }
-      const zip = await buildZipBlob(files);
+      const zip = await buildZipBlob(await finalizeZipEntries(files));
       downloadBlob(zip, "MCQ-Redownload.zip");
       toast({
         title: "✅ ZIP downloaded",
@@ -1397,9 +1455,10 @@ export default function Home() {
       }
       if (items.length < 2) throw new Error("Not enough files to merge");
       const merged = await buildMergedDocxBlob(items, fontSettings);
-      downloadBlob(merged, `${shuffleItems[0].baseName} (merged shuffled).docx`);
+      await finalizeDownload({ blob: merged, fileName: `${shuffleItems[0].baseName} (merged shuffled).docx` });
       toast({
-        title: "✅ Merged Word file downloaded",
+        title:
+          downloadFormat === "pdf" ? "✅ Merged PDF file downloaded" : "✅ Merged Word file downloaded",
         description: "All files' sets in order — page breaks between files, formatting exactly intact.",
       });
     } catch (e) {
@@ -1426,7 +1485,7 @@ export default function Home() {
         out.push({ name: `${it.baseName} (shuffled).docx`, blob: await replaceDocumentXml(it.file, xml, fontSettings) });
       }
       if (!out.length) throw new Error("No files to download");
-      const zip = await buildZipBlob(out);
+      const zip = await buildZipBlob(await finalizeZipEntries(out));
       downloadBlob(zip, "MCQ-shuffled-files.zip");
       toast({
         title: "✅ ZIP downloaded",
@@ -1461,8 +1520,11 @@ export default function Home() {
     if (!sets) return;
     setBusy("docx");
     try {
-      await exportDocx(sets, exportOpts, fontSettings);
-      toast({ title: "✅ Word file downloaded", description: "Each set is on its own page." });
+      await finalizeDownload(await buildSetsDocxBlob(sets, exportOpts, fontSettings));
+      toast({
+        title: downloadFormat === "pdf" ? "✅ PDF file downloaded" : "✅ Word file downloaded",
+        description: "Each set is on its own page.",
+      });
     } catch (e) {
       toast({ title: "Download failed", description: String(e), variant: "destructive" });
     } finally {
@@ -1473,6 +1535,8 @@ export default function Home() {
   const handleExportDoc = () => {
     if (!sets) return;
     try {
+      // NOTE: the .doc (legacy Word) path stays DOCX/HTML-only by design — the
+      // "Download as" PDF toggle does not affect it (nor the Print button below).
       exportDocHtml(sets, exportOpts);
       toast({ title: "✅ .doc file downloaded" });
     } catch (e) {
@@ -1627,6 +1691,8 @@ export default function Home() {
                   mergedBusy={rdMergedBusy}
                   zipBusy={rdZipBusy}
                   fileCount={rdDocs.length}
+                  format={downloadFormat}
+                  onFormatChange={updateDownloadFormat}
                 />
 
                 <NextModesCard current="redownload" filesCount={rdFileCount} onOpen={changeMode} />
@@ -1661,6 +1727,8 @@ export default function Home() {
                 downloading={serialPasteDlBusy}
                 onFix={handleSerialPasteFix}
                 onDownload={handleSerialPasteDownload}
+                format={downloadFormat}
+                onFormatChange={updateDownloadFormat}
               />
             )}
 
@@ -1675,12 +1743,16 @@ export default function Home() {
                   fileName={serialDoc.file.name}
                   busy={serialBusy}
                   onSerial={handleColorSerial}
+                  format={downloadFormat}
+                  onFormatChange={updateDownloadFormat}
                 />
               ) : (
                 <NoColorSerialCard
                   questionCount={serialDoc.analysis.questionCount}
                   busy={serialBusy}
                   onContinuous={() => handleColorSerial({ kind: "continuous" }, "continuous")}
+                  format={downloadFormat}
+                  onFormatChange={updateDownloadFormat}
                 />
               )
             ) : null}
@@ -1705,6 +1777,8 @@ export default function Home() {
                   mergedBusy={serialMergedBusy}
                   zipBusy={serialZipBusy}
                   fileCount={serialDocs.length}
+                  format={downloadFormat}
+                  onFormatChange={updateDownloadFormat}
                 />
                 <NextModesCard current="serial" filesCount={serialFileCount} onOpen={changeMode} />
               </>
@@ -1791,6 +1865,8 @@ export default function Home() {
                       mergedBusy={multiMergedBusy}
                       zipBusy={multiZipBusy}
                       fileCount={shuffleItems.length}
+                      format={downloadFormat}
+                      onFormatChange={updateDownloadFormat}
                     />
                   )}
                 </div>
@@ -1860,6 +1936,8 @@ export default function Home() {
                       onDownload={handleDocxDownload}
                       onCopySet={handleDocxCopySet}
                       dominant={encData.dominant}
+                      format={downloadFormat}
+                      onFormatChange={updateDownloadFormat}
                     />
                   )}
                 </div>
@@ -1920,6 +1998,8 @@ export default function Home() {
                       busy={busy}
                       copiedSet={copiedSet}
                       dominant={encData.dominant}
+                      format={downloadFormat}
+                      onFormatChange={updateDownloadFormat}
                     />
                   )}
                 </div>

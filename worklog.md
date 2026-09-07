@@ -860,3 +860,36 @@ Work Log:
 Stage Summary:
 - ইউজার এখন যেকোনো মোডের ডাউনলোডের আগে "Fonts in the output file" কার্ড থেকে ৩ ফন্ট বাছতে পারে — সব docx-আউটপুট (শাফল সিঙ্গেল/মার্জ/ZIP, রঙ-সিরিয়াল, সিরিয়াল-ফিক্স, রিডাউনলোড, পেস্ট-সিরিয়াল, টেক্সট-ফ্লো .docx) এক সেটিংসে রিম্যাপ হয়; সেটিংস ব্রাউজারে মনে থাকে
 - OFF করলে আউটপুট বাইট-লেভেলে আগের মতোই — রিগ্রেশন-ঝুঁকি শূন্য
+
+---
+Task ID: 44
+Agent: Sub Agent (DOCX/PDF download selector)
+Task: In EVERY mode, before downloading, offer "Download as" DOCX (default) / PDF; PDF path converts each generated .docx Blob in-browser (docx-preview → html2canvas-pro → jsPDF); multi-file PDF outputs packed into the SAME ZIP naming as the DOCX path
+
+Work Log:
+- Deps: bun add docx-preview@0.4.0 html2canvas-pro@2.4.1 jspdf@4.2.1 — all loaded via dynamic `await import()` inside the conversion function (verified in static build: libs live in lazy chunks, main page HTML carries none)
+- NEW `src/lib/mcq/pdf-export.ts`:
+  • `export type DownloadFormat = "docx" | "pdf"`
+  • `export function pdfFileNameOf(docxName: string): string` — ".docx" → ".pdf"
+  • `export async function docxBlobToPdfBlob(docx: Blob, baseName: string): Promise<Blob>` — per-call hidden offscreen host (fixed, left:-10000px, white bg, ~A4 width) removed in finally; renderAsync(inWrapper, breakPages, useBase64URL, headers/footers/footnotes/endnotes) → await document.fonts.ready + 150 ms settle → html2canvas-pro each `.docx-wrapper > section.docx` at scale 2 (white bg, useCORS) → jsPDF A4 portrait, each capture added as centered JPEG q0.95 fitted by min-ratio (fills page, no distortion); zero pages → capture the whole `.docx-wrapper` fallback; html2canvas/render failures throw clear English errors (surfaced by the existing toast pattern, e.g. "Download failed"/"Merging failed" toasts)
+- NEW `src/components/mcq/download-format-toggle.tsx` — compact segmented pills: "Download as" + DOCX/PDF (`data-testid="download-format"` container, `format-docx`/`format-pdf` buttons with aria-pressed, disabled while busy, tiny "PDF is rendered in your browser (best effort)" hint when PDF active)
+- Format state LIFTED to page.tsx (DECISION, noted): download cards are mutually exclusive per view today (verified: shuffle-multi XOR single-docx XOR text; serial file-flow XOR paste; redownload alone), but lifting to one `downloadFormat` state + `updateDownloadFormat` (persisted localStorage "mcq-download-format", DOCX default when absent/broken, hydrated on mount) guarantees exactly one toggle instance per view AND one persisted choice shared by every mode/card
+- Toggle (same testids) rendered above the download buttons in ALL SIX download cards: MultiDownloadCard (redownload + serial-multi + shuffle-multi), DocxSetsResult (single-docx shuffle), SetsResult (text flow), SerialPasteCard (paste flow), ColorSerialCard + NoColorSerialCard (single-file serial). Card download-button labels swap ".docx"/"Word" ↔ ".pdf"/"PDF" with the selection (existing texts byte-identical in DOCX mode)
+- Blob-builder split (download functions now thin wrappers — DOCX bytes unchanged): `exporter.buildSetsDocxBlob` (+exportDocx), `docx-exporter.buildShuffledDocxBlob`/`buildSerialFixedDocxBlob` (+download*), `color-serial.buildColorSerialDocxBlob` (+downloadColorSerialDocx) — all return `{blob, fileName}`, keep fontSettings remap as the last step
+- page.tsx wiring: `finalizeDownload(out)` helper (DOCX → downloadBlob exactly as before; PDF → docxBlobToPdfBlob + downloadBlob with .pdf name) and `finalizeZipEntries(entries)` (DOCX → identity; PDF → every entry converted, names base-identical *.pdf) used by every handler:
+  • PDF-supported download paths (exhaustive): shuffle single-docx renumbered/original (handleDocxDownload), serial-fix (handleDocxSerialFix), text-flow Word export (handleExportDocx), serial-paste (handleSerialPasteDownload), color-serial single (handleColorSerial), serial multi merged + ZIP, shuffle multi merged + ZIP, redownload merged (single+multi) + ZIP
+  • ZIP names unchanged ("MCQ-serial-files.zip", "MCQ-shuffled-files.zip", "MCQ-Redownload.zip"); merged names keep base, ext becomes .pdf (incl. "MCQ-Redownload-merged.pdf")
+  • DOCX-only by design (code comment added): text-flow ".doc (legacy Word)" button (exportDocHtml) and Print — the toggle does not affect them
+- Busy states reused (existing per-button spinners; toggle disabled while its card is busy); font remap untouched and still applied inside every built docx before PDF conversion
+
+Verification (all green):
+- npx tsc --noEmit → 0 errors; npx eslint src → clean
+- Unit tests: test-mcq 71, test-docx 48, test-color-serial 129, test-multi-docx 65, test-redownload 41, test-reference 61, test-font-remap 115 = 530/530 pass
+- Dev server :3000 → 200; E2E ALL pass with zero console/page errors: e2e-mode-tabs, e2e-modes 55/55, e2e-multi-file, e2e-shuffle-headers, e2e-shuffle-limit, e2e-reference 6/6, e2e-live-bare-ref 10/10, e2e-back-home, e2e-font-remap 20/20, e2e-pdf-export 20/20 (NEW)
+- NEW `scripts/e2e-pdf-export.ts` (self-sufficient JSZip fixture generator): asserts DOCX default active on fresh load → .docx download with PK magic; toggle PDF → localStorage "mcq-download-format"=pdf → .pdf download with %PDF magic; multi-file view keeps persisted PDF → merged %PDF + ZIP named "MCQ-shuffled-files.zip" containing ONLY *.pdf entries each starting %PDF; toggling back to DOCX persists; 0 JS errors
+- Static export: STATIC_EXPORT=1 NEXT_PUBLIC_BASE_PATH=/MCQ_Shuffler_Pro npx next build → success (6 static routes; /MCQ_Shuffler_Pro present in HTML asset URLs; pdf libs confirmed in lazy chunks) — artifact dir `.next-static` deleted afterwards, no out/ created, working tree clean of build junk
+- No git commit made (per task)
+
+Stage Summary:
+- Every download in all 3 modes now offers DOCX (default, byte-identical to before) or PDF (rendered 100% client-side); multi-file PDFs ride the exact same merge/ZIP UX and zip naming as DOCX with *.pdf entries
+- Known limitations (documented in README "Download formats" section): PDF is a best-effort in-browser render — legacy Bijoy fonts (SutonnyMJ etc.) appear correctly only when installed on the viewer's device; pages are raster images (no selectable text); .doc legacy + Print paths are DOCX-only

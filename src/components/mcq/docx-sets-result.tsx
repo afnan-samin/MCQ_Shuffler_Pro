@@ -18,6 +18,8 @@ import {
 import type { DocxQuestion } from "@/lib/mcq/docx-xml";
 import { englishSetName } from "@/lib/mcq/docx-exporter";
 import { lineDominantOf, type Enc } from "@/lib/mcq/encoding";
+import type { DownloadFormat } from "@/lib/mcq/pdf-export";
+import { DownloadFormatToggle } from "@/components/mcq/download-format-toggle";
 import { TokText } from "@/components/mcq/tok-text";
 import { SerialSpan } from "@/components/mcq/docx-detect-card";
 
@@ -33,6 +35,9 @@ interface DocxSetsResultProps {
   onDownload: (renumber: boolean) => void;
   onCopySet: (si: number) => void;
   dominant: Enc | null;
+  /** "Download as" ফরম্যাট (DOCX ডিফল্ট) — onFormatChange দিলেই টগল রেন্ডার হয় */
+  format?: DownloadFormat;
+  onFormatChange?: (f: DownloadFormat) => void;
 }
 
 export function DocxSetsResult({
@@ -45,9 +50,12 @@ export function DocxSetsResult({
   onDownload,
   onCopySet,
   dominant,
+  format = "docx",
+  onFormatChange,
 }: DocxSetsResultProps) {
   const byId = new Map(questions.map((q) => [q.id, q]));
   const totalQ = sets.reduce((a, s) => a + s.length, 0);
+  const fmtLabel = format === "pdf" ? "PDF (.pdf)" : "Word (.docx)";
 
   return (
     <Card id="step-result" className="border-brand-300 dark:border-brand-700">
@@ -78,15 +86,20 @@ export function DocxSetsResult({
           <Switch id="renumber-switch" checked={renumber} onCheckedChange={onRenumberChange} />
         </div>
 
+        {/* ফরম্যাট-টগল (DOCX ডিফল্ট / PDF) — এক্সপোর্ট বারের ঠিক উপরে */}
+        {onFormatChange && (
+          <DownloadFormatToggle value={format} onChange={onFormatChange} disabled={busy !== null} />
+        )}
+
         {/* এক্সপোর্ট বার */}
         <div className="sticky top-2 z-10 flex flex-wrap items-center justify-center gap-2 rounded-xl border bg-white/95 p-3 shadow-sm backdrop-blur dark:bg-background/95">
           <Button className="gap-2 bg-brand-600 hover:bg-brand-700" onClick={() => onDownload(true)} disabled={busy !== null}>
             {busy === "docx-r" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-            ⬇️ Word (.docx) — renumbered serials (1,2,3…)
+            ⬇️ {fmtLabel} — renumbered serials (1,2,3…)
           </Button>
           <Button variant="outline" className="gap-2" onClick={() => onDownload(false)} disabled={busy !== null}>
             {busy === "docx-o" ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlignLeft className="h-4 w-4" />}
-            ⬇️ Word (.docx) — original numbers
+            ⬇️ {fmtLabel} — original numbers
           </Button>
         </div>
 

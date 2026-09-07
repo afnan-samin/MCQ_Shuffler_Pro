@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle, CheckCircle2, Download, Info, Wrench } from "lucide-react";
 import type { ParseOutput } from "@/lib/mcq/parser";
+import type { DownloadFormat } from "@/lib/mcq/pdf-export";
+import { DownloadFormatToggle } from "@/components/mcq/download-format-toggle";
 
 interface SerialPasteCardProps {
   result: ParseOutput;
@@ -15,6 +17,9 @@ interface SerialPasteCardProps {
   onFix: () => void;
   /** পজিশন-অনুযায়ী ১..N রিনাম্বার করে এক সেট .docx ডাউনলোড */
   onDownload: () => void;
+  /** "Download as" ফরম্যাট (DOCX ডিফল্ট) — onFormatChange দিলেই টগল রেন্ডার হয় */
+  format?: DownloadFormat;
+  onFormatChange?: (f: DownloadFormat) => void;
 }
 
 const scriptLabelOf = (s: ParseOutput["numberScript"]) =>
@@ -31,7 +36,7 @@ const scriptLabelOf = (s: ParseOutput["numberScript"]) =>
  * থাকে না (ফাইল লোড হলে এই কার্ড সরে যায়)। পেস্ট = টেক্সট পাইপলাইন —
  * এখানে রঙ-ডিটেকশন হয় না, তাই অ্যাম্বার নোটসহ .docx আপলোডের ইঙ্গিত দেখানো হয়।
  */
-export function SerialPasteCard({ result, fixing, downloading, onFix, onDownload }: SerialPasteCardProps) {
+export function SerialPasteCard({ result, fixing, downloading, onFix, onDownload, format = "docx", onFormatChange }: SerialPasteCardProps) {
   const questions = result.questions;
   const withOptions = questions.filter((q) => q.options.length >= 2).length;
   const serial = result.serial;
@@ -129,6 +134,11 @@ export function SerialPasteCard({ result, fixing, downloading, onFix, onDownload
           </p>
         </div>
 
+        {/* ফরম্যাট-টগল (DOCX ডিফল্ট / PDF) — ডাউনলোড বাটনের ঠিক উপরে */}
+        {onFormatChange && (
+          <DownloadFormatToggle value={format} onChange={onFormatChange} disabled={downloading} />
+        )}
+
         {/* বড় ডাউনলোড বাটন — পজিশন-অনুযায়ী ১..N রিনাম্বার করে এক সেট */}
         <Button
           type="button"
@@ -140,7 +150,7 @@ export function SerialPasteCard({ result, fixing, downloading, onFix, onDownload
             <span className="flex items-center gap-2 text-sm font-semibold">Generating...</span>
           ) : (
             <span className="flex items-center gap-2 text-sm font-semibold">
-              <Download /> Download serial .docx (1..N)
+              <Download /> Download serial .{format === "pdf" ? "pdf" : "docx"} (1..N)
             </span>
           )}
           <span className="text-xs opacity-80">

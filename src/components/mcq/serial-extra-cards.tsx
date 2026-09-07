@@ -6,7 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, ChevronDown, ChevronUp, Download, FileText, Info, ListOrdered, PaintBucket, ShieldX } from "lucide-react";
 import { colorKeyHex, colorKeyName, type BlockedLine, type ColorAnalysis, type SerialScheme } from "@/lib/mcq/color-serial";
+import type { DownloadFormat } from "@/lib/mcq/pdf-export";
 import { lineDominantOf } from "@/lib/mcq/encoding";
+import { DownloadFormatToggle } from "@/components/mcq/download-format-toggle";
 import { cn } from "@/lib/utils";
 
 interface ColorShuffleInfoCardProps {
@@ -62,10 +64,13 @@ interface NoColorSerialCardProps {
   busy: boolean;
   /** একটানা (continuous) সিরিয়াল চালিয়ে ডাউনলোড */
   onContinuous: () => void;
+  /** "Download as" ফরম্যাট (DOCX ডিফল্ট) — onFormatChange দিলেই টগল রেন্ডার হয় */
+  format?: DownloadFormat;
+  onFormatChange?: (f: DownloadFormat) => void;
 }
 
 /** সিরিয়াল মোডে রঙ না পেলে — একটানা ১..N অপশন */
-export function NoColorSerialCard({ questionCount, busy, onContinuous }: NoColorSerialCardProps) {
+export function NoColorSerialCard({ questionCount, busy, onContinuous, format = "docx", onFormatChange }: NoColorSerialCardProps) {
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -87,9 +92,12 @@ export function NoColorSerialCard({ questionCount, busy, onContinuous }: NoColor
               <b>one continuous 1,2,3…</b> serial. For color structure, add shading to the headers in Word (Home →
               Paragraph → Shading) and re-upload.
             </p>
+            {onFormatChange && (
+              <DownloadFormatToggle value={format} onChange={onFormatChange} disabled={busy} />
+            )}
             <Button onClick={onContinuous} disabled={busy} className="w-full sm:w-auto">
               <Download className="mr-2 h-4 w-4" />
-              {busy ? "Processing…" : "Download continuous 1..N serial .docx"}
+              {busy ? "Processing…" : `Download continuous 1..N serial .${format === "pdf" ? "pdf" : "docx"}`}
             </Button>
           </>
         ) : (

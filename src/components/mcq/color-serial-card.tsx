@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Download, PaintBucket, Shuffle, Info } from "lucide-react";
 import type { ColorAnalysis, DetectedColor, SerialScheme } from "@/lib/mcq/color-serial";
+import type { DownloadFormat } from "@/lib/mcq/pdf-export";
+import { DownloadFormatToggle } from "@/components/mcq/download-format-toggle";
 import { cn } from "@/lib/utils";
 
 interface ColorSerialCardProps {
@@ -14,6 +16,9 @@ interface ColorSerialCardProps {
   busy: boolean;
   /** সিলেক্ট করা স্কিমে সিরিয়াল চালিয়ে .docx ডাউনলোড */
   onSerial: (scheme: SerialScheme, label: string) => void;
+  /** "Download as" ফরম্যাট (DOCX ডিফল্ট) — onFormatChange দিলেই টগল রেন্ডার হয় */
+  format?: DownloadFormat;
+  onFormatChange?: (f: DownloadFormat) => void;
 }
 
 /** সোয়াচ — থিম-কী হলে নিরপেক্ষ ধূসর গ্রেডিয়েন্ট */
@@ -39,7 +44,7 @@ export function schemeLabelOf(scheme: SerialScheme, colors: DetectedColor[]): st
   return c.name; // প্যালেট কোড (B1/A3…)
 }
 
-export function ColorSerialCard({ analysis, fileName, busy, onSerial }: ColorSerialCardProps) {
+export function ColorSerialCard({ analysis, fileName, busy, onSerial, format = "docx", onFormatChange }: ColorSerialCardProps) {
   const [sel, setSel] = useState<SerialScheme | null>(null);
 
   const selLabel = sel ? schemeLabelOf(sel, analysis.colors) : "";
@@ -142,9 +147,12 @@ export function ColorSerialCard({ analysis, fileName, busy, onSerial }: ColorSer
         </div>
 
         {/* অ্যাকশন */}
+        {onFormatChange && (
+          <DownloadFormatToggle value={format} onChange={onFormatChange} disabled={busy} />
+        )}
         <Button className="w-full sm:w-auto" disabled={!sel || busy} onClick={() => sel && onSerial(sel, selLabel)}>
           <Download className="mr-2 h-4 w-4" />
-          {busy ? "Processing…" : `Download serial .docx${selLabel ? ` (${selLabel})` : ""}`}
+          {busy ? "Processing…" : `Download serial .${format === "pdf" ? "pdf" : "docx"}${selLabel ? ` (${selLabel})` : ""}`}
         </Button>
       </CardContent>
     </Card>

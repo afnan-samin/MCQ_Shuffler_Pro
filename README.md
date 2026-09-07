@@ -12,6 +12,15 @@ A completely free web tool that shuffles MCQ questions into multiple exam sets. 
 - **Reference tags** — keep, strip, or move `[CU-A: 22-23]`-style source tags when shuffling
 - **Privacy** — the whole pipeline runs in the browser; no API routes, no uploads
 
+## Download formats
+
+Every download card shows a **"Download as"** toggle before you download: **DOCX (default)** or **PDF**. The choice is remembered in your browser (`localStorage: mcq-download-format`).
+
+- **DOCX** — byte-faithful Word output (original formatting, tabs, equations, fonts); this is the recommended format.
+- **PDF** — the generated DOCX is rendered in your browser (docx-preview → canvas → jsPDF) and packed as PDF. Single outputs download as `.pdf`; multi-file outputs pack all PDFs into the same ZIP that the DOCX path would produce (entries renamed `*.pdf`). This is **best-effort**: PDF is a rendered snapshot, and legacy Bijoy fonts (SutonnyMJ, etc.) appear correctly only if those fonts are installed on the viewer's device — otherwise the browser substitutes a fallback font.
+
+The legacy `.doc (legacy Word)` button and the Print button are unaffected by the toggle.
+
 ## Local development
 
 ```bash

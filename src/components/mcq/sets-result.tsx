@@ -24,7 +24,9 @@ import {
 import type { McqQuestion } from "@/lib/mcq/parser";
 import { getSetName, type NameStyle } from "@/lib/mcq/set-engine";
 import type { ExportOptions, FontMode } from "@/lib/mcq/exporter";
+import type { DownloadFormat } from "@/lib/mcq/pdf-export";
 import { lineDominantOf, type Enc } from "@/lib/mcq/encoding";
+import { DownloadFormatToggle } from "@/components/mcq/download-format-toggle";
 import { TokText } from "@/components/mcq/tok-text";
 
 interface SetsResultProps {
@@ -43,6 +45,10 @@ interface SetsResultProps {
   copiedSet: number | null;
   /** ডকুমেন্টের প্রধান লেখার ধরন (প্রিভিউতে সঠিক ফন্টের জন্য) */
   dominant: Enc | null;
+  /** "Download as" ফরম্যাট (DOCX ডিফল্ট) — onFormatChange দিলেই টগল রেন্ডার হয়;
+   * শুধু .docx বাটন প্রভাবিত হয় — .doc (legacy) ও Print সবসময় আগের মতোই */
+  format?: DownloadFormat;
+  onFormatChange?: (f: DownloadFormat) => void;
 }
 
 const LEGACY_FONT_SUGGESTIONS = ["SutonnyMJ", "SutonnyOMJ", "SutonnyEMJ", "BijoyClassic", "SushreeMJ", "ShiblyMJ"];
@@ -64,6 +70,8 @@ export function SetsResult({
   busy,
   copiedSet,
   dominant,
+  format = "docx",
+  onFormatChange,
 }: SetsResultProps) {
   const [showSettings, setShowSettings] = useState(false);
   const totalQ = sets.reduce((a, s) => a + s.length, 0);
@@ -210,11 +218,17 @@ export function SetsResult({
           </div>
         )}
 
+        {/* ফরম্যাট-টগল (DOCX ডিফল্ট / PDF) — এক্সপোর্ট বারের ঠিক উপরে;
+            .doc (legacy) ও Print বাটন ফরম্যাট-টগলের বাইরে (DOCX/HTML-only পাথ) */}
+        {onFormatChange && (
+          <DownloadFormatToggle value={format} onChange={onFormatChange} disabled={busy !== null} />
+        )}
+
         {/* এক্সপোর্ট বার */}
         <div className="sticky top-2 z-10 flex flex-wrap items-center justify-center gap-2 rounded-xl border bg-white/95 p-3 shadow-sm backdrop-blur dark:bg-background/95">
           <Button className="gap-2 bg-brand-600 hover:bg-brand-700" onClick={onExportDocx} disabled={busy !== null}>
             {busy === "docx" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-            ⬇️ Word (.docx) — one set per page
+            ⬇️ {format === "pdf" ? "PDF (.pdf)" : "Word (.docx)"} — one set per page
           </Button>
           <Button variant="outline" className="gap-2" onClick={onExportDoc} disabled={busy !== null}>
             <ArrowDownToLine className="h-4 w-4" />
