@@ -229,6 +229,26 @@ console.log("\n── applyFontRemapXml — এজ-কেস ──");
   );
 }
 {
+  // English-ফন্ট ground-truth — Bijoy-প্রধান ডকেও Times/Arial-ফন্ট রান English-ই থাকে
+  const doc = wrapDoc(`<w:p><w:r><w:rPr><w:rFonts w:ascii="Times New Roman"/></w:rPr><w:t>wefxK</w:t></w:r></w:p>`);
+  const out = applyFontRemapXml(doc, S, { dominant: "bijoy" });
+  ok(
+    out.includes(`w:ascii="Arial"`) && !out.includes(`w:ascii="Shibly"`),
+    "English-ফন্ট ground-truth: Times-রান dominant-bijoy হলেও English ফন্ট পায়"
+  );
+}
+{
+  // শব্দ-ভোট — English-কমন শব্দ বেশি/সমান → latin; খাঁটি-ASCII Bijoy → bijoy
+  ok(
+    classifyRunText("The velocity of light", "bijoy") === "latin",
+    "শব্দ-ভোট: English-স্টাইল রান → latin"
+  );
+  ok(
+    classifyRunText("Photosynthesis Bengali", "bijoy") === "bijoy",
+    "শব্দ-ভোট: খাঁটি-ASCII Bijoy রান → bijoy"
+  );
+}
+{
   const doc = wrapDoc(`<w:p><w:r><w:t>Avgvi †K</w:t></w:r></w:p>`);
   const out = applyFontRemapXml(doc, { ...S, enabled: false });
   ok(out === doc, "enabled:false → বাইট-অপরিবর্তিত");
@@ -417,7 +437,7 @@ console.log("\n── FONT_CHOICES ও ডিফল্ট সেটিংস ─
 ok(FONT_CHOICES.english.length === 5 && FONT_CHOICES.english.includes("Times New Roman"), "FONT_CHOICES.english (৫টি, TNR-সহ)");
 ok(FONT_CHOICES.bijoy.length === 5 && FONT_CHOICES.bijoy.includes("SutonnyMJ") && FONT_CHOICES.bijoy.includes("Shibly"), "FONT_CHOICES.bijoy (৫টি)");
 ok(FONT_CHOICES.unicode.length === 5 && FONT_CHOICES.unicode.includes("Noto Serif Bengali"), "FONT_CHOICES.unicode (৫টি)");
-ok(DEFAULT_FONT_REMAP_SETTINGS.enabled === true, "ডিফল্ট: enabled=true");
+ok(DEFAULT_FONT_REMAP_SETTINGS.enabled === false, "ডিফল্ট: enabled=false (ডাউনলোড অরিজিনাল ফন্টই রাখে)");
 ok(DEFAULT_FONT_REMAP_SETTINGS.englishFont === "Times New Roman", "ডিফল্ট: englishFont");
 ok(DEFAULT_FONT_REMAP_SETTINGS.bijoyFont === "SutonnyMJ", "ডিফল্ট: bijoyFont");
 ok(DEFAULT_FONT_REMAP_SETTINGS.unicodeFont === "Noto Serif Bengali", "ডিফল্ট: unicodeFont");

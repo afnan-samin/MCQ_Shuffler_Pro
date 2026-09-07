@@ -58,7 +58,9 @@ export const DEFAULT_FONT_REMAP_SETTINGS: FontRemapSettings = {
   englishFont: "Times New Roman",
   bijoyFont: "SutonnyMJ",
   unicodeFont: "Noto Serif Bengali",
-  enabled: true,
+  /** ডিফল্ট OFF — ডাউনলোড আপলোড করা ফাইলের ফন্টই রাখে; বদলাতে চাইলে
+   * FontSettingsCard ("Fonts in the output file") থেকে চালু করতে হয় */
+  enabled: false,
 };
 
 /** UI-ড্রপডাউনের জন্য ফন্ট-তালিকা */
@@ -118,10 +120,16 @@ export function classifyRunText(text: string, dominant: RemapDominant = null): R
   if (hasBn) return "unicode-bengali";
   if (hasBijoy) return "bijoy";
   if (dominant === "bijoy" && /[A-Za-z]/.test(text)) {
-    // কমন-English শব্দের রান Bijoy-প্রধান ডকেও English ফন্টেই থাকুক
-    const words = text.split(/\s+/).filter((w) => /[A-Za-z]/.test(w));
-    if (words.length > 0 && words.every(isCommonEnglishWord)) return "latin";
-    return "bijoy";
+    // শব্দ-ভোট: English-কমন শব্দ সংখ্যায় বেশি/সমান হলে রান English ফন্টেই থাকুক —
+    // নাহলে খাঁটি-ASCII Bijoy রান ("Avgvi"-জাতীয়) বিজয় ফন্ট পায়
+    let en = 0;
+    let bj = 0;
+    for (const w of text.split(/\s+/)) {
+      if (!/[A-Za-z]/.test(w)) continue;
+      if (isCommonEnglishWord(w)) en++;
+      else bj++;
+    }
+    return bj > en ? "bijoy" : "latin";
   }
   return "latin";
 }
@@ -281,11 +289,17 @@ export function applyFontRemapXml(
     }
     if (!hasT) return m; // w:t নেই — w:tab/w:br/ফিল্ড-কোড রান অস্পৃশ্য
     let cls = classifyRunText(text, dominant);
-    if (cls === "latin") {
-      // রানের নিজস্ব ফন্ট লিগ্যাসি Bijoy হলে সেটাই ground-truth — মার্কারহীন
-      // খাঁটি-ASCII বাংলা রান ("Avgvi"-জাতীয়) English ফন্টে চলে যায় না
-      const runFont = runAsciiFontOf(runInner);
-      if (runFont && LEGACY_BIJOY_FONT_VALUE_RE.test(runFont)) cls = "bijoy";
+    const runFont = runAsciiFontOf(runInner);
+    if (runFont) {
+      if (LEGACY_BIJOY_FONT_VALUE_RE.test(runFont)) {
+        // লিগ্যাসি-Bijoy ফন্ট ground-truth — মার্কারহীন খাঁটি-ASCII বাংলা
+        // রান ("Avgvi"-জাতীয়) English ফন্টে চলে যায় না
+        if (cls === "latin") cls = "bijoy";
+      } else if (KNOWN_LATIN_FONT_VALUE_RE.test(runFont)) {
+        // পরিচিত English-ফন্ট ground-truth — Bijoy-প্রধান ডকেও English রান
+        // ইংরেজি ফন্টেই থাকে (ভুল করে SutonnyMJ পেয়ে ভাঙে না)
+        cls = "latin";
+      }
     }
     const font = fontForClass(cls, settings);
     const openEnd = m.length - runInner.length - "</w:r>".length;
@@ -302,6 +316,14 @@ export function applyFontRemapXml(
  * শুধু পরিচিত লিগ্যাসি নাম bijoyFont দিয়ে বদলানো হয়)।
  */
 export const LEGACY_BIJOY_FONT_VALUE_RE = /^(?:sutonny|bijoy|shibly)/i;
+
+/**
+ * পরিচিত ল্যাটিন/English ফন্ট — রানের নিজস্ব ফন্ট এগুলোর কোনো-একটা হলে
+ * রানটা English ground-truth (Bijoy-প্রধান ডকেও English রান English-ই থাকে —
+ * ভুল করে SutonnyMJ পেয়ে বাংলা-গিববেরিশ হয় না)।
+ */
+export const KNOWN_LATIN_FONT_VALUE_RE =
+  /^(?:times( new roman)?|arial( narrow| black)?|calibri|cambria|candara|corbel|constantia|consolas|comic sans ms|georgia|garamond|verdana|tahoma|segoe ui|trebuchet ms|helvetica|courier( new)?|lucida (sans|console|bright)|book (antiqua|man old style)|century (schoolbook|gothic)|franklin gothic|gill sans( mt)?|palatino linotype|rockwell|impact)$/i;
 
 const STYLE_FONTVAL_RE = /((?:w:ascii|w:hAnsi|w:cs|w:eastAsia)=")([^"]*)(")/g;
 
