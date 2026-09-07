@@ -83,7 +83,13 @@ import {
 } from "@/lib/mcq/redownload";
 import { renumberQuestionsByPosition } from "@/lib/mcq/serial-paste";
 import { DEFAULT_FONT_REMAP_SETTINGS, FONT_CHOICES, type FontSettings } from "@/lib/mcq/font-remap";
+import {
+  DEFAULT_OPTION_LABEL_SETTINGS,
+  sanitizeOptionLabelSettings,
+  type OptionLabelSettings,
+} from "@/lib/mcq/option-labels";
 import { FontSettingsCard } from "@/components/mcq/font-settings-card";
+import { OptionLabelsCard } from "@/components/mcq/option-labels-card";
 import {
   FILE_TOO_BIG_MSG,
   prepareShuffleXml,
@@ -98,6 +104,8 @@ const STORAGE_KEY = "mcq-shuffler-text";
 const MODE_KEY = "mcq-shuffler-mode";
 /** আউটপুট ফাইলের ফন্ট-রিম্যাপ সেটিংস — সব মোডের ডাউনলোডে এক সেটিংস (persisted) */
 const FONT_SETTINGS_KEY = "mcq-font-settings";
+/** রিডাউনলোডের অপশন-লেবেল কাস্টমাইজ সেটিংস (persisted) */
+const OPTION_LABELS_KEY = "mcq-option-labels";
 
 /**
  * Persisted ফন্ট-সেটিংস হাইড্রেশন-গার্ড — FONT_CHOICES-এ নেই এমন ভ্যালু
@@ -254,6 +262,9 @@ export default function Home() {
   // কোন অংশগুলো নতুন ফাইলে থাকবে (ডিফল্ট: সিরিয়াল + প্রশ্ন)
   const [rdParts, setRdParts] = useState<PartSel>(DEFAULT_PART_SELECTION);
   const [rdRenumber, setRdRenumber] = useState(true);
+  const [optionLabels, setOptionLabels] = useState<OptionLabelSettings>(
+    DEFAULT_OPTION_LABEL_SETTINGS
+  );
   const [rdMergedBusy, setRdMergedBusy] = useState(false);
   const [rdZipBusy, setRdZipBusy] = useState(false);
 
@@ -341,6 +352,15 @@ export default function Home() {
     }
   }, []);
 
+  // অপশন-লেবেল সেটিংস হাইড্রেট (প্রথম লোডে একবারই) — অজানা ভ্যালু ড্রপ
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(OPTION_LABELS_KEY);
+      if (raw) setOptionLabels(sanitizeOptionLabelSettings(JSON.parse(raw)));
+    } catch { // ভাঙা JSON/কোটা — ডিফল্টেই থাকুক
+    }
+  }, []);
+
   // ডাউনলোড-ফরম্যাট হাইড্রেট (প্রথম লোডে একবারই) — DOCX ডিফল্ট যখন key অনুপস্থিত
   useEffect(() => {
     try {
@@ -355,6 +375,15 @@ export default function Home() {
     setFontSettings(s);
     try {
       localStorage.setItem(FONT_SETTINGS_KEY, JSON.stringify(s));
+    } catch { // কোটা/প্রাইভেসি-মোড — নীরবে উপেক্ষা
+    }
+  }, []);
+
+  /** অপশন-লেবেল সেটিংস কমিট (কার্ডের "Use labels"/"Reset") — state + localStorage */
+  const updateOptionLabels = useCallback((s: OptionLabelSettings) => {
+    setOptionLabels(s);
+    try {
+      localStorage.setItem(OPTION_LABELS_KEY, JSON.stringify(s));
     } catch { // কোটা/প্রাইভেসি-মোড — নীরবে উপেক্ষা
     }
   }, []);
@@ -1255,6 +1284,7 @@ export default function Home() {
           partSel: rdParts,
           renumber: rdRenumber,
           expandAnswer: true,
+          optionLabels,
         });
         return { xml, file: d.file as Blob, baseName: d.baseName };
       })
@@ -1731,6 +1761,8 @@ export default function Home() {
                     dominant={null}
                   />
                 ))}
+
+                <OptionLabelsCard settings={optionLabels} onChange={updateOptionLabels} />
 
                 <FontSettingsCard settings={fontSettings} onChange={updateFontSettings} />
 

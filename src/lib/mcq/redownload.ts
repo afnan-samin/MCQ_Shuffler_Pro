@@ -17,6 +17,7 @@
 import JSZip from "jszip";
 
 import { MAX_SERIAL_NUMBER } from "./limits";
+import { relabelOptionPara, type OptionLabelSettings } from "./option-labels";
 import {
   W_NS,
   countRunTabs,
@@ -500,6 +501,8 @@ export interface RedownloadOptions {
   renumber: boolean;
   /** অপশন বাদ + উত্তর থাকলে অক্ষরের জায়গায় অপশনের পুরো লেখা বসবে */
   expandAnswer: boolean;
+  /** অপশন-লেবেল কাস্টমাইজ (ক. খ. → A. B.) — শুধু options-অংশের লেবেল বদলায় */
+  optionLabels?: OptionLabelSettings | null;
 }
 
 /**
@@ -553,6 +556,9 @@ export function buildRedownloadXml(
       if (kind === "answer" && expandActive) {
         expandAnswerBySerial(clone, parse, kids);
       }
+      if (kind === "options" && opts.optionLabels?.enabled) {
+        relabelOptionPara(clone, opts.optionLabels);
+      }
       body.appendChild(clone);
       continue;
     }
@@ -575,7 +581,11 @@ export function buildRedownloadXml(
 
     // উত্তর-বিস্তার: অপশন বাদ + উত্তর আছে + অক্ষর-উত্তর ("উঃ ক")
     if (kind === "answer" && expandActive) {
-      expandAnswerPara(clone, q, kids, parse);
+      expandAnswerPara(clone, q, kids, parse, opts.optionLabels ?? null);
+    }
+
+    if (kind === "options" && opts.optionLabels?.enabled) {
+      relabelOptionPara(clone, opts.optionLabels);
     }
 
     body.appendChild(clone);
@@ -606,7 +616,7 @@ function expandAnswerBySerial(answerClone: Element, parse: RdParseResult, kids: 
   const q = parse.questions.find((qq) => qq.serial === si.num);
   if (!q || !q.answer) return;
   if (normLetter(slM[1]) !== normLetter(q.answer)) return;
-  expandAnswerPara(answerClone, q, kids, parse);
+  expandAnswerPara(answerClone, q, kids, parse, null);
 }
 
 /** প্রশ্ন-শুরু প্যারা থেকে সিরিয়াল (ডিজিট+সেপারেটর) সরানো */
@@ -634,7 +644,8 @@ function expandAnswerPara(
   answerClone: Element,
   q: RdQuestion,
   kids: Element[],
-  parse: RdParseResult
+  parse: RdParseResult,
+  labelSettings: OptionLabelSettings | null = null
 ): void {
   if (!q.answer) return;
   const answerLetter = normLetter(q.answer);
@@ -679,7 +690,14 @@ function expandAnswerPara(
   }
 
   // অপশন-প্যারার রানগুলো (pPr বাদ) উত্তর-প্যারায় জোড়া — বুকমার্ক বাদ (id-দ্বন্দ্ব এড়াতে)
-  for (const child of Array.from(optionEl.childNodes)) {
+  // লেবেল-কাস্টমাইজ চালু থাকলে ক্লোনে রিলেবেল করে তবেই জোড়া (উত্তরের অপশন-লেখাও একই স্টাইলে)
+  let sourceEl = optionEl;
+  if (labelSettings?.enabled) {
+    const labeledClone = optionEl.cloneNode(true) as Element;
+    relabelOptionPara(labeledClone, labelSettings);
+    sourceEl = labeledClone;
+  }
+  for (const child of Array.from(sourceEl.childNodes)) {
     if (child.nodeType !== 1) continue;
     const el = child as Element;
     const ln = el.localName;
