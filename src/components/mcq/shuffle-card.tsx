@@ -56,11 +56,11 @@ export function ShuffleCard({
     <Card id="step-shuffle" className={enabled ? "border-emerald-300 dark:border-emerald-700" : ""}>
       <CardHeader>
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">৩</span>
-          <CardTitle className="text-lg md:text-xl">শাফল সেটিংস ও শুরু</CardTitle>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">3</span>
+          <CardTitle className="text-lg md:text-xl">Shuffle settings & start</CardTitle>
         </div>
         <CardDescription>
-          কতটা সেট চান লিখে দিন (১–১০)। Original Shuffle-এ প্রতি সেটে সবগুলো প্রশ্ন থাকে, বাকি স্টাইলে প্রশ্ন ভাগ হয়ে যায়।
+          Enter how many sets you want (1–10). Original Shuffle keeps every question in each set; the other styles split the questions up.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -68,7 +68,7 @@ export function ShuffleCard({
           {/* সেট সংখ্যা */}
           <div className="space-y-2">
             <Label htmlFor="set-count" className="font-medium">
-              কয়টা সেট হবে?
+              How many sets?
             </Label>
             <div className="flex items-center gap-2">
               <Input
@@ -98,54 +98,54 @@ export function ShuffleCard({
             </div>
             {countInvalid && (
               <p className="text-xs text-red-600 dark:text-red-400">
-                ১ থেকে ১০ এর মধ্যে দিন{!isOriginal && " — সিলেক্টেড প্রশ্নের সংখ্যার চেয়ে বেশি হতে পারবে না"}।
+                Enter a number from 1 to 10{!isOriginal && " — can't exceed the number of selected questions"}.
               </p>
             )}
             {enabled && !countInvalid && isOriginal && (
               <p className="text-xs text-muted-foreground">
-                প্রতি সেটে <span className="font-semibold text-emerald-700 dark:text-emerald-400">সবগুলো {selectedCount}</span> টি প্রশ্ন — কিন্তু প্রতি সেটের সিরিয়াল ক্রম আলাদা (যেমন: A: ১,২,৩,৪… / B: ৪,১,২,৫,৩…)
+                Every set gets <span className="font-semibold text-emerald-700 dark:text-emerald-400">all {selectedCount}</span> questions — but each set's serial order differs (e.g. A: 1,2,3,4… / B: 4,1,2,5,3…)
               </p>
             )}
             {enabled && !countInvalid && !isOriginal && (
               <p className="text-xs text-muted-foreground">
-                প্রতি সেটে ≈ <span className="font-semibold text-emerald-700 dark:text-emerald-400">{perSet}</span> টি প্রশ্ন
-                {remainder > 0 && ` (প্রথম ${remainder} টি সেটে ১টা করে বেশি)`}
+                ≈ <span className="font-semibold text-emerald-700 dark:text-emerald-400">{perSet}</span> questions per set
+                {remainder > 0 && ` (first ${remainder} set(s) get one extra)`}
               </p>
             )}
           </div>
 
           {/* ভাগ করার স্টাইল */}
           <div className="space-y-2">
-            <Label className="font-medium">ভাগ করার স্টাইল</Label>
+            <Label className="font-medium">Split style</Label>
             <RadioGroup value={distribution} onValueChange={(v) => onDistributionChange(v as Distribution)} className="gap-2">
               <div className="flex items-start gap-2">
                 <RadioGroupItem value="original" id="dist-original" className="mt-0.5" />
                 <Label htmlFor="dist-original" className="cursor-pointer text-sm leading-snug flex-col items-start gap-0.5">
-                  <span className="font-medium">⭐ Original Shuffle — সব সেটে সব প্রশ্ন</span>
+                  <span className="font-medium">⭐ Original Shuffle — all questions in every set</span>
                   <span className="block text-xs text-muted-foreground">
-                    ১০০ প্রশ্ন × ৫ সেট = প্রতি সেটেই ১০০টা প্রশ্ন, কিন্তু সিরিয়াল ক্রম সেটভেদে আলাদা — সেট A: ১,২,৩,৪… সেট B: ৪,১,২,৫,৩… প্রশ্ন-অপশন হুবহু অপরিবর্তিত। (বিঃদ্রঃ: খুব কম প্রশ্নে — যেমন ২টা — সম্ভাব্য সব ক্রম সীমিত হয়, তাই কিছু সেট একই ক্রমের হতে পারে।)
+                    100 questions × 5 sets = 100 questions per set, but the serial order differs per set — Set A: 1,2,3,4… Set B: 4,1,2,5,3… Questions and options stay exactly unchanged. (Note: with very few questions — say 2 — the possible distinct orders are limited, so some sets may end up identical.)
                   </span>
                 </Label>
               </div>
               <div className="flex items-start gap-2">
                 <RadioGroupItem value="interleaved" id="dist-inter" className="mt-0.5" />
                 <Label htmlFor="dist-inter" className="cursor-pointer text-sm leading-snug flex-col items-start gap-0.5">
-                  <span className="font-medium">পরপর ভাগ (রাউন্ড-রবিন)</span>
-                  <span className="block text-xs text-muted-foreground">প্রশ্ন ১→সেটA, ২→সেটB, ৩→সেটC... প্রতি সেটে সমান মানের মিক্স</span>
+                  <span className="font-medium">Round-robin (interleaved)</span>
+                  <span className="block text-xs text-muted-foreground">Q1→Set A, Q2→Set B, Q3→Set C... an even mix in every set</span>
                 </Label>
               </div>
               <div className="flex items-start gap-2">
                 <RadioGroupItem value="chunk" id="dist-chunk" className="mt-0.5" />
                 <Label htmlFor="dist-chunk" className="cursor-pointer text-sm leading-snug flex-col items-start gap-0.5">
-                  <span className="font-medium">ধারাবাহিক ব্লক</span>
-                  <span className="block text-xs text-muted-foreground">সেটA = প্রশ্ন ১–২৫, সেটB = ২৬–৫০ (শাফল বন্ধ রাখলে প্রতি সেট সিরিয়াল থাকে)</span>
+                  <span className="font-medium">Sequential blocks</span>
+                  <span className="block text-xs text-muted-foreground">Set A = questions 1–25, Set B = 26–50 (with shuffle-within off, each set keeps serial order)</span>
                 </Label>
               </div>
               <div className="flex items-start gap-2">
                 <RadioGroupItem value="random" id="dist-random" className="mt-0.5" />
                 <Label htmlFor="dist-random" className="cursor-pointer text-sm leading-snug flex-col items-start gap-0.5">
-                  <span className="font-medium">একদম এলোমেলো ভাগ</span>
-                  <span className="block text-xs text-muted-foreground">পুরো পুল আগে শাফল হয়ে তারপর সেটে ভাগ হবে</span>
+                  <span className="font-medium">Fully random split</span>
+                  <span className="block text-xs text-muted-foreground">The whole pool is shuffled first, then split into sets</span>
                 </Label>
               </div>
             </RadioGroup>
@@ -157,9 +157,9 @@ export function ShuffleCard({
           <div className="flex items-center justify-between rounded-xl border bg-muted/40 p-3">
             <div>
               <Label htmlFor="shuffle-within" className="cursor-pointer font-medium">
-                সেটের ভেতরেও প্রশ্ন এলোমেলো
+                Shuffle questions within each set
               </Label>
-              <p className="text-xs text-muted-foreground">বন্ধ রাখলে সেটের ভেতরে প্রশ্নগুলো অরিজিনাল সিরিয়ালেই থাকবে</p>
+              <p className="text-xs text-muted-foreground">Off = questions keep their original serial order inside each set</p>
             </div>
             <Switch id="shuffle-within" checked={shuffleWithin} onCheckedChange={onShuffleWithinChange} />
           </div>
@@ -172,11 +172,11 @@ export function ShuffleCard({
               <Tags className="mt-0.5 h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" />
               <div>
                 <Label className="font-medium">
-                  রেফারেন্স ট্যাগ আলাদা করুন
+                  Handle reference tags
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  <span className="font-semibold text-violet-700 dark:text-violet-400">{refReport.questionCount}</span> টি প্রশ্নে
-                  সোর্স-ট্যাগ পাওয়া গেছে (যেমন {refReport.samples.slice(0, 2).join(", ")}) — ভার্সিটি/বোর্ড/বছর যেভাবেই লেখা থাকুক, ধরা পড়ে।
+                  <span className="font-semibold text-violet-700 dark:text-violet-400">{refReport.questionCount}</span> question(s) have
+                  source tags (e.g. {refReport.samples.slice(0, 2).join(", ")}) — detected no matter how the university/board/year is written.
                 </p>
               </div>
             </div>
@@ -189,22 +189,22 @@ export function ShuffleCard({
               <div className="flex items-start gap-2">
                 <RadioGroupItem value="keep" id="ref-keep" className="mt-0.5" />
                 <Label htmlFor="ref-keep" className="cursor-pointer text-sm leading-snug flex-col items-start gap-0.5">
-                  <span className="font-medium">যেমন আছে তেমন রাখুন</span>
-                  <span className="block text-xs text-muted-foreground">প্রশ্নের সাথেই রেফারেন্স থাকবে (বর্তমান আচরণ)</span>
+                  <span className="font-medium">Keep as-is</span>
+                  <span className="block text-xs text-muted-foreground">References stay with the question (current behavior)</span>
                 </Label>
               </div>
               <div className="flex items-start gap-2">
                 <RadioGroupItem value="strip" id="ref-strip" className="mt-0.5" />
                 <Label htmlFor="ref-strip" className="cursor-pointer text-sm leading-snug flex-col items-start gap-0.5">
-                  <span className="font-medium">রেফারেন্স বাদ দিন — ক্লিন প্রশ্নপত্র</span>
-                  <span className="block text-xs text-muted-foreground">সব [সোর্স] ট্যাগ মুছে যাবে; প্রশ্ন-অপশন হুবহু অক্ষত</span>
+                  <span className="font-medium">Strip references — clean question paper</span>
+                  <span className="block text-xs text-muted-foreground">All [source] tags removed; questions and options stay exactly intact</span>
                 </Label>
               </div>
               <div className="flex items-start gap-2">
                 <RadioGroupItem value="endline" id="ref-endline" className="mt-0.5" />
                 <Label htmlFor="ref-endline" className="cursor-pointer text-sm leading-snug flex-col items-start gap-0.5">
-                  <span className="font-medium">প্রশ্নের শেষে আলাদা লাইনে সরান</span>
-                  <span className="block text-xs text-muted-foreground">ট্যাগ প্রশ্ন-ব্লকের একেবারে নিচে নিজের লাইনে বসবে</span>
+                  <span className="font-medium">Move to a separate line after each question</span>
+                  <span className="block text-xs text-muted-foreground">The tag goes on its own line at the very bottom of the question block</span>
                 </Label>
               </div>
             </RadioGroup>
@@ -220,7 +220,7 @@ export function ShuffleCard({
             className={`h-14 gap-3 text-base font-bold ${enabled ? "bg-emerald-600 hover:bg-emerald-700" : ""}`}
           >
             {enabled ? <Shuffle className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
-            {shuffling ? "শাফল হচ্ছে..." : "🔀 শাফল করুন ও সেট তৈরি করুন"}
+            {shuffling ? "Shuffling..." : "🔀 Shuffle & build sets"}
           </Button>
           {lockReason ? (
             <p className="flex items-center justify-center gap-1.5 text-center text-sm text-amber-700 dark:text-amber-400">
@@ -228,11 +228,11 @@ export function ShuffleCard({
             </p>
           ) : isOriginal ? (
             <p className="text-center text-sm text-emerald-700 dark:text-emerald-400">
-              রেডি! ক্লিক করলেই {setCount} টি সেট — প্রতিটিতে সব {selectedCount} টি প্রশ্ন, সিরিয়াল ক্রম আলাদা, প্রতিটি সেট আলাদা পেজে।
+              Ready! One click builds {setCount} set(s) — each with all {selectedCount} questions, a distinct serial order, one set per page.
             </p>
           ) : (
             <p className="text-center text-sm text-emerald-700 dark:text-emerald-400">
-              রেডি! ক্লিক করলেই {setCount} টি সেট তৈরি হবে — প্রতিটি আলাদা পেজে।
+              Ready! One click builds {setCount} set(s) — each on its own page.
             </p>
           )}
         </div>

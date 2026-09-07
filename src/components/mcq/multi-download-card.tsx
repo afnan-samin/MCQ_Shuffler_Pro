@@ -62,7 +62,7 @@ export function MultiDownloadCard({
         {/* সিরিয়াল-মোড মার্জে দুই ধরনের সিরিয়াল বাছাই */}
         {showSerialChoice && (
           <div className="space-y-2">
-            <Label className="font-medium">মার্জ করা ফাইলে সিরিয়াল কেমন হবে</Label>
+            <Label className="font-medium">How should serials work in the merged file?</Label>
             <RadioGroup
               value={serialStrategy}
               onValueChange={(v) => onSerialStrategyChange?.(v as SerialStrategy)}
@@ -72,18 +72,18 @@ export function MultiDownloadCard({
               <div className="flex items-start gap-3 rounded-xl border p-3">
                 <RadioGroupItem value="per-file" id="mf-serial-per-file" className="mt-0.5" />
                 <Label htmlFor="mf-serial-per-file" className="cursor-pointer text-sm leading-snug flex-col items-start gap-0.5">
-                  <span className="font-semibold">প্রতি ফাইলে নতুন করে ১ থেকে সিরিয়াল</span>
+                  <span className="font-semibold">Restart from 1 in each file</span>
                   <span className="block text-xs text-muted-foreground">
-                    প্রতিটা ফাইলের প্রশ্ন নিজের ভিতরে ১, ২, ৩… পাবে — মার্জ করা ফাইলেও ফাইল-ভিত্তিক ভাগ থাকবে।
+                    Each file's questions get 1, 2, 3… inside itself — the merged file keeps file-by-file sections.
                   </span>
                 </Label>
               </div>
               <div className="flex items-start gap-3 rounded-xl border p-3">
                 <RadioGroupItem value="global" id="mf-serial-global" className="mt-0.5" />
                 <Label htmlFor="mf-serial-global" className="cursor-pointer text-sm leading-snug flex-col items-start gap-0.5">
-                  <span className="font-semibold">একটানা এক সিরিয়াল — শুরু থেকে শেষ পর্যন্ত</span>
+                  <span className="font-semibold">One continuous serial — start to finish</span>
                   <span className="block text-xs text-muted-foreground">
-                    ১ম ফাইল শেষ হলে ২য় ফাইল সেখান থেকেই নম্বর ধরবে — যেমন ১ম ফাইলে ৫০ প্রশ্ন হলে ২য় ফাইল শুরু হবে ৫১ থেকে।
+                    The 2nd file continues where the 1st ended — e.g. if file 1 has 50 questions, file 2 starts at 51.
                   </span>
                 </Label>
               </div>
@@ -102,15 +102,15 @@ export function MultiDownloadCard({
           >
             {mergedBusy ? (
               <span className="flex items-center gap-2 text-sm font-semibold">
-                <Loader2 className="animate-spin" /> তৈরি হচ্ছে...
+                <Loader2 className="animate-spin" /> Generating...
               </span>
             ) : (
               <span className="flex items-center gap-2 text-sm font-semibold">
-                <FileText /> {single ? "ডাউনলোড করুন (.docx)" : "এক ফাইলে ডাউনলোড (.docx)"}
+                <FileText /> {single ? "Download (.docx)" : "Download as one file (.docx)"}
               </span>
             )}
             <span className="text-xs opacity-80">
-              {single ? "একটি ফাইল — সরাসরি ডাউনলোড হবে" : "সব ফাইল পরপর — ফাইলের মাঝে পেজ ব্রেক"}
+              {single ? "One file — downloads directly" : "All files in order — page breaks between files"}
             </span>
           </Button>
 
@@ -125,14 +125,14 @@ export function MultiDownloadCard({
             >
               {zipBusy ? (
                 <span className="flex items-center gap-2 text-sm font-semibold">
-                  <Loader2 className="animate-spin" /> ZIP হচ্ছে...
+                  <Loader2 className="animate-spin" /> Zipping...
                 </span>
               ) : (
                 <span className="flex items-center gap-2 text-sm font-semibold">
-                  <Archive /> আলাদা আলাদা ডাউনলোড (.zip)
+                  <Archive /> Download separately (.zip)
                 </span>
               )}
-              <span className="text-xs text-muted-foreground opacity-80">এক ক্লিকে ZIP — ভিতরে সবগুলো ফাইল আলাদা</span>
+              <span className="text-xs text-muted-foreground opacity-80">One click ZIP — all files inside, separate</span>
             </Button>
           )}
         </div>

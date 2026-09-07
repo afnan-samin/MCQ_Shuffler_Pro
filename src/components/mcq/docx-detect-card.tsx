@@ -102,11 +102,11 @@ export function DocxDetectCard({
     <Card id="step-detect">
       <CardHeader>
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">২</span>
-          <CardTitle className="text-lg md:text-xl">ডিটেকশন রেজাল্ট — {fileName}</CardTitle>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">2</span>
+          <CardTitle className="text-lg md:text-xl">Detection result — {fileName}</CardTitle>
         </div>
         <CardDescription>
-          ফাইলের XML সরাসরি পড়া হয়েছে — tab, ইকুয়েশন, sub/superscript, Bijoy ফন্ট সব হুবহু আছে। শাফলে শুধু প্রশ্নের ক্রম বদলাবে।
+          Read straight from the file's XML — tabs, equations, sub/superscript, Bijoy fonts all intact. Shuffling only changes the question order.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -114,27 +114,27 @@ export function DocxDetectCard({
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
           <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
             <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{stats.total}</div>
-            <div className="text-xs text-muted-foreground">মোট প্রশ্ন ডিটেক্ট</div>
+            <div className="text-xs text-muted-foreground">Questions detected</div>
           </div>
           <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
             <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{stats.withOptions}</div>
-            <div className="text-xs text-muted-foreground">অপশনসহ প্রশ্ন</div>
+            <div className="text-xs text-muted-foreground">With options</div>
           </div>
           <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
             <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{stats.withAnswer}</div>
-            <div className="text-xs text-muted-foreground">উত্তরসহ প্রশ্ন</div>
+            <div className="text-xs text-muted-foreground">With answers</div>
           </div>
           <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
             <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{stats.withBekkha}</div>
-            <div className="text-xs text-muted-foreground">ব্যাখ্যাসহ প্রশ্ন</div>
+            <div className="text-xs text-muted-foreground">With explanations</div>
           </div>
           <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
             <div className="mt-1 text-[13px] font-semibold leading-snug">{serialEncLabel}</div>
-            <div className="text-xs text-muted-foreground">সিরিয়ালের ধরন</div>
+            <div className="text-xs text-muted-foreground">Serial style</div>
           </div>
           <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
             <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{selected.size}</div>
-            <div className="text-xs text-muted-foreground">সিলেক্টেড</div>
+            <div className="text-xs text-muted-foreground">Selected</div>
           </div>
         </div>
 
@@ -143,28 +143,28 @@ export function DocxDetectCard({
           <div className="rounded-xl border border-sky-200 bg-sky-50/50 p-4 dark:border-sky-900 dark:bg-sky-950/20">
             <div className="flex flex-wrap items-center gap-2">
               <ScanText className="h-5 w-5 text-sky-700 dark:text-sky-400" />
-              <span className="font-semibold text-sky-900 dark:text-sky-200">শব্দ ধরে ধরে ডিটেক্টর</span>
+              <span className="font-semibold text-sky-900 dark:text-sky-200">Word-by-word detector</span>
               <span className="text-xs text-sky-700/80 dark:text-sky-400/80">
-                — Bijoy / ইউনিকোড / English আলাদা করে চেনা হয়েছে
+                — Bijoy / Unicode / English identified separately
               </span>
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
               <div className="rounded-lg border bg-white p-2 text-center dark:bg-background">
                 <div className="text-lg font-bold">{encStats.total}</div>
-                <div className="text-[11px] text-muted-foreground">মোট শব্দ চেক</div>
+                <div className="text-[11px] text-muted-foreground">Words checked</div>
               </div>
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-center dark:border-amber-900 dark:bg-amber-950/30">
                 <div className="text-lg font-bold text-amber-800 dark:text-amber-300">
                   {encStats.bijoy} <span className="text-xs font-medium">({Math.round((encStats.bijoy / encStats.total) * 100)}%)</span>
                 </div>
-                <div className="text-[11px] text-amber-700 dark:text-amber-400">Bijoy টাইপ (SutonnyMJ)</div>
+                <div className="text-[11px] text-amber-700 dark:text-amber-400">Bijoy (SutonnyMJ)</div>
               </div>
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-center dark:border-emerald-900 dark:bg-emerald-950/30">
                 <div className="text-lg font-bold text-emerald-800 dark:text-emerald-300">
                   {encStats.unicode} <span className="text-xs font-medium">({Math.round((encStats.unicode / encStats.total) * 100)}%)</span>
                 </div>
-                <div className="text-[11px] text-emerald-700 dark:text-emerald-400">ইউনিকোড বাংলা (অভ্র)</div>
+                <div className="text-[11px] text-emerald-700 dark:text-emerald-400">Unicode Bengali (Avro)</div>
               </div>
               <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-2 text-center dark:border-indigo-900 dark:bg-indigo-950/30">
                 <div className="text-lg font-bold text-indigo-800 dark:text-indigo-300">
@@ -184,10 +184,10 @@ export function DocxDetectCard({
 
             <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
               <span className="flex items-center gap-1.5">
-                <span className="tok tok-bijoy px-1">Avi evsjv</span> = Bijoy → SutonnyMJ ফন্টে
+                <span className="tok tok-bijoy px-1">Avi evsjv</span> = Bijoy → SutonnyMJ font
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="tok tok-unicode px-1">বাংলা</span> = ইউনিকোড
+                <span className="tok tok-unicode px-1">বাংলা</span> = Unicode
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="tok tok-english px-1">English</span> = English
@@ -202,8 +202,8 @@ export function DocxDetectCard({
             <div className="flex items-start gap-3">
               <TriangleAlert className="h-5 w-5 shrink-0 text-amber-600" />
               <div className="text-sm text-amber-800 dark:text-amber-300">
-                <span className="font-semibold">{parse.unicodeQuestionIds.length} টি প্রশ্নে Unicode বাংলা (Avro-টাইপ) টেক্সট আছে।</span>{" "}
-                ডাউনলোড ফাইলে ওগুলো যেমন আছে তেমনই থাকবে — বাকি সব অংশ Bijoy (SutonnyMJ) ও English-এ।
+                <span className="font-semibold">{parse.unicodeQuestionIds.length} question(s) contain Unicode Bengali (Avro-style) text.</span>{" "}
+                They'll be kept as-is in the downloaded file — everything else stays Bijoy (SutonnyMJ) and English.
               </div>
             </div>
           </div>
@@ -237,35 +237,34 @@ export function DocxDetectCard({
                   {serial.status === "ok" ? (
                     <>
                       <div className="font-semibold text-emerald-800 dark:text-emerald-300">
-                        ✅ সিরিয়াল ঠিক আছে — শাফল করার জন্য রেডি!
+                        ✅ Serial is correct — ready to shuffle!
                       </div>
                       <div className="mt-0.5 text-sm text-emerald-700/80 dark:text-emerald-400/80">
-                        {questions.length} টি প্রশ্ন পরপর সাজানো ({serial.startAt} থেকে শুরু)।
+                        {questions.length} question(s) in consecutive order (starting at {serial.startAt}).
                       </div>
                     </>
                   ) : restartOnly ? (
                     <>
                       <div className="font-semibold text-sky-800 dark:text-sky-300">
-                        📂 এক ফাইলে একাধিক সেকশন/পরীক্ষা — মাঝে {serial.issues.length} জায়গায় নম্বর ১ থেকে আবার শুরু
+                        📂 Multiple sections/exams in one file — numbering restarts at 1 in {serial.issues.length} place(s)
                       </div>
                       <div className="mt-0.5 text-sm text-sky-700/90 dark:text-sky-400/90">
-                        এটা ভুল না — প্রতিটি সেকশনের নিজের নম্বর ({serial.startAt} থেকে শুরু)। শাফল করতে নিচের
-                        "যেভাবে আছে তেভাবে চালান" চালু করুন।
+                        That's not an error — each section has its own numbering (starting at {serial.startAt}). To shuffle, enable "Run as-is" below.
                       </div>
                     </>
                   ) : (
                     <>
                       <div className="font-semibold text-amber-800 dark:text-amber-300">
-                        ⚠️ সিরিয়ালে {Math.min(serial.issues.length, 30)} টি জায়গায় সমস্যা (ডুপ্লিকেট/লাফ)
+                        ⚠️ {Math.min(serial.issues.length, 30)} serial problem(s) (duplicates/jumps)
                       </div>
                       <div className="mt-1 text-sm text-amber-700/90 dark:text-amber-400/90">
                         {serial.issues.slice(0, 3).map((is, i) => (
                           <div key={i}>
-                            প্রশ্ন #{is.index + 1}: নম্বর {is.expected} হওয়ার কথা, পাওয়া গেছে {is.found}
-                            {is.restart ? " (নতুন সেকশন)" : ""}
+                            Question #{is.index + 1}: expected number {is.expected}, found {is.found}
+                            {is.restart ? " (new section)" : ""}
                           </div>
                         ))}
-                        {serial.issues.length > 3 && <div>...আরও {serial.issues.length - 3} টি</div>}
+                        {serial.issues.length > 3 && <div>...and {serial.issues.length - 3} more</div>}
                       </div>
                     </>
                   )}
@@ -276,12 +275,12 @@ export function DocxDetectCard({
                 <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-amber-200 pt-3 dark:border-amber-800">
                   <Button size="sm" className="gap-2 bg-amber-600 hover:bg-amber-700" onClick={onSerialFix} disabled={fixing}>
                     <Download className="h-4 w-4" />
-                    {fixing ? "বানানো হচ্ছে..." : "🔧 সিরিয়াল ঠিক করে .docx ডাউনলোড (১..N)"}
+                    {fixing ? "Building..." : "🔧 Fix serial & download .docx (1..N)"}
                   </Button>
                   <div className="flex items-center gap-2">
                     <Switch id="docx-allow-broken" checked={allowBroken} onCheckedChange={onAllowBrokenChange} />
                     <Label htmlFor="docx-allow-broken" className="cursor-pointer text-sm">
-                      যেভাবে আছে তেভাবে চালান
+                      Run as-is
                     </Label>
                   </div>
                 </div>
@@ -294,17 +293,17 @@ export function DocxDetectCard({
         <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-muted/40 p-3">
           <ListChecks className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
           <Button size="sm" variant="outline" onClick={onSelectAll}>
-            সব সিলেক্ট
+            Select all
           </Button>
           <Button size="sm" variant="outline" onClick={onSelectNone}>
-            সব বাদ
+            Deselect all
           </Button>
           <div className="flex items-center gap-1.5">
             <Input
               value={rangeFrom}
               onChange={(e) => setRangeFrom(e.target.value)}
               className="h-8 w-16 text-center"
-              placeholder="থেকে"
+              placeholder="From"
               inputMode="numeric"
             />
             <span className="text-sm text-muted-foreground">—</span>
@@ -312,14 +311,14 @@ export function DocxDetectCard({
               value={rangeTo}
               onChange={(e) => setRangeTo(e.target.value)}
               className="h-8 w-16 text-center"
-              placeholder="পর্যন্ত"
+              placeholder="To"
               inputMode="numeric"
             />
             <Button size="sm" variant="outline" onClick={applyRange}>
-              রেঞ্জ সিলেক্ট
+              Select range
             </Button>
           </div>
-          <span className="text-xs text-muted-foreground">(পজিশন নম্বর, যেমন ১ থেকে ৫০)</span>
+          <span className="text-xs text-muted-foreground">(position numbers, e.g. 1 to 50)</span>
         </div>
 
         {/* প্রশ্ন লিস্ট — Bijoy সিরিয়াল ও লেখা Word-এর মত ফন্টে */}
@@ -345,12 +344,12 @@ export function DocxDetectCard({
                 </span>
                 {q.options.length > 0 && (
                   <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-[10px]">
-                    {q.options.length} অপশন
+                    {q.options.length} options
                   </Badge>
                 )}
                 {q.answer && (
                   <Badge variant="outline" className="ml-1 h-5 px-1.5 text-[10px]">
-                    উত্তর:{" "}
+                    Answer:{" "}
                     <span className={q.serialEnc === "bijoy" || q.serialEnc === "en" ? "tokfont-bijoy ml-0.5" : "ml-0.5"}>
                       {q.answer}
                     </span>
@@ -358,13 +357,13 @@ export function DocxDetectCard({
                 )}
                 {q.bekkha && (
                   <Badge variant="outline" className="ml-1 h-5 px-1.5 text-[10px]">
-                    ব্যাখ্যা ✓
+                    Explanation ✓
                   </Badge>
                 )}
                 {q.paras.length > 1 && (
-                  <span className="ml-2 text-xs text-muted-foreground">(+{q.paras.length - 1} লাইন)</span>
+                  <span className="ml-2 text-xs text-muted-foreground">(+{q.paras.length - 1} lines)</span>
                 )}
-                <span className="sr-only">প্রশ্ন পজিশন {pos + 1}</span>
+                <span className="sr-only">Question position {pos + 1}</span>
               </span>
             </label>
           ))}
@@ -376,7 +375,7 @@ export function DocxDetectCard({
               onClick={() => setVisible((v) => v + PAGE)}
             >
               <ChevronDown className="h-4 w-4" />
-              আরও দেখুন (বাকি {questions.length - visible} টি)
+              Show more ({questions.length - visible} remaining)
             </Button>
           )}
         </div>

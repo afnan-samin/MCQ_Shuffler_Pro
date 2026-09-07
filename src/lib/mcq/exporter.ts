@@ -285,7 +285,7 @@ export function printSets(sets: McqQuestion[][], opts: ExportOptions): void {
   const html = buildSetsHtml(sets, opts, true);
   const w = window.open("", "_blank", "width=900,height=700");
   if (!w) {
-    throw new Error("প্রিন্ট উইন্ডো খোলা যায়নি — ব্রাউজারের পপআপ ব্লকার চেক করুন");
+    throw new Error("Could not open the print window — check your browser's pop-up blocker");
   }
   w.document.write(html);
   w.document.close();

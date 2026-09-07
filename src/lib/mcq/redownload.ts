@@ -47,13 +47,13 @@ export type PartKind =
 export type PartSel = Record<Exclude<PartKind, "other">, boolean>;
 
 export const PART_LABELS: Record<PartKind, string> = {
-  serial: "সিরিয়াল (নম্বর)",
-  question: "প্রশ্ন",
-  reference: "রেফারেন্স / উদ্দীপক",
-  options: "অপশন (ক খ গ ঘ)",
-  answer: "উত্তর",
-  bekkha: "ব্যাখ্যা",
-  other: "অন্যান্য",
+  serial: "Serial (number)",
+  question: "Question",
+  reference: "Reference / stimulus",
+  options: "Options (ক খ গ ঘ)",
+  answer: "Answer",
+  bekkha: "Explanation",
+  other: "Other",
 };
 
 export const DEFAULT_PART_SELECTION: PartSel = {
@@ -259,10 +259,10 @@ function isShadedHeaderText(t: string): boolean {
 export function parseRedownloadXml(xml: string): RdParseResult {
   const doc = new DOMParser().parseFromString(xml, "application/xml");
   if (doc.getElementsByTagName("parsererror").length) {
-    throw new Error("document.xml পার্স করা যায়নি — ফাইলটি করাপ্ট মনে হচ্ছে");
+    throw new Error("Could not parse document.xml — the file looks corrupt");
   }
   const body = doc.getElementsByTagNameNS(W_NS, "body")[0];
-  if (!body) throw new Error("document.xml-এ w:body পাওয়া যায়নি");
+  if (!body) throw new Error("No w:body found in document.xml");
 
   const kids = Array.from(body.children) as Element[];
   const texts = kids.map((el) => (el.localName === "sectPr" ? "" : extractParaText(el)));
@@ -516,10 +516,10 @@ export function buildRedownloadXml(
 ): string {
   const doc = new DOMParser().parseFromString(xml, "application/xml");
   if (doc.getElementsByTagName("parsererror").length) {
-    throw new Error("document.xml পার্স করা যায়নি");
+    throw new Error("Could not parse document.xml");
   }
   const body = doc.getElementsByTagNameNS(W_NS, "body")[0];
-  if (!body) throw new Error("document.xml-এ w:body নেই");
+  if (!body) throw new Error("No w:body in document.xml");
 
   const kids = Array.from(body.children) as Element[];
   const sectPr = kids.find((k) => k.localName === "sectPr") ?? null;

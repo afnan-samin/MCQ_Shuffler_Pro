@@ -1,7 +1,9 @@
 // ============================================================
-// লাইভ E2E — ব্র্যাকেট-ছাড়া রেফারেন্সসহ সিনথেটিক docx লাইভ সাইটে
+// লাইভ E2E — ব্র্যাকেট-ছাড়া রেফারেন্সসহ সিনথেটিক docx
 // আপলোড → শাফল-ট্যাব → রেফারেন্স-সেকশন + কাউন্ট যাচাই
-// রান: bun run scripts/e2e-live-bare-ref.ts
+// NOTE: URL এখন localhost:3000 — লাইভ GitHub Pages ডেপ্লয়মেন্ট এখনো পুরনো
+// (বাংলা) বিল্ড চালায়; ইংরেজি UI ডেপ্লয় হলে আবার লাইভ URL-এ ফেরানো যাবে।
+// রান: dev-server চালু (localhost:3000) থাকতে হবে → bun run scripts/e2e-live-bare-ref.ts
 // ============================================================
 import { writeFileSync } from "node:fs";
 import JSZip from "jszip";
@@ -73,17 +75,17 @@ page.on("pageerror", (e) => jsErrors.push(String(e)));
 page.on("console", (m) => { if (m.type() === "error") jsErrors.push(m.text()); });
 
 try {
-  await page.goto("https://afnan-samin.github.io/MCQ_Shuffler_Pro/", { waitUntil: "networkidle", timeout: 60000 });
+  await page.goto("http://localhost:3000", { waitUntil: "networkidle", timeout: 60000 });
   ok(true, "লাইভ সাইট লোড");
 
   await page.setInputFiles("#step-upload input[type='file']", "/tmp/bare-ref-test.docx");
-  await page.waitForSelector('button[role="tab"]:has-text("MCQ শাফল")', { timeout: 30000 });
-  await page.click('button[role="tab"]:has-text("MCQ শাফল")');
+  await page.waitForSelector('button[role="tab"]:has-text("MCQ Shuffle")', { timeout: 30000 });
+  await page.click('button[role="tab"]:has-text("MCQ Shuffle")');
   await page.waitForTimeout(1500);
 
   // ডিটেক্ট-স্ক্রিনে প্রশ্ন-সংখ্যা
   const bodyText = (await page.locator("body").innerText()).replace(/\s+/g, " ");
-  ok(/৮\s*টি?\s*প্রশ্ন|8\s*টি?\s*প্রশ্ন/.test(bodyText), "৮টি প্রশ্ন ডিটেক্ট");
+  ok(/8\s*question/.test(bodyText), "৮টি প্রশ্ন ডিটেক্ট");
 
   // রেফারেন্স-সেকশন দেখা যাচ্ছে? (ব্র্যাকেট-ছাড়া সহ)
   const section = page.locator('[data-testid="ref-mode-group"]');
@@ -93,19 +95,19 @@ try {
   console.log("  সেকশন:", secText.slice(0, 140));
   // কাউন্ট-লাইন সেকশনের বাইরে রেন্ডার হয় — পুরো পেজ-টেক্সটে দেখা হয়
   const bodyText2 = (await page.locator("body").innerText()).replace(/\s+/g, " ");
-  ok(/টি?\s*প্রশ্নে\s*সোর্স-ট্যাগ\s*পাওয়া/.test(bodyText2), "রিপোর্টে প্রশ্ন-কাউন্ট লাইন (টি প্রশ্নে সোর্স-ট্যাগ পাওয়া গেছে)");
+  ok(/question\(s\)\s+have\s+source/.test(bodyText2), "রিপোর্টে প্রশ্ন-কাউন্ট লাইন (question(s) have source tags)");
 
   // "বাদ দিন" সিলেক্ট করে শাফল-পর্যন্ত যাওয়া
   await page.click('label[for="ref-strip"]');
   await page.waitForTimeout(300);
-  await page.click('button:has-text("শাফল করুন ও সেট তৈরি করুন")');
-  await page.waitForSelector("text=শাফল সম্পন্ন", { timeout: 60000 });
+  await page.click('button:has-text("Shuffle & build sets")');
+  await page.waitForSelector("text=Shuffle complete", { timeout: 60000 });
   ok(true, "শাফল সম্পন্ন (strip-মোডে)");
 
   // ডাউনলোড-করা ফাইলে রেফ-ট্যাগ শূন্য কি না
   const [download] = await Promise.all([
     page.waitForEvent("download", { timeout: 60000 }),
-    page.click('button:has-text("রিনাম্বার সিরিয়াল")'),
+    page.click('button:has-text("renumbered serials")'),
   ]);
   const outPath = "/tmp/bare-ref-out.docx";
   await download.saveAs(outPath);

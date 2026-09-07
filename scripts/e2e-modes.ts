@@ -35,7 +35,7 @@ const fresh = async () => {
 };
 const stage = async (files: string | string[]) => {
   await page.setInputFiles("#step-upload input[type='file']", files);
-  await page.waitForSelector("text=ফাইল প্রস্তুত — এখন মোড বেছে নিন", { timeout: 60000 });
+  await page.waitForSelector("text=files ready — pick a mode now", { timeout: 60000 });
 };
 const openMode = async (label: string) => {
   await page.click(`button[role="tab"]:has-text("${label}")`);
@@ -54,21 +54,21 @@ console.log("\n== A. শাফল মোড (একক docx) ==");
 await fresh();
 await stage(HSC);
 ok(true, "আপলোড → স্টেজ-কার্ড");
-await openMode("MCQ শাফল");
-await page.waitForSelector("text=60 প্রশ্ন শাফল হবে", { timeout: 120000 });
+await openMode("MCQ Shuffle");
+await page.waitForSelector("text=60 questions will shuffle", { timeout: 120000 });
 ok(true, "শাফল-মোডে ঢোকা → রঙ-ইনফো (৬০ প্রশ্ন)");
 await page.waitForSelector('[data-testid="mode-work-bar"]', { timeout: 30000 });
-ok((await page.locator("text=১/৫০ ফাইল").count()) === 1, "ফাইল-চিপ ১/৫০ (SHUFFLE_MAX_FILES কপি ঠিক)");
+ok((await page.locator("text=1/50 files").count()) === 1, "ফাইল-চিপ ১/৫০ (SHUFFLE_MAX_FILES কপি ঠিক)");
 
-const shuffleBtn = 'button:has-text("শাফল করুন ও সেট তৈরি করুন")';
+const shuffleBtn = 'button:has-text("Shuffle & build sets")';
 await page.waitForSelector(shuffleBtn, { timeout: 60000 });
 
 // A1. সেট কাউন্ট ১ — নতুন গেট (min ১) — এটাই ইউজারের মূল কমপ্লেইন
 await page.fill("#set-count", "1");
 await page.click(shuffleBtn);
 await page.waitForSelector("#step-result", { timeout: 60000 });
-ok((await page.locator('#step-result :text("1 টি সেট")').count()) >= 1, "সেট-কাউন্ট ১ → ১ টি সেট তৈরি");
-ok((await page.locator('#step-result :text("60 প্রশ্ন")').count()) >= 1, "১ সেটেই সব ৬০ প্রশ্ন (ব্যাজ)");
+ok((await page.locator('#step-result :text("1 set")').count()) >= 1, "সেট-কাউন্ট ১ → ১ টি সেট তৈরি");
+ok((await page.locator('#step-result :text("60 questions")').count()) >= 1, "১ সেটেই সব ৬০ প্রশ্ন (ব্যাজ)");
 
 // A2. কুইক ৩ → ৩ সেট × ২০
 await page.locator('#step-shuffle').getByRole("button", { name: "3", exact: true }).click(); // QUICK_SETS চিপ "3" (রেজাল্ট-কার্ডের "3" নম্বর-টগলের সাথে না মেশাতে স্কোপ করা)
@@ -76,68 +76,68 @@ await page.waitForTimeout(300);
 const quickVal = await page.inputValue("#set-count");
 ok(quickVal === "3", "কুইক-চিপ 3 → ইনপুটে 3", `(মান=${quickVal})`);
 await page.click(shuffleBtn);
-await page.waitForSelector('#step-result :text("3 টি সেট")', { timeout: 60000 });
-ok((await page.locator('#step-result :text("20 প্রশ্ন")').count()) === 3, "৩ সেট × ২০ প্রশ্ন");
+await page.waitForSelector('#step-result :text("3 sets")', { timeout: 60000 });
+ok((await page.locator('#step-result :text("20 questions")').count()) === 3, "৩ সেট × ২০ প্রশ্ন");
 
 // A3. কুইক ১০ → ১০ সেট × ৬
 await page.fill("#set-count", "10");
 await page.click(shuffleBtn);
-await page.waitForSelector('#step-result :text("10 টি সেট")', { timeout: 60000 });
-ok((await page.locator('#step-result :text("6 প্রশ্ন")').count()) === 10, "১০ সেট × ৬ প্রশ্ন");
+await page.waitForSelector('#step-result :text("10 sets")', { timeout: 60000 });
+ok((await page.locator('#step-result :text("6 questions")').count()) === 10, "১০ সেট × ৬ প্রশ্ন");
 
 // A4. ক্ল্যাম্প: ১১ লিখলে ১০-এ নামে; ০ লিখলে ১-এ ধরে
 await page.fill("#set-count", "11");
 ok((await page.inputValue("#set-count")) === "10", "১১ ইনপুট → ক্ল্যাম্প ১০");
-ok((await page.locator("text=১ থেকে ১০ এর মধ্যে দিন").count()) === 0, "১০-এ এরর-মেসেজ নেই");
+ok((await page.locator("text=Enter a number from 1 to 10").count()) === 0, "১০-এ এরর-মেসেজ নেই");
 await page.fill("#set-count", "0");
 ok((await page.inputValue("#set-count")) === "1", "০ ইনপুট → ফলব্যাক ১ (min ১)");
-ok((await page.locator("text=১ থেকে ১০ এর মধ্যে দিন").count()) === 0, "১-এও এরর-মেসেজ নেই");
+ok((await page.locator("text=Enter a number from 1 to 10").count()) === 0, "১-এও এরর-মেসেজ নেই");
 await page.fill("#set-count", "3");
 
 // A5. ডিস্ট্রিবিউশন — chunk (শাফল-ভিতরে বন্ধ → সিরিয়াল ব্লক)
 await page.click('label[for="dist-chunk"]');
 await page.click('#shuffle-within'); // OFF — এর সাথে shuffleWithin=off পাথও যাচাই হলো
 await page.click(shuffleBtn);
-await page.waitForSelector('#step-result :text("3 টি সেট")', { timeout: 60000 });
+await page.waitForSelector('#step-result :text("3 sets")', { timeout: 60000 });
 ok(true, "chunk + shuffleWithin OFF → ৩ সেট রেন্ডার");
 await page.click('#shuffle-within'); // আবার ON
 
 // A6. random
 await page.click('label[for="dist-random"]');
 await page.click(shuffleBtn);
-await page.waitForSelector('#step-result :text("3 টি সেট")', { timeout: 60000 });
+await page.waitForSelector('#step-result :text("3 sets")', { timeout: 60000 });
 ok(true, "random ডিস্ট্রিবিউশন → ৩ সেট রেন্ডার");
 
 // A7. original — প্রতি সেটে সব ৬০
 await page.click('label[for="dist-original"]');
 await page.click(shuffleBtn);
-await page.waitForSelector('#step-result :text("3 টি সেট")', { timeout: 60000 });
-ok((await page.locator('#step-result :text("60 প্রশ্ন")').count()) === 3, "original → ৩ সেটেই সব ৬০ প্রশ্ন");
+await page.waitForSelector('#step-result :text("3 sets")', { timeout: 60000 });
+ok((await page.locator('#step-result :text("60 questions")').count()) === 3, "original → ৩ সেটেই সব ৬০ প্রশ্ন");
 
 // A8. interleaved-এ ফেরা + রিনাম্বার টগল
 await page.click('label[for="dist-inter"]');
 await page.click(shuffleBtn);
-await page.waitForSelector('#step-result :text("3 টি সেট")', { timeout: 60000 });
-ok((await page.locator('text=সিরিয়াল: ১,২,৩…').count()) >= 1, "রিনাম্বার ON ডিফল্ট ব্যাজ");
+await page.waitForSelector('#step-result :text("3 sets")', { timeout: 60000 });
+ok((await page.locator('text=Serial: 1,2,3').count()) >= 1, "রিনাম্বার ON ডিফল্ট ব্যাজ");
 await page.click("#renumber-switch");
 await page.waitForTimeout(300);
-ok((await page.locator('text=সিরিয়াল: আসল').count()) >= 1, "রিনাম্বার টগল → আসল-নম্বর ব্যাজ");
+ok((await page.locator('text=Serial: original').count()) >= 1, "রিনাম্বার টগল → আসল-নম্বর ব্যাজ");
 
 // A9. দুই ডাউনলোডই ফায়ার + ফাইলনেম
 const [dlR] = await Promise.all([
   page.waitForEvent("download", { timeout: 120000 }),
-  page.click('button:has-text("রিনাম্বার সিরিয়াল")'),
+  page.click('button:has-text("renumbered serials")'),
 ]);
 ok(dlR.suggestedFilename() === "hsc27-physics-bijoy (shuffled, renumbered).docx", "রিনাম্বারড ডাউনলোড নাম", dlR.suggestedFilename());
-ok(await toastSeen("Word ফাইল ডাউনলোড হয়েছে"), "ডাউনলোড-টোস্ট");
+ok(await toastSeen("Word file downloaded"), "ডাউনলোড-টোস্ট");
 const [dlO] = await Promise.all([
   page.waitForEvent("download", { timeout: 120000 }),
-  page.click('button:has-text("আসল নম্বরসহ")'),
+  page.click('button:has-text("original numbers")'),
 ]);
 ok(dlO.suggestedFilename() === "hsc27-physics-bijoy (shuffled, original serial).docx", "আসল-নম্বর ডাউনলোড নাম", dlO.suggestedFilename());
 
 // A10. পেছনে → হোমে ফেরা (আপলোড-কার্ড; সব ফাইল রিসেট)
-await page.click('button[aria-label="পেছনে — হোমে ফিরুন"]');
+await page.click('button[aria-label="Back — return home"]');
 await page.waitForSelector("#step-upload", { timeout: 30000 });
 ok((await page.locator('button[role="tab"]:has-text("MCQ")').count()) === 0, "পেছনে → হোমে ফেরা (মোড-বাটন নেই, সব রিসেট)");
 
@@ -146,22 +146,22 @@ ok((await page.locator('button[role="tab"]:has-text("MCQ")').count()) === 0, "�
 // ============================================================
 console.log("\n== B. সিরিয়াল মোড ==");
 await stage(RAW10); // নতুন ফ্লো: পেছনে = ফুল-রিসেট → সিরিয়ালের ফাইল নতুন করে স্টেজ
-await openMode("MCQ সিরিয়াল");
-await page.waitForSelector("text=রঙ-ভিত্তিক সিরিয়াল", { timeout: 120000 });
-ok((await page.locator("text=১/৫০").count()) >= 0, "সিরিয়াল মোডে ঢোকা (নতুন স্টেজ করা ফাইল)");
+await openMode("MCQ Serial");
+await page.waitForSelector("text=Color-based serial", { timeout: 120000 });
+ok((await page.locator("text=1/50").count()) >= 0, "সিরিয়াল মোডে ঢোকা (নতুন স্টেজ করা ফাইল)");
 // ১ ফাইল + রঙ → চিপ সিলেক্ট → B1 ডাউনলোড
 await page.click('button:has-text("B1")');
 const [dlB1] = await Promise.all([
   page.waitForEvent("download", { timeout: 180000 }),
-  page.click('button:has-text("সিরিয়াল করে .docx ডাউনলোড")'),
+  page.click('button:has-text("Download serial .docx")'),
 ]);
 ok(dlB1.suggestedFilename().includes("color serial - B1"), "১-ফাইল রঙ-সিরিয়াল B1 ডাউনলোড", dlB1.suggestedFilename());
 
 // B1. আরও ফাইল (ওয়ার্ক-বার) → ৩ ফাইল → স্কিম-কার্ড + মার্জ/ZIP
 await page.setInputFiles('[data-testid="mode-work-bar-input"]', [NOCOLOR, CHEM]);
-await page.waitForSelector("text=প্রতি ফাইলের সিরিয়াল-স্কিম", { timeout: 120000 });
-ok((await page.locator('button:has-text("এক ফাইলে ডাউনলোড (.docx)")').count()) === 1, "৩ ফাইল → মার্জ বাটন");
-ok((await page.locator('button:has-text("আলাদা আলাদা ডাউনলোড (.zip)")').count()) === 1, "৩ ফাইল → ZIP বাটন");
+await page.waitForSelector("text=Per-file serial scheme", { timeout: 120000 });
+ok((await page.locator('button:has-text("Download as one file (.docx)")').count()) === 1, "৩ ফাইল → মার্জ বাটন");
+ok((await page.locator('button:has-text("Download separately (.zip)")').count()) === 1, "৩ ফাইল → ZIP বাটন");
 
 // B2. প্রতি-ফাইল স্কিম বদল — রঙ-ফাইলের রো-তে B1 চিপ
 const schemeRows = page.locator('button:has-text("B1")');
@@ -173,7 +173,7 @@ ok((await schemeRows.count()) >= beforeChip, "প্রতি-ফাইল স�
 // B3. রিঅর্ডার (তীর-বাটন) — লিস্টের ২য় ফাইল উপরে (নাম-স্প্যান: span.truncate.text-sm — লিস্ট আগে, স্কিম-কার্ড পরে)
 const nameSpans = page.locator('span.truncate.text-sm');
 const secondName = await nameSpans.nth(1).textContent();
-await page.locator('button[aria-label="উপরে তুলুন"]').nth(1).click();
+await page.locator('button[aria-label="Move up"]').nth(1).click();
 await page.waitForTimeout(400);
 const firstNameAfter = await nameSpans.nth(0).textContent();
 ok(firstNameAfter === secondName?.trim(), "রিঅর্ডার: ২য় ফাইল ১ম-এ উঠল", `${secondName?.trim()} → ১ম`);
@@ -181,38 +181,38 @@ ok(firstNameAfter === secondName?.trim(), "রিঅর্ডার: ২য় �
 // B4. মার্জ + ZIP ডাউনলোড
 const [dlMerge] = await Promise.all([
   page.waitForEvent("download", { timeout: 180000 }),
-  page.click('button:has-text("এক ফাইলে ডাউনলোড (.docx)")'),
+  page.click('button:has-text("Download as one file (.docx)")'),
 ]);
 ok(dlMerge.suggestedFilename().includes("(merged serial).docx"), "মার্জ সিরিয়াল ডাউনলোড নাম", dlMerge.suggestedFilename());
 const [dlZip] = await Promise.all([
   page.waitForEvent("download", { timeout: 180000 }),
-  page.click('button:has-text("আলাদা আলাদা ডাউনলোড (.zip)")'),
+  page.click('button:has-text("Download separately (.zip)")'),
 ]);
 ok(dlZip.suggestedFilename() === "MCQ-serial-files.zip", "সিরিয়াল ZIP নাম", dlZip.suggestedFilename());
 
 // B5. একটা ফাইল বাদ → ২ ফাইল → আবার ZIP চলে
-await page.locator('button[aria-label="তালিকা থেকে বাদ দিন"]').nth(0).click();
+await page.locator('button[aria-label="Remove from list"]').nth(0).click();
 await page.waitForTimeout(600);
-await page.waitForSelector('button:has-text("আলাদা আলাদা ডাউনলোড (.zip)")', { timeout: 30000 });
+await page.waitForSelector('button:has-text("Download separately (.zip)")', { timeout: 30000 });
 ok(true, "ফাইল বাদ দিয়েও মাল্টি-কার্ড স্থিতিশীল");
 const [dlZip2] = await Promise.all([
   page.waitForEvent("download", { timeout: 180000 }),
-  page.click('button:has-text("আলাদা আলাদা ডাউনলোড (.zip)")'),
+  page.click('button:has-text("Download separately (.zip)")'),
 ]);
 ok(dlZip2.suggestedFilename() === "MCQ-serial-files.zip", "২-ফাইল ZIP আবারও চলে");
 
 // B6. সিরিয়াল পেস্ট-পাথ — পেস্ট-ট্যাব (ফাইল লোড থাকলেও ট্যাব ক্লিকযোগ্য) → ডিটেক্ট (docx-লিস্ট অটো-ক্লিয়ার) → ফিক্স → ডাউনলোড
-await page.click('button[role="tab"]:has-text("পেস্ট করুন")');
+await page.click('button[role="tab"]:has-text("Paste")');
 await page.fill("textarea", "1. পানির সংকেত কী?\nক) H2O খ) CO2 গ) O2 ঘ) NaCl\n2. বাতাসে সবচেয়ে বেশি কী আছে?\nক) অক্সিজেন খ) নাইট্রোজেন গ) হিলিয়াম ঘ) হাইড্রোজেন\n5. লোহার প্রতীক?\nক) Fe খ) Au গ) Ag ঘ) Cu");
-await page.click('button:has-text("🔍 প্রশ্ন ডিটেক্ট করুন")');
+await page.click('button:has-text("🔍 Detect questions")');
 await page.waitForSelector("#serial-paste-result", { timeout: 30000 });
-ok(await toastSeen("সিরিয়ালে সমস্যা আছে"), "ভাঙা সিরিয়াল ডিটেক্ট (৩,৪ লাফ)");
-await page.click('button:has-text("অটো নম্বরিং ঠিক করুন")');
-await page.waitForSelector("text=সিরিয়াল ঠিক আছে — ডাউনলোড বাটন চালু!", { timeout: 30000 });
+ok(await toastSeen("the serial has problems"), "ভাঙা সিরিয়াল ডিটেক্ট (৩,৪ লাফ)");
+await page.click('button:has-text("Fix numbering automatically")');
+await page.waitForSelector("text=Serial is correct", { timeout: 30000 });
 ok(true, "অটো-ফিক্স → সিরিয়াল ঠিক");
 const [dlPaste] = await Promise.all([
   page.waitForEvent("download", { timeout: 120000 }),
-  page.click('button:has-text("সিরিয়াল করে .docx ডাউনলোড (১..N)")'),
+  page.click('button:has-text("Download serial .docx (1..N)")'),
 ]);
 ok(dlPaste.suggestedFilename().startsWith("MCQ-Serial-3q.docx"), "পেস্ট সিরিয়াল ডাউনলোড নাম", dlPaste.suggestedFilename());
 
@@ -222,12 +222,12 @@ ok(dlPaste.suggestedFilename().startsWith("MCQ-Serial-3q.docx"), "পেস্�
 console.log("\n== C. রিডাউনলোড মোড ==");
 await fresh();
 await stage(RAW10);
-await openMode("MCQ রিডাউনলোড");
-await page.waitForSelector("text=নতুন ফাইলে কী কী থাকবে", { timeout: 120000 });
+await openMode("MCQ Redownload");
+await page.waitForSelector("text=Pick parts", { timeout: 120000 });
 ok(true, "রিডাউনলোড মোডে ঢোকা → অংশ-বাছাই কার্ড");
-const rdSingle = 'button:has-text("ডাউনলোড করুন (.docx)")';
+const rdSingle = 'button:has-text("Download (.docx)")';
 await page.waitForSelector(rdSingle, { timeout: 30000 });
-ok((await page.locator('button:has-text("আলাদা আলাদা ডাউনলোড (.zip)")').count()) === 0, "১ ফাইল → ZIP বাটন নেই");
+ok((await page.locator('button:has-text("Download separately (.zip)")').count()) === 0, "১ ফাইল → ZIP বাটন নেই");
 
 // C1. ৬ অংশ-চেকবক্স টগল (সব বন্ধ → আবার ডিফল্ট serial+question)
 // ৬ অংশ-চেকবক্স aria-label-এ শনাক্ত (প্রশ্ন-রো-চেকবক্সে aria-label নেই — কনফ্লিক্ট নেই)
@@ -238,9 +238,9 @@ for (let i = 0; i < nBoxes; i++) {
   const st = await partBoxes.nth(i).getAttribute("data-state");
   if (st === "checked") await partBoxes.nth(i).click();
 }
-ok((await page.locator("text=উত্তর-বিস্তার").count()) === 0, "সব অংশ বন্ধ → উত্তর-বিস্তার হিন্টও নেই");
+ok((await page.locator("text=Answer expansion").count()) === 0, "সব অংশ বন্ধ → উত্তর-বিস্তার হিন্টও নেই");
 // রিনাম্বার OFF পাথ
-await page.click('button[aria-label="সিরিয়াল রিনাম্বার টগল"]');
+await page.click('button[aria-label="Serial renumber toggle"]');
 await page.waitForTimeout(300);
 // সব প্রশ্ন ডিফল্ট সিলেক্টেড — একক ডাউনলোড ফায়ার (অংশ-কম্বো: সব বন্ধ)
 const [dlRd1] = await Promise.all([
@@ -248,30 +248,30 @@ const [dlRd1] = await Promise.all([
   page.click(rdSingle),
 ]);
 ok(dlRd1.suggestedFilename().endsWith("(redownload).docx"), "একক রিডাউনলোড ডাউনলোড নাম", dlRd1.suggestedFilename());
-ok(await toastSeen("রিডাউনলোড ফাইল তৈরি"), "রিডাউনলোড টোস্ট");
+ok(await toastSeen("Redownload file created"), "রিডাউনলোড টোস্ট");
 
 // C2. প্রতিটি অংশ আবার চালু (all-on কম্বো) + রিনাম্বার আবার ON
 for (let i = 0; i < nBoxes; i++) {
   const st = await partBoxes.nth(i).getAttribute("data-state");
   if (st !== "checked") await partBoxes.nth(i).click();
 }
-await page.waitForSelector("text=উত্তর-বিস্তার চালু", { timeout: 10000 }).catch(() => {});
-await page.click('button[aria-label="সিরিয়াল রিনাম্বার টগল"]');
+await page.waitForSelector("text=Answer expansion on", { timeout: 10000 }).catch(() => {});
+await page.click('button[aria-label="Serial renumber toggle"]');
 await page.waitForTimeout(300);
 ok(true, "৬ অংশ all-ON + রিনাম্বার ON টগল স্থিতিশীল");
 
 // C3. সিলেকশন — সব বাদ → ডাউনলোড ব্লক-টোস্ট; রেঞ্জ ১–৫ → ডাউনলোড
 const rdCard = page.locator("#step-rd-questions");
-await rdCard.locator('button:has-text("সব বাদ")').click();
+await rdCard.locator('button:has-text("Deselect all")').click();
 await page.waitForTimeout(300);
 await page.click(rdSingle);
-ok(await toastSeen("প্রশ্ন সিলেক্ট করুন"), "সিলেকশন শূন্য → ব্লকিং-টোস্ট");
-await rdCard.locator('button:has-text("সব সিলেক্ট")').click();
-await rdCard.locator('input[placeholder="থেকে"]').fill("1");
-await rdCard.locator('input[placeholder="পর্যন্ত"]').fill("5");
-await rdCard.locator('button:has-text("রেঞ্জ সিলেক্ট")').click();
+ok(await toastSeen("Select questions"), "সিলেকশন শূন্য → ব্লকিং-টোস্ট");
+await rdCard.locator('button:text-is("Select all")').click();
+await rdCard.locator('input[placeholder="From"]').fill("1");
+await rdCard.locator('input[placeholder="To"]').fill("5");
+await rdCard.locator('button:has-text("Select range")').click();
 await page.waitForTimeout(300);
-const selText = await rdCard.locator("text=/সিলেক্টেড 5\\//").count();
+const selText = await rdCard.locator("text=/Selected 5\\//").count();
 ok(selText >= 1, "রেঞ্জ ১–৫ → সিলেক্টেড 5/N");
 const [dlRd2] = await Promise.all([
   page.waitForEvent("download", { timeout: 180000 }),
@@ -281,15 +281,15 @@ ok(dlRd2.suggestedFilename().endsWith("(redownload).docx"), "রেঞ্জ-স
 
 // C4. ২ ফাইল → মার্জ + ZIP
 await page.setInputFiles('[data-testid="mode-work-bar-input"]', RAW11);
-await page.waitForSelector('button:has-text("এক ফাইলে ডাউনলোড (.docx)")', { timeout: 120000 });
+await page.waitForSelector('button:has-text("Download as one file (.docx)")', { timeout: 120000 });
 const [dlRdM] = await Promise.all([
   page.waitForEvent("download", { timeout: 240000 }),
-  page.click('button:has-text("এক ফাইলে ডাউনলোড (.docx)")'),
+  page.click('button:has-text("Download as one file (.docx)")'),
 ]);
 ok(dlRdM.suggestedFilename() === "MCQ-Redownload-merged.docx", "রিডাউনলোড মার্জ নাম", dlRdM.suggestedFilename());
 const [dlRdZ] = await Promise.all([
   page.waitForEvent("download", { timeout: 240000 }),
-  page.click('button:has-text("আলাদা আলাদা ডাউনলোড (.zip)")'),
+  page.click('button:has-text("Download separately (.zip)")'),
 ]);
 ok(dlRdZ.suggestedFilename() === "MCQ-Redownload.zip", "রিডাউনলোড ZIP নাম", dlRdZ.suggestedFilename());
 
@@ -300,20 +300,20 @@ console.log("\n== D. শাফল ফাইল-চিপ (১০/৫০, সা�
 await fresh();
 const tenFiles = Array(10).fill(NOCOLOR);
 await stage(tenFiles);
-await openMode("MCQ শাফল");
-await page.waitForSelector("text=আপলোড হওয়া ফাইল (10 টি)", { timeout: 180000 });
+await openMode("MCQ Shuffle");
+await page.waitForSelector("text=Uploaded files (10)", { timeout: 180000 });
 ok(true, "১০ ফাইল স্টেজ → শাফলে ১০টাই লোড (ক্যাপের নিচে)");
-await page.waitForSelector("text=১০/৫০ ফাইল", { timeout: 30000 });
-const addDisabled = (await page.locator('button:has-text("আরও ফাইল")').getAttribute("disabled")) !== null;
+await page.waitForSelector("text=10/50 files", { timeout: 30000 });
+const addDisabled = (await page.locator('button:has-text("Add files")').getAttribute("disabled")) !== null;
 ok(!addDisabled, "১০/৫০ → 'আরও ফাইল' চালু (ক্যাপ ৫০)");
 // মাল্টি-শাফল রান (১০ ফাইল × setCount ডিফল্ট ৪)
 await page.waitForSelector(shuffleBtn, { timeout: 60000 });
 await page.click(shuffleBtn);
-await page.waitForSelector("text=শাফল সম্পন্ন — এখন ডাউনলোড করুন", { timeout: 180000 });
+await page.waitForSelector("text=Shuffle complete — download now", { timeout: 180000 });
 ok(true, "১০-ফাইল মাল্টি-শাফল → মার্জ/ZIP কার্ড");
 const [dlMZip] = await Promise.all([
   page.waitForEvent("download", { timeout: 240000 }),
-  page.click('button:has-text("আলাদা আলাদা ডাউনলোড (.zip)")'),
+  page.click('button:has-text("Download separately (.zip)")'),
 ]);
 ok(dlMZip.suggestedFilename() === "MCQ-shuffled-files.zip", "মাল্টি-শাফল ZIP নাম", dlMZip.suggestedFilename());
 
@@ -324,32 +324,32 @@ console.log("\n== E. টেক্সট-ফ্লো + মোড-মনে র�
 await fresh();
 // E1. localStorage — সিরিয়াল মোডে ঢুকে reload → নতুন স্টেজে সিরিয়ালই selected
 await stage(NOCOLOR);
-await openMode("MCQ সিরিয়াল");
+await openMode("MCQ Serial");
 // NOCOLOR রঙহীন — ColorSerialCard না, SerialInputCard-ই লোড-প্রমাণ (রঙ-ফাইল হলে "রঙ-ভিত্তিক সিরিয়াল" কার্ড আসত)
-await page.waitForSelector("text=MCQ সিরিয়াল — ফাইল আপলোড", { timeout: 120000 });
+await page.waitForSelector("text=MCQ Serial — upload files", { timeout: 120000 });
 await page.reload({ waitUntil: "networkidle" });
 await page.waitForSelector("#step-upload", { timeout: 30000 });
 await stage(NOCOLOR);
 const selTab = await page.locator('button[role="tab"][aria-selected="true"]').textContent();
-ok(selTab?.includes("সিরিয়াল") ?? false, "reload → localStorage-এ শেষ মোড (সিরিয়াল) selected", selTab ?? "");
+ok(selTab?.includes("Serial") ?? false, "reload → localStorage-এ শেষ মোড (সিরিয়াল) selected", selTab ?? "");
 
 // E2. staged clear — বাতিল চাপলে আবার আপলোড-কার্ড
-await page.click('button[aria-label="ফাইল বাতিল"]');
+await page.click('button[aria-label="Clear files"]');
 await page.waitForSelector("#step-upload", { timeout: 30000 });
-ok((await page.locator('button[role="tab"]:has-text("MCQ শাফল")').count()) === 0, "staged clear → মোড-ট্যাবও লুকানো");
+ok((await page.locator('button[role="tab"]:has-text("MCQ Shuffle")').count()) === 0, "staged clear → মোড-ট্যাবও লুকানো");
 
 // E3. পেস্ট-টেক্সট ফ্লো — ১২ প্রশ্ন → সরাসরি শাফল-ওয়ার্ক → সেট ১/৩
 const pasteQs = Array.from({ length: 12 }, (_, i) =>
   `${i + 1}. ${i + 1} নম্বর প্রশ্ন — পানির সংকেত কী?\nক) H2O খ) CO2 গ) O2 ঘ) NaCl`
 ).join("\n");
-await page.click('button[role="tab"]:has-text("টেক্সট পেস্ট")');
+await page.click('button[role="tab"]:has-text("Paste text")');
 await page.fill("textarea", pasteQs);
-await page.click('button:has-text("🔍 প্রশ্ন ডিটেক্ট করুন (পেস্ট মোড)")');
+await page.click('button:has-text("Detect questions (paste mode)")');
 await page.waitForSelector(shuffleBtn, { timeout: 60000 });
 ok(true, "পেস্ট → ডিটেক্ট → সরাসরি শাফল-ওয়ার্ক (১২ প্রশ্ন)");
 await page.fill("#set-count", "1");
 await page.click(shuffleBtn);
-await page.waitForSelector('#step-result :text("1 টি সেট")', { timeout: 60000 });
+await page.waitForSelector('#step-result :text("1 set")', { timeout: 60000 });
 ok(true, "টেক্সট-ফ্লোতেও সেট-কাউন্ট ১ কাজ করে");
 const [dlTxt] = await Promise.all([
   page.waitForEvent("download", { timeout: 120000 }),

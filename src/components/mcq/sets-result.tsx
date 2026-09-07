@@ -74,13 +74,13 @@ export function SetsResult({
     <Card id="step-result" className="border-emerald-300 dark:border-emerald-700">
       <CardHeader>
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">৪</span>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">4</span>
           <CardTitle className="text-lg md:text-xl">
-            শাফল সম্পন্ন — {sets.length} টি সেট ({totalQ} প্রশ্ন)
+            Shuffle complete — {sets.length} {sets.length === 1 ? "set" : "sets"} ({totalQ} questions)
           </CardTitle>
         </div>
         <CardDescription>
-          প্রতিটি সেট আলাদা পেজে যাবে। যেকোনো সেট আবার সিরিয়ালে সাজাতে বা আবার শাফল করতে পারবেন।
+          Each set goes on its own page. You can re-sort any set back to serial order or reshuffle it.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -88,7 +88,7 @@ export function SetsResult({
         <div className="flex justify-center">
           <Button variant="outline" size="sm" onClick={() => setShowSettings((s) => !s)} className="gap-2">
             <Settings2 className="h-4 w-4" />
-            {showSettings ? "ফন্ট/হেডার সেটিংস লুকান" : "⚙️ ফন্ট ও হেডার সেটিংস (Bijoy/Unicode)"}
+            {showSettings ? "Hide font/header settings" : "⚙️ Font & header settings (Bijoy/Unicode)"}
           </Button>
         </div>
 
@@ -96,25 +96,25 @@ export function SetsResult({
           <div className="space-y-4 rounded-xl border bg-muted/30 p-4">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <div className="space-y-1.5">
-                <Label className="text-sm">ফন্ট মোড</Label>
+                <Label className="text-sm">Font mode</Label>
                 <Select value={exportOpts.fontMode} onValueChange={(v) => patch({ fontMode: v as FontMode })}>
                   <SelectTrigger className="h-9">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="auto">অটো — শব্দ ধরে ধরে ফন্ট</SelectItem>
-                    <SelectItem value="legacy">Bijoy / লিগ্যাসি ফন্ট</SelectItem>
-                    <SelectItem value="unicode">Unicode বাংলা</SelectItem>
+                    <SelectItem value="auto">Auto — font per word</SelectItem>
+                    <SelectItem value="legacy">Bijoy / legacy font</SelectItem>
+                    <SelectItem value="unicode">Unicode Bengali</SelectItem>
                     <SelectItem value="english">English</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-[11px] leading-snug text-muted-foreground">
-                  অটো মোডে শব্দ ধরে ধরে ফন্ট বসে: Bijoy→{exportOpts.legacyFont}, ইউনিকোড→{exportOpts.unicodeFont}, English→{exportOpts.englishFont}
+                  Auto mode picks fonts word-by-word: Bijoy→{exportOpts.legacyFont}, Unicode→{exportOpts.unicodeFont}, English→{exportOpts.englishFont}
                 </p>
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-sm">Bijoy ফন্ট (Word-এ বসবে)</Label>
+                <Label className="text-sm">Bijoy font (used in Word)</Label>
                 <Input
                   list="legacy-fonts"
                   value={exportOpts.legacyFont}
@@ -126,11 +126,11 @@ export function SetsResult({
                     <option key={f} value={f} />
                   ))}
                 </datalist>
-                <p className="text-[11px] text-muted-foreground">আপনার PC-তে যে Bijoy ফন্ট ইনস্টল আছে</p>
+                <p className="text-[11px] text-muted-foreground">A Bijoy font installed on your PC</p>
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-sm">Unicode বাংলা ফন্ট</Label>
+                <Label className="text-sm">Unicode Bengali font</Label>
                 <Input
                   list="unicode-fonts"
                   value={exportOpts.unicodeFont}
@@ -145,7 +145,7 @@ export function SetsResult({
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-sm">English ফন্ট</Label>
+                <Label className="text-sm">English font</Label>
                 <Input
                   list="english-fonts"
                   value={exportOpts.englishFont}
@@ -162,7 +162,7 @@ export function SetsResult({
 
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-1.5">
-                <Label className="text-sm">ফন্ট সাইজ (pt)</Label>
+                <Label className="text-sm">Font size (pt)</Label>
                 <Input
                   type="number"
                   min={8}
@@ -173,16 +173,16 @@ export function SetsResult({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-sm">সেটের নামের স্টাইল</Label>
+                <Label className="text-sm">Set name style</Label>
                 <Select value={exportOpts.nameStyle} onValueChange={(v) => patch({ nameStyle: v as NameStyle })}>
                   <SelectTrigger className="h-9">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="letter">সেট A, সেট B, সেট C...</SelectItem>
-                    <SelectItem value="bangla">সেট ক, সেট খ, সেট গ...</SelectItem>
-                    <SelectItem value="number">সেট ১, সেট ২, সেট ৩...</SelectItem>
-                    <SelectItem value="setn">Set 1, Set 2, Set 3...</SelectItem>
+                    <SelectItem value="letter">Bengali label — সেট A, সেট B, সেট C…</SelectItem>
+                    <SelectItem value="bangla">Bengali letters — সেট ক, সেট খ, সেট গ…</SelectItem>
+                    <SelectItem value="number">Bengali digits — সেট ১, সেট ২, সেট ৩…</SelectItem>
+                    <SelectItem value="setn">English — Set 1, Set 2, Set 3…</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -190,7 +190,7 @@ export function SetsResult({
                 <div className="flex items-center gap-2 pb-1.5">
                   <Switch id="include-header" checked={exportOpts.includeHeader} onCheckedChange={(v) => patch({ includeHeader: v })} />
                   <Label htmlFor="include-header" className="cursor-pointer text-sm">
-                    প্রতি সেটের পেজে হেডার বসান
+                    Put a header on each set's page
                   </Label>
                 </div>
               </div>
@@ -198,11 +198,11 @@ export function SetsResult({
 
             {exportOpts.includeHeader && (
               <div className="space-y-1.5">
-                <Label className="text-sm">হেডার টেক্সট (ইনস্টিটিউট নাম, সময়, পূর্ণমান ইত্যাদি — প্রতি পেজে উপরে বসবে)</Label>
+                <Label className="text-sm">Header text (institute name, time, marks etc. — top of every page)</Label>
                 <Textarea
                   value={exportOpts.headerText}
                   onChange={(e) => patch({ headerText: e.target.value })}
-                  placeholder={"যেমন:\nXYZ কলেজ, ঢাকা\nপরীক্ষা: বিষয় কোড ১০১\nসময়: ১ ঘণ্টা | পূর্ণমান: ৫০"}
+                  placeholder={"Example:\nXYZ College, Dhaka\nExam: Subject code 101\nTime: 1 hour | Marks: 50"}
                   className="min-h-[70px] text-sm"
                 />
               </div>
@@ -214,18 +214,18 @@ export function SetsResult({
         <div className="sticky top-2 z-10 flex flex-wrap items-center justify-center gap-2 rounded-xl border bg-white/95 p-3 shadow-sm backdrop-blur dark:bg-background/95">
           <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700" onClick={onExportDocx} disabled={busy !== null}>
             {busy === "docx" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-            ⬇️ Word (.docx) — প্রতি সেট আলাদা পেজে
+            ⬇️ Word (.docx) — one set per page
           </Button>
           <Button variant="outline" className="gap-2" onClick={onExportDoc} disabled={busy !== null}>
             <ArrowDownToLine className="h-4 w-4" />
-            .doc (পুরনো Word)
+            .doc (legacy Word)
           </Button>
           <Button variant="outline" className="gap-2" onClick={onPrint} disabled={busy !== null}>
-            <Printer className="h-4 w-4" /> 🖨️ প্রিন্ট
+            <Printer className="h-4 w-4" /> 🖨️ Print
           </Button>
           <Button variant="outline" className="gap-2" onClick={onCopyAll} disabled={busy !== null}>
             {busy === "copyall" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardCopy className="h-4 w-4" />}
-            📋 সব সেট কপি
+            📋 Copy all sets
           </Button>
         </div>
 
@@ -236,15 +236,15 @@ export function SetsResult({
               <div className="flex flex-wrap items-center gap-2 border-b bg-emerald-50/70 px-4 py-2.5 dark:bg-emerald-950/20">
                 <span className="font-bold text-emerald-800 dark:text-emerald-300">{getSetName(si, exportOpts.nameStyle)}</span>
                 <Badge variant="secondary" className="gap-1">
-                  {qs.length} প্রশ্ন
+                  {qs.length} questions
                 </Badge>
                 {sortedFlags[si] ? (
                   <Badge className="gap-1 bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
-                    <AlignLeft className="h-3 w-3" /> সিরিয়াল
+                    <AlignLeft className="h-3 w-3" /> Serial
                   </Badge>
                 ) : (
                   <Badge className="gap-1 bg-amber-100 text-amber-800 hover:bg-amber-100">
-                    <Shuffle className="h-3 w-3" /> শাফলড
+                    <Shuffle className="h-3 w-3" /> Shuffled
                   </Badge>
                 )}
                 <div className="ml-auto flex gap-1.5">
@@ -253,10 +253,10 @@ export function SetsResult({
                     variant="outline"
                     className="h-7 gap-1 px-2 text-xs"
                     onClick={() => onToggleSort(si)}
-                    title={sortedFlags[si] ? "এই সেটটা আবার শাফল করুন" : "অরিজিনাল সিরিয়ালে ফিরিয়ে আনুন"}
+                    title={sortedFlags[si] ? "Reshuffle this set" : "Restore original serial order"}
                   >
                     {sortedFlags[si] ? <Shuffle className="h-3 w-3" /> : <AlignLeft className="h-3 w-3" />}
-                    {sortedFlags[si] ? "শাফল" : "সিরিয়ালে সাজান"}
+                    {sortedFlags[si] ? "Shuffle" : "Sort serial"}
                   </Button>
                   <Button
                     size="sm"
@@ -266,7 +266,7 @@ export function SetsResult({
                     disabled={busy !== null}
                   >
                     {copiedSet === si ? <Check className="h-3 w-3 text-emerald-600" /> : <ClipboardCopy className="h-3 w-3" />}
-                    {copiedSet === si ? "কপি হয়েছে" : "কপি"}
+                    {copiedSet === si ? "Copied" : "Copy"}
                   </Button>
                 </div>
               </div>
@@ -291,12 +291,12 @@ export function SetsResult({
         </div>
 
         <div className="rounded-lg border bg-muted/30 px-3 py-2 text-center text-xs text-muted-foreground">
-          ✍️ সিরিয়ালগুলো <span className="font-medium text-foreground/80">প্লেইন টেক্সটে</span> বসে — কোনো বুলেট বা Word-এর অটো নম্বরিং নেই। প্রতিটি সেট আলাদা পেজে/সেগমেন্টে ভাগ হয়ে যায়।
+          ✍️ Serials are <span className="font-medium text-foreground/80">plain text</span> — no bullets or Word auto-numbering. Each set is split onto its own page/segment.
         </div>
 
         <div className="flex items-center justify-center gap-1.5 pt-2 text-xs text-muted-foreground">
           <Star className="h-3.5 w-3.5 text-amber-500" />
-          টিপস: ডাউনলোড করা Word ফাইলে প্রতিটি সেট আলাদা পেজে থাকবে — সরাসরি প্রিন্ট করতে পারবেন।
+          Tip: in the downloaded Word file each set sits on its own page — you can print directly.
         </div>
       </CardContent>
     </Card>

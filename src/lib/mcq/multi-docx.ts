@@ -68,7 +68,7 @@ export function extractBodyInner(xml: string): string {
   const open = xml.indexOf(BODY_OPEN);
   const close = xml.indexOf(BODY_CLOSE);
   if (open < 0 || close < open) {
-    throw new Error("document.xml-এ <w:body> পাওয়া যায়নি — ফাইলটি সঠিক .docx না মনে হচ্ছে");
+    throw new Error("No <w:body> found in document.xml — this file does not look like a valid .docx");
   }
   return xml.slice(open + BODY_OPEN.length, close);
 }
@@ -114,13 +114,13 @@ export function splitTrailingSectPr(inner: string): { content: string; sectPr: s
  * বাইরের prologue/epilogue byte-হুবহু প্রিজার্ভ।
  */
 function mergeDocumentXmlCore(baseXml: string, extraInners: string[]): string {
-  if (!extraInners.length) throw new Error("items খালি — অন্তত একটা extra ফাইলের body-XML দিন");
-  if (!baseXml) throw new Error("base XML খালি");
+  if (!extraInners.length) throw new Error("items is empty — provide body-XML for at least one extra file");
+  if (!baseXml) throw new Error("base XML is empty");
 
   const bodyOpen = baseXml.indexOf(BODY_OPEN);
   const bodyClose = baseXml.indexOf(BODY_CLOSE);
   if (bodyOpen < 0 || bodyClose < bodyOpen) {
-    throw new Error("base XML-এ <w:body> পাওয়া যায়নি — ফাইলটি সঠিক .docx না মনে হচ্ছে");
+    throw new Error("No <w:body> found in the base XML — this file does not look like a valid .docx");
   }
   const bodyContentStart = bodyOpen + BODY_OPEN.length;
 
@@ -242,12 +242,12 @@ function injectMissingNamespaces(mergedXml: string, extraInners: string[], extra
  * সেটা buildMergedDocxBlob-এর দায়িত্ব; এখানে শুধু body-জোড়া + xmlns-ইউনিয়ন)।
  */
 export function buildMergedDocumentXml(baseXml: string, extraInnerXmls: string[]): string {
-  if (!extraInnerXmls.length) throw new Error("items খালি — অন্তত একটা extra ফাইলের body-XML দিন");
-  if (!baseXml) throw new Error("base XML খালি");
+  if (!extraInnerXmls.length) throw new Error("items is empty — provide body-XML for at least one extra file");
+  if (!baseXml) throw new Error("base XML is empty");
 
   const inners: string[] = [];
   for (const extra of extraInnerXmls) {
-    if (!extra) throw new Error("extra XML খালি");
+    if (!extra) throw new Error("extra XML is empty");
     const extraInner = extractBodyInner(extra);
     const sp = splitTrailingSectPr(extraInner);
     inners.push(sp.content); // extra-র body-level sectPr ইচ্ছাকৃত বাদ
@@ -405,7 +405,7 @@ function ensureCtCover(ct: string, partPath: string): string {
  * বিস্তারিত ফাইল-হেডারের রিল-ইন্টিগ্রেশন কমেন্টে।
  */
 export async function buildMergedDocxBlob(items: Array<{ xml: string; file: Blob }>): Promise<Blob> {
-  if (items.length < 2) throw new Error("items খালি — মার্জে অন্তত ২টা docx লাগবে (base + extra)");
+  if (items.length < 2) throw new Error("items is empty — the merge needs at least 2 docx (base + extra)");
   const baseZip = await JSZip.loadAsync(items[0].file);
 
   const baseRelsXml = (await baseZip.file(RELS_PATH)?.async("string")) ?? null;
@@ -481,7 +481,7 @@ export async function buildMergedDocxBlob(items: Array<{ xml: string; file: Blob
   // ---- প্রতিটা extra: body-INNER + রিল-রিম্যাপ-রি-রাইট ----
   const extraInners: string[] = [];
   for (let i = 1; i < items.length; i++) {
-    if (!items[i].xml) throw new Error("extra XML খালি");
+    if (!items[i].xml) throw new Error("extra XML is empty");
     const extraZip = await JSZip.loadAsync(items[i].file);
     const extraRels = parseRelsXml((await extraZip.file(RELS_PATH)?.async("string")) ?? "");
     const relById = new Map(extraRels.map((r) => [r.id, r]));
@@ -536,7 +536,7 @@ export async function buildMergedDocxBlob(items: Array<{ xml: string; file: Blob
  * " (2)", " (3)" বসে (যেমন "set.docx", "set (2).docx") — zip-এ নাম-সংঘর্ষ যেন না হয়।
  */
 export async function buildZipBlob(files: Array<{ name: string; blob: Blob }>): Promise<Blob> {
-  if (!files.length) throw new Error("ফাইল তালিকা খালি");
+  if (!files.length) throw new Error("file list is empty");
   const zip = new JSZip();
   const used = new Set<string>();
   for (const f of files) {

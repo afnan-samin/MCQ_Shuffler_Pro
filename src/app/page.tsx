@@ -92,11 +92,6 @@ import { Dices, ShieldCheck, Zap } from "lucide-react";
 
 const STORAGE_KEY = "mcq-shuffler-text";
 const MODE_KEY = "mcq-shuffler-mode";
-/** বাংলা ডিজিটে রূপান্তর — টোস্ট/চিপের নাম্বারগুলোর জন্য */
-const bnNum = (n: number) => String(n).replace(/\d/g, (d) => "০১২৩৪৫৬৭৮৯"[Number(d)]);
-/** শাফল মোডের ফাইল-ক্যাপ (limits.ts) — টোস্টে বাংলা ডিজিটে */
-const SHUFFLE_MAX_FILES_BN = bnNum(SHUFFLE_MAX_FILES);
-
 // মাল্টি-ফাইল লিস্টের আইটেম-id (reorder/remove-এর জন্য স্টেবল কী দরকার)
 let multiIdCounter = 0;
 const nextMultiId = () => `mf-${++multiIdCounter}-${Date.now().toString(36)}`;
@@ -478,8 +473,8 @@ export default function Home() {
       setSelected(new Set(result.questions.map((q) => q.id)));
       setAllowBroken(false);
       toast({
-        title: "🔧 সিরিয়াল ঠিক করা হয়েছে",
-        description: `${result.questions.length} টি প্রশ্নে ১ থেকে শুরু করে নতুন নম্বর বসানো হয়েছে।`,
+        title: "🔧 Serial fixed",
+        description: `Renumbered ${result.questions.length} question(s) starting from 1.`,
       });
     } finally {
       setFixing(false);
@@ -498,18 +493,18 @@ export default function Home() {
   const announceDetect = (result: ParseOutput) => {
     if (result.questions.length === 0) {
       toast({
-        title: "কোনো প্রশ্ন পাওয়া যায়নি",
-        description: "প্রশ্নগুলো নম্বর দিয়ে শুরু আছে কিনা দেখুন (যেমন: ১. অথবা 1.)",
+        title: "No questions found",
+        description: "Check that questions start with a number (e.g. 1. or ১.),",
       });
     } else if (result.serial?.status === "ok") {
       toast({
-        title: `✅ ${result.questions.length} টি প্রশ্ন ডিটেক্ট হয়েছে`,
-        description: "সিরিয়াল ঠিক আছে — শাফল বাটন এখন চালু!",
+        title: `✅ ${result.questions.length} question(s) detected`,
+        description: "Serial is correct — the shuffle button is enabled now!",
       });
     } else if (result.serial) {
       toast({
-        title: `⚠️ ${result.questions.length} টি প্রশ্ন পাওয়া গেছে, কিন্তু সিরিয়ালে সমস্যা আছে`,
-        description: "'অটো নম্বরিং ঠিক করুন' চাপলে এক ক্লিকে ঠিক হয়ে যাবে।",
+        title: `⚠️ ${result.questions.length} question(s) found, but the serial has problems`,
+        description: '"Fix numbering automatically" fixes it in one click.',
       });
     }
   };
@@ -532,7 +527,7 @@ export default function Home() {
       const item = run.items[0];
       if (!item) {
         toast({
-          title: "ফাইল পড়া যায়নি",
+          title: "Could not read the file",
           description: String(run.failures[0]?.message ?? ""),
           variant: "destructive",
         });
@@ -558,39 +553,39 @@ export default function Home() {
 
       if (v.colorAn) {
         toast({
-          title: `🎨 রঙ-হেডার ${v.headersStripped} টি${patternStripped ? ` + নন-MCQ লাইন ${patternStripped} টি` : ""} বাদ দিয়ে ${v.parse.questions.length} টি প্রশ্ন এক সিরিয়ালে ডিটেক্ট হয়েছে`,
-          description: "শাফলে হেডার/নন-MCQ লাইনগুলো যাবে না — নিচে বাদ-পড়া লাইনের পুরো লিস্ট দেখা যায়।",
+          title: `🎨 Detected ${v.parse.questions.length} question(s) as one serial — stripped ${v.headersStripped} color header(s)${patternStripped ? ` + ${patternStripped} non-MCQ line(s)` : ""}`,
+          description: "Headers/non-MCQ lines won't be shuffled — the full stripped-line list is below.",
         });
       } else if (v.parse.questions.length === 0) {
         toast({
-          title: "কোনো প্রশ্ন পাওয়া যায়নি",
-          description: "প্রশ্নগুলো সিরিয়াল দিয়ে শুরু আছে কিনা দেখুন (যেমন: 32. / ১. / 1.)",
+          title: "No questions found",
+          description: "Check that questions start with a serial (e.g. 32. / ১. / 1.),",
           variant: "destructive",
         });
         return;
       } else {
         const serialMsg =
           v.parse.serial?.status === "ok"
-            ? "সিরিয়াল ঠিক আছে — শাফল রেডি!"
-            : `সিরিয়ালে ${v.parse.serial?.issues.length ?? 0} টি জায়গায় সমস্যা — শাফলের সময় serial replace ON রাখলে ঠিক হয়ে যাবে।`;
+            ? "Serial is correct — ready to shuffle!"
+            : `${v.parse.serial?.issues.length ?? 0} serial problem(s) — turning serial replace ON during the shuffle fixes them.`;
 
         toast({
-          title: `✅ ${v.parse.questions.length} টি প্রশ্ন ডিটেক্ট হয়েছে${patternStripped ? ` (নন-MCQ লাইন ${patternStripped} টি বাদ)` : ""}`,
+          title: `✅ ${v.parse.questions.length} question(s) detected${patternStripped ? ` (${patternStripped} non-MCQ line(s) stripped)` : ""}`,
           description: patternStripped
-            ? `${patternStripped} টি হেডার/শিরোনাম লাইন MCQ না — শাফলে যাবে না (নিচে লিস্ট)। ${serialMsg}`
-            : `${serialMsg}${v.parse.unicodeQuestionIds.length ? ` ⚠️ ${v.parse.unicodeQuestionIds.length} টি প্রশ্নে Unicode আছে (ডাউনলোডে অরিজিনালই থাকবে)।` : ""}`,
+            ? `${patternStripped} header/title line(s) aren't MCQs — excluded from the shuffle (list below). ${serialMsg}`
+            : `${serialMsg}${v.parse.unicodeQuestionIds.length ? ` ⚠️ ${v.parse.unicodeQuestionIds.length} question(s) contain Unicode (kept as-is in the download).` : ""}`,
         });
       }
 
       if (item.xml.length > 8_000_000) {
         toast({
-          title: "⚠️ বিশাল ফাইল",
-          description: "ফাইলটা বড় — শাফল ও ডাউনলোডে কিছু সময় লাগতে পারে, ট্যাব বন্ধ করবেন না।",
+          title: "⚠️ Very large file",
+          description: "This file is big — shuffling and downloading may take a while; don't close the tab.",
         });
       }
     } catch (e) {
       toast({
-        title: "ফাইল পড়া যায়নি",
+        title: "Could not read the file",
         description: String(e instanceof Error ? e.message : e),
         variant: "destructive",
       });
@@ -638,12 +633,12 @@ export default function Home() {
           return next;
         });
         toast({
-          title: `✅ ${added.length} টি ফাইল ${append ? "যোগ" : "লোড"} হয়েছে`,
-          description: `মোট ${questions} টি প্রশ্ন${colors ? `, ${colors} টি রঙ-হেডার` : ""}।${added.length > 1 ? " লিস্ট থেকে ক্রম বদলাতে পারবেন — নিচে মার্জ/ZIP ডাউনলোড।" : ""}`,
+          title: `✅ ${added.length} file(s) ${append ? "added" : "loaded"}`,
+          description: `${questions} question(s) in total${colors ? `, ${colors} color header(s)` : ""}.${added.length > 1 ? " Reorder from the list — merge/ZIP download below." : ""}`,
         });
       }
       if (errors.length) {
-        toast({ title: "কিছু ফাইল পড়া যায়নি", description: errors.join("\n"), variant: "destructive" });
+        toast({ title: "Some files could not be read", description: errors.join("\n"), variant: "destructive" });
       }
     } finally {
       loadersBusyRef.current = false;
@@ -676,8 +671,8 @@ export default function Home() {
       const plan = planSerialByColor(serialDoc.analysis, scheme);
       if (plan.size === 0) {
         toast({
-          title: "নম্বর দেওয়ার মতো প্রশ্ন পাওয়া যায়নি",
-          description: "এই রঙের সেকশনের ভিতরে সিরিয়াল-দেওয়া প্রশ্ন-লাইন নেই।",
+          title: "No questions found to number",
+          description: "No serial-numbered question lines inside this color's sections.",
           variant: "destructive",
         });
         return;
@@ -690,14 +685,14 @@ export default function Home() {
         schemeLabel: label,
       });
       toast({
-        title: "✅ রঙ-অনুযায়ী সিরিয়াল করা .docx ডাউনলোড হয়েছে",
+        title: "✅ Color-serial .docx downloaded",
         description:
           scheme.kind === "continuous"
-            ? `${plan.size} টি প্রশ্ন একটানা ১,২,৩… নম্বর পেয়েছে। বাকি সব হুবহু অক্ষত।`
-            : `${plan.size} টি প্রশ্ন রঙ-সেকশন অনুযায়ী ১ থেকে নম্বর পেয়েছে। হেডার/ইকুয়েশন/ছবি অক্ষত।`,
+            ? `${plan.size} question(s) numbered continuously 1,2,3…. Everything else untouched.`
+            : `${plan.size} question(s) numbered from 1 per color section. Headers/equations/images intact.`,
       });
     } catch (e) {
-      toast({ title: "সিরিয়াল করা যায়নি", description: String(e), variant: "destructive" });
+      toast({ title: "Serialing failed", description: String(e), variant: "destructive" });
     } finally {
       setSerialBusy(false);
     }
@@ -724,14 +719,14 @@ export default function Home() {
       const merged = await buildMergedDocxBlob(items);
       downloadBlob(merged, `${serialDocs[0].baseName} (merged serial).docx`);
       toast({
-        title: "✅ মার্জ করা .docx ডাউনলোড হয়েছে",
+        title: "✅ Merged .docx downloaded",
         description:
           serialStrategy === "global"
-            ? "সব ফাইল পরপর, পেজ ব্রেকসহ — সিরিয়াল শুরু থেকে শেষ পর্যন্ত একটানা।"
-            : "সব ফাইল পরপর, পেজ ব্রেকসহ — প্রতি ফাইলে সিরিয়াল নতুন করে ১ থেকে।",
+            ? "All files in order with page breaks — one continuous serial start to finish."
+            : "All files in order with page breaks — serials restart at 1 in each file.",
       });
     } catch (e) {
-      toast({ title: "মার্জ করা যায়নি", description: String(e), variant: "destructive" });
+      toast({ title: "Merging failed", description: String(e), variant: "destructive" });
     } finally {
       setSerialMergedBusy(false);
     }
@@ -752,11 +747,11 @@ export default function Home() {
       const zip = await buildZipBlob(out);
       downloadBlob(zip, "MCQ-serial-files.zip");
       toast({
-        title: "✅ ZIP ডাউনলোড হয়েছে",
-        description: `${out.length} টি ফাইল আলাদা আলাদা সিরিয়াল করা — ভিতরে সবগুলো আছে।`,
+        title: "✅ ZIP downloaded",
+        description: `${out.length} file(s), each serialized separately — all inside.`,
       });
     } catch (e) {
-      toast({ title: "ZIP বানানো যায়নি", description: String(e), variant: "destructive" });
+      toast({ title: "ZIP failed", description: String(e), variant: "destructive" });
     } finally {
       setSerialZipBusy(false);
     }
@@ -775,19 +770,19 @@ export default function Home() {
       setSerialPaste(result);
       if (result.questions.length === 0) {
         toast({
-          title: "কোনো প্রশ্ন পাওয়া যায়নি",
-          description: "প্রশ্নগুলো নম্বর দিয়ে শুরু আছে কিনা দেখুন (যেমন: ১. অথবা 1.)",
+          title: "No questions found",
+          description: "Check that questions start with a number (e.g. 1. or ১.),",
           variant: "destructive",
         });
       } else if (result.serial?.status === "ok") {
         toast({
-          title: `✅ ${result.questions.length} টি প্রশ্ন ডিটেক্ট হয়েছে`,
-          description: "সিরিয়াল ঠিক আছে — নিচে সিরিয়াল ডাউনলোড বাটন চালু!",
+          title: `✅ ${result.questions.length} question(s) detected`,
+          description: "Serial is correct — the serial download button below is enabled!",
         });
       } else {
         toast({
-          title: `⚠️ ${result.questions.length} টি প্রশ্ন পাওয়া গেছে, কিন্তু সিরিয়ালে সমস্যা আছে`,
-          description: "'অটো নম্বরিং ঠিক করুন' চাপলে এক ক্লিকে ঠিক হয়ে যাবে।",
+          title: `⚠️ ${result.questions.length} question(s) found, but the serial has problems`,
+          description: '"Fix numbering automatically" fixes it in one click.',
         });
       }
     } finally {
@@ -805,8 +800,8 @@ export default function Home() {
       setSerialPasteText(fixed);
       setSerialPaste(result);
       toast({
-        title: "🔧 সিরিয়াল ঠিক করা হয়েছে",
-        description: `${result.questions.length} টি প্রশ্নে ১ থেকে শুরু করে নতুন নম্বর বসানো হয়েছে।`,
+        title: "🔧 Serial fixed",
+        description: `Renumbered ${result.questions.length} question(s) starting from 1.`,
       });
     } finally {
       setSerialPasteFixing(false);
@@ -827,11 +822,11 @@ export default function Home() {
         fileName: `MCQ-Serial-${renumbered.length}q.docx`,
       });
       toast({
-        title: "✅ সিরিয়াল করা .docx ডাউনলোড হয়েছে",
-        description: `${renumbered.length} টি প্রশ্ন পজিশন-অনুযায়ী ১..N নম্বর পেয়েছে — ক্রম ও অপশন হুবহু অক্ষত।`,
+        title: "✅ Serial .docx downloaded",
+        description: `${renumbered.length} question(s) numbered 1..N by position — order and options exactly intact.`,
       });
     } catch (e) {
-      toast({ title: "ডাউনলোডে সমস্যা", description: String(e), variant: "destructive" });
+      toast({ title: "Download failed", description: String(e), variant: "destructive" });
     } finally {
       setSerialPasteDlBusy(false);
     }
@@ -857,8 +852,8 @@ export default function Home() {
     // carry বাইপাস — changeMode-এর carryToMode স্টেল serialDocs=[] পড়ে ফাইলটা আবার লোড করত (ডাবল-বিশ্লেষণ + ডাবল-টোস্ট)
     changeMode("serial", true);
     toast({
-      title: "🔢 সিরিয়াল মোডে ফাইল খোলা হলো",
-      description: "নিচে রঙ বাছাই করে সিরিয়াল ডাউনলোড করুন।",
+      title: "🔢 File opened in Serial mode",
+      description: "Pick a color below and download the serial file.",
     });
   };
 
@@ -879,11 +874,11 @@ export default function Home() {
       }, 80);
       toast({
         title: isOriginal
-          ? `🔀 ${setCount} টি সেট তৈরি — প্রতিটিতে সব ${pool.length} টি প্রশ্ন!`
-          : `🔀 ${setCount} টি সেট তৈরি হয়েছে!`,
+          ? `🔀 ${setCount} set(s) built — all ${pool.length} question(s) in each!`
+          : `🔀 ${setCount} set(s) built!`,
         description: isOriginal
-          ? "প্রতি সেটের সিরিয়াল ক্রম আলাদা — এক সেটের ক্রম আরেক সেটের সাথে মিলবে না।"
-          : "এখন Word ফাইল ডাউনলোড করতে পারেন — প্রতি সেট আলাদা পেজে।",
+          ? "Each set's serial order is distinct — no two sets share an order."
+          : "You can download the Word file now — one set per page.",
       });
     } finally {
       setShuffling(false);
@@ -904,13 +899,13 @@ export default function Home() {
         opts: { renumber: doRenumber, includeSetHeader: true, refMode },
       });
       toast({
-        title: "✅ Word ফাইল ডাউনলোড হয়েছে",
+        title: "✅ Word file downloaded",
         description: doRenumber
-          ? "প্রতি সেট আলাদা পেজে, সিরিয়াল ১,২,৩… করা। ফরম্যাট হুবহু অক্ষত।"
-          : "প্রতি সেট আলাদা পেজে, প্রশ্নের আসল নম্বরসহ। ফরম্যাট হুবহু অক্ষত।",
+          ? "One set per page, serials 1,2,3…. Formatting exactly intact."
+          : "One set per page, with the questions' original numbers. Formatting exactly intact.",
       });
     } catch (e) {
-      toast({ title: "ডাউনলোডে সমস্যা", description: String(e), variant: "destructive" });
+      toast({ title: "Download failed", description: String(e), variant: "destructive" });
     } finally {
       setBusy(null);
     }
@@ -928,11 +923,11 @@ export default function Home() {
         refMode,
       });
       toast({
-        title: "🔧 সিরিয়াল ঠিক করা .docx ডাউনলোড হয়েছে",
-        description: "অরিজিনাল অর্ডারেই প্রশ্নগুলো, সিরিয়াল ১..N বসানো — ফরম্যাট হুবহু অক্ষত।",
+        title: "🔧 Serial-fixed .docx downloaded",
+        description: "Questions in original order with serials 1..N — formatting exactly intact.",
       });
     } catch (e) {
-      toast({ title: "ডাউনলোডে সমস্যা", description: String(e), variant: "destructive" });
+      toast({ title: "Download failed", description: String(e), variant: "destructive" });
     } finally {
       setFixing(false);
     }
@@ -951,7 +946,7 @@ export default function Home() {
       setCopiedSet(si);
       setTimeout(() => setCopiedSet(null), 1800);
     } catch (e) {
-      toast({ title: "কপি করা যায়নি", description: String(e), variant: "destructive" });
+      toast({ title: "Copy failed", description: String(e), variant: "destructive" });
     }
   };
 
@@ -1001,23 +996,23 @@ export default function Home() {
   const multiEffectiveSets =
     distribution === "original" ? setCount : Math.min(setCount, Math.max(1, multiMinQuestions));
   const multiGateReason = useMemo(() => {
-    if (!shuffleItems || shuffleItems.length === 0) return "প্রথমে ফাইল আপলোড করুন";
-    if (shuffleMultiTotal < 2) return "ফাইলগুলোতে মোট অন্তত ২ টি প্রশ্ন দরকার";
+    if (!shuffleItems || shuffleItems.length === 0) return "Upload files first";
+    if (shuffleMultiTotal < 2) return "The files need at least 2 questions in total";
     if (shuffleMultiZero > 0)
-      return `${shuffleMultiZero} টি ফাইলে কোনো প্রশ্ন পাওয়া যায়নি — লিস্ট থেকে বাদ দিন`;
+      return `${shuffleMultiZero} file(s) have no questions — remove them from the list`;
     // সেট-সংখ্যা প্রতি ফাইলের প্রশ্নসংখ্যায় ক্ল্যাম্প হয় — আগেই জানিয়ে দিই (original-এ ক্ল্যাম্প নেই)
     if (distribution !== "original" && setCount > multiMinQuestions)
-      return `সবচেয়ে ছোট ফাইলে ${multiMinQuestions} টি প্রশ্ন — সর্বোচ্চ ${multiMinQuestions} টি সেট নেওয়া যাবে`;
+      return `The smallest file has ${multiMinQuestions} questions — max ${multiMinQuestions} set(s)`;
     return null;
   }, [shuffleItems, shuffleMultiTotal, shuffleMultiZero, distribution, setCount, multiMinQuestions]);
 
   const gateReason = useMemo(() => {
-    if (!docx && !parsed) return "প্রথমে প্রশ্ন ডিটেক্ট করুন";
-    if (activeCount === 0) return "কোনো প্রশ্ন পাওয়া যায়নি";
+    if (!docx && !parsed) return "Detect questions first";
+    if (activeCount === 0) return "No questions found";
     // docx মোডে সিরিয়াল gate নেই — serial replace ON থাকলে পজিশন-ভিত্তিক নম্বরেই সব ঠিক হয়ে যায়
-    if (!docx && !serialOk && !allowBroken) return "সিরিয়াল ঠিক নেই — অটো নম্বরিং ঠিক করুন অথবা 'যেভাবে আছে তেভাবে চালান' চালু করুন";
-    if (selected.size === 0) return "অন্তত একটি প্রশ্ন সিলেক্ট করুন";
-    if (selected.size < 2) return "অন্তত ২ টি প্রশ্ন সিলেক্ট করুন";
+    if (!docx && !serialOk && !allowBroken) return 'Serial is broken — fix numbering automatically or enable "Run as-is"';
+    if (selected.size === 0) return "Select at least one question";
+    if (selected.size < 2) return "Select at least 2 questions";
     return null;
   }, [docx, parsed, activeCount, serialOk, allowBroken, selected.size]);
 
@@ -1056,12 +1051,12 @@ export default function Home() {
         });
         const totalQ = added.reduce((a, d) => a + d.parse.questions.length, 0);
         toast({
-          title: `✅ ${added.length} টি ফাইল ${append ? "যোগ" : "লোড"} হয়েছে`,
-          description: `মোট ${totalQ} টি প্রশ্ন। এখন অংশ বাছাই করে ডাউনলোড করুন।`,
+          title: `✅ ${added.length} file(s) ${append ? "added" : "loaded"}`,
+          description: `${totalQ} question(s) in total. Now pick parts and download.`,
         });
       }
       if (errors.length) {
-        toast({ title: "কিছু ফাইল পড়া যায়নি", description: errors.join("\n"), variant: "destructive" });
+        toast({ title: "Some files could not be read", description: errors.join("\n"), variant: "destructive" });
       }
     } finally {
       loadersBusyRef.current = false;
@@ -1135,7 +1130,7 @@ export default function Home() {
   const handleRdMerged = async () => {
     const items = buildRdItems();
     if (!items) {
-      toast({ title: "প্রশ্ন সিলেক্ট করুন", description: "অন্তত একটা ফাইলে প্রশ্ন টিক দিন।", variant: "destructive" });
+      toast({ title: "Select questions", description: "Tick questions in at least one file.", variant: "destructive" });
       return;
     }
     setRdMergedBusy(true);
@@ -1148,11 +1143,11 @@ export default function Home() {
         items.length === 1 ? `${items[0].baseName} (redownload).docx` : "MCQ-Redownload-merged.docx";
       downloadBlob(blob, name);
       toast({
-        title: "✅ রিডাউনলোড ফাইল তৈরি",
-        description: `${items.length} টি ফাইলের বাছাই করা অংশ নতুন ফাইলে — ট্যাব, ইকুয়েশন, ওয়াটারমার্ক সব অক্ষত।`,
+        title: "✅ Redownload file created",
+        description: `Picked parts from ${items.length} file(s) in the new file — tabs, equations, watermark all intact.`,
       });
     } catch (e) {
-      toast({ title: "ডাউনলোডে সমস্যা", description: String(e), variant: "destructive" });
+      toast({ title: "Download failed", description: String(e), variant: "destructive" });
     } finally {
       setRdMergedBusy(false);
     }
@@ -1161,7 +1156,7 @@ export default function Home() {
   const handleRdZip = async () => {
     const items = buildRdItems();
     if (!items) {
-      toast({ title: "প্রশ্ন সিলেক্ট করুন", description: "অন্তত একটা ফাইলে প্রশ্ন টিক দিন।", variant: "destructive" });
+      toast({ title: "Select questions", description: "Tick questions in at least one file.", variant: "destructive" });
       return;
     }
     setRdZipBusy(true);
@@ -1174,11 +1169,11 @@ export default function Home() {
       const zip = await buildZipBlob(files);
       downloadBlob(zip, "MCQ-Redownload.zip");
       toast({
-        title: "✅ ZIP ডাউনলোড হয়েছে",
-        description: `${files.length} টি আলাদা ফাইল — প্রতিটাতেই বাছাই করা অংশ।`,
+        title: "✅ ZIP downloaded",
+        description: `${files.length} separate file(s) — each with the picked parts.`, 
       });
     } catch (e) {
-      toast({ title: "ZIP-এ সমস্যা", description: String(e), variant: "destructive" });
+      toast({ title: "ZIP failed", description: String(e), variant: "destructive" });
     } finally {
       setRdZipBusy(false);
     }
@@ -1203,11 +1198,11 @@ export default function Home() {
       }, 80);
       toast({
         title: isOriginal
-          ? `🔀 ${setCount} টি সেট তৈরি — প্রতিটিতে সব ${pool.length} টি প্রশ্ন!`
-          : `🔀 ${setCount} টি সেট তৈরি হয়েছে!`,
+          ? `🔀 ${setCount} set(s) built — all ${pool.length} question(s) in each!`
+          : `🔀 ${setCount} set(s) built!`,
         description: isOriginal
-          ? "প্রতি সেটের সিরিয়াল ক্রম আলাদা — এক সেটের ক্রম আরেক সেটের সাথে মিলবে না।"
-          : `${pool.length} টি প্রশ্ন ভাগ হয়েছে। এখন Word ফাইল ডাউনলোড করতে পারেন।`,
+          ? "Each set's serial order is distinct — no two sets share an order."
+          : `${pool.length} question(s) split. You can download the Word file now.`, 
       });
     } finally {
       setShuffling(false);
@@ -1239,10 +1234,10 @@ export default function Home() {
         const take = Math.max(0, SHUFFLE_MAX_FILES - (append ? existingCount : 0));
         list = files.slice(0, take);
         toast({
-          title: `⚠️ শাফল মোডে সর্বোচ্চ ${SHUFFLE_MAX_FILES_BN} টি ফাইল`,
+          title: `⚠️ Shuffle mode: max ${SHUFFLE_MAX_FILES} files`,
           description: take > 0
-            ? `একসাথে ১ থেকে ${SHUFFLE_MAX_FILES_BN} টি ফাইল নেওয়া যায় — প্রথম ${bnNum(take)} টি নেওয়া হলো, বাকিগুলো বাদ।`
-            : `আগেই ${SHUFFLE_MAX_FILES_BN} টি ফাইল আছে — নতুন ফাইল যোগ করতে হলে লিস্ট থেকে কিছু বাদ দিন।`,
+            ? `Between 1 and ${SHUFFLE_MAX_FILES} files at a time — took the first ${take}, dropped the rest.`
+            : `Already ${SHUFFLE_MAX_FILES} files — remove some from the list to add new ones.`,
           variant: "destructive",
         });
       }
@@ -1291,22 +1286,22 @@ export default function Home() {
       if (isAppend) {
         if (loaded.length) {
           toast({
-            title: `✅ ${loaded.length} টি ফাইল যোগ হয়েছে — এখন মোট ${items.length} টি`,
-            description: "লিস্ট থেকে ক্রম বদলাতে পারবেন — মার্জ/ZIP-এ ঠিক এই ক্রমেই আসবে।",
+            title: `✅ ${loaded.length} file(s) added — ${items.length} in total`,
+            description: "Reorder from the list — merge/ZIP keeps exactly this order.",
           });
         }
       } else if (items.length) {
         const totalQuestions = items.reduce((a, i) => a + i.parse.questions.length, 0);
         const zeroQ = items.filter((i) => i.parse.questions.length === 0).length;
         toast({
-          title: `✅ ${items.length} টি ফাইল লোড হয়েছে — মোট ${totalQuestions} টি প্রশ্ন`,
+          title: `✅ ${items.length} file(s) loaded — ${totalQuestions} question(s) in total`,
           description: zeroQ
-            ? `${zeroQ} টি ফাইলে কোনো প্রশ্ন পাওয়া যায়নি — লিস্ট থেকে বাদ দিন। ক্রম বদলাতে টেনে ধরুন।`
-            : "লিস্ট থেকে ক্রম বদলাতে পারবেন — নিচের শাফল-কনফিগ দিয়ে সব ফাইল একসাথে শাফল হবে।",
+            ? `${zeroQ} file(s) have no questions — remove them from the list. Drag to reorder.`
+            : "Reorder from the list — the shuffle config below shuffles all files together.",
         });
       }
       if (errors.length) {
-        toast({ title: "কিছু ফাইল পড়া যায়নি", description: errors.join("\n"), variant: "destructive" });
+        toast({ title: "Some files could not be read", description: errors.join("\n"), variant: "destructive" });
       }
     } finally {
       loadersBusyRef.current = false;
@@ -1348,8 +1343,8 @@ export default function Home() {
         resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 80);
       toast({
-        title: `🔀 ${shuffleItems.length} টি ফাইল শাফল হয়েছে — প্রতি ফাইলে ${multiEffectiveSets} টি সেট!`,
-        description: "নিচে মার্জ (.docx) বা ZIP — দুইভাবেই ডাউনলোড করা যাবে।",
+        title: `🔀 ${shuffleItems.length} file(s) shuffled — ${multiEffectiveSets} set(s) per file!`,
+        description: "Merge (.docx) or ZIP below — both ways available.",
       });
     } finally {
       setMultiShuffling(false);
@@ -1372,15 +1367,15 @@ export default function Home() {
         });
         items.push({ xml, file: await replaceDocumentXml(it.file, xml) });
       }
-      if (items.length < 2) throw new Error("মার্জ করার মতো পর্যাপ্ত ফাইল নেই");
+      if (items.length < 2) throw new Error("Not enough files to merge");
       const merged = await buildMergedDocxBlob(items);
       downloadBlob(merged, `${shuffleItems[0].baseName} (merged shuffled).docx`);
       toast({
-        title: "✅ মার্জ করা Word ফাইল ডাউনলোড হয়েছে",
-        description: "সব ফাইলের সেটগুলো পরপর — ফাইলের মাঝে পেজ ব্রেক, ফরম্যাট হুবহু অক্ষত।",
+        title: "✅ Merged Word file downloaded",
+        description: "All files' sets in order — page breaks between files, formatting exactly intact.",
       });
     } catch (e) {
-      toast({ title: "মার্জ করা যায়নি", description: String(e), variant: "destructive" });
+      toast({ title: "Merging failed", description: String(e), variant: "destructive" });
     } finally {
       setMultiMergedBusy(false);
     }
@@ -1402,15 +1397,15 @@ export default function Home() {
         });
         out.push({ name: `${it.baseName} (shuffled).docx`, blob: await replaceDocumentXml(it.file, xml) });
       }
-      if (!out.length) throw new Error("ডাউনলোড করার মতো ফাইল নেই");
+      if (!out.length) throw new Error("No files to download");
       const zip = await buildZipBlob(out);
       downloadBlob(zip, "MCQ-shuffled-files.zip");
       toast({
-        title: "✅ ZIP ডাউনলোড হয়েছে",
-        description: `${out.length} টি আলাদা শাফল্ড ফাইল ভিতরে আছে।`,
+        title: "✅ ZIP downloaded",
+        description: `${out.length} separate shuffled file(s) inside.`, 
       });
     } catch (e) {
-      toast({ title: "ZIP বানানো যায়নি", description: String(e), variant: "destructive" });
+      toast({ title: "ZIP failed", description: String(e), variant: "destructive" });
     } finally {
       setMultiZipBusy(false);
     }
@@ -1439,9 +1434,9 @@ export default function Home() {
     setBusy("docx");
     try {
       await exportDocx(sets, exportOpts);
-      toast({ title: "✅ Word ফাইল ডাউনলোড হয়েছে", description: "প্রতিটি সেট আলাদা পেজে আছে।" });
+      toast({ title: "✅ Word file downloaded", description: "Each set is on its own page." });
     } catch (e) {
-      toast({ title: "ডাউনলোডে সমস্যা", description: String(e), variant: "destructive" });
+      toast({ title: "Download failed", description: String(e), variant: "destructive" });
     } finally {
       setBusy(null);
     }
@@ -1451,9 +1446,9 @@ export default function Home() {
     if (!sets) return;
     try {
       exportDocHtml(sets, exportOpts);
-      toast({ title: "✅ .doc ফাইল ডাউনলোড হয়েছে" });
+      toast({ title: "✅ .doc file downloaded" });
     } catch (e) {
-      toast({ title: "ডাউনলোডে সমস্যা", description: String(e), variant: "destructive" });
+      toast({ title: "Download failed", description: String(e), variant: "destructive" });
     }
   };
 
@@ -1462,7 +1457,7 @@ export default function Home() {
     try {
       printSets(sets, exportOpts);
     } catch (e) {
-      toast({ title: "প্রিন্ট খোলা যায়নি", description: String(e), variant: "destructive" });
+      toast({ title: "Could not open print", description: String(e), variant: "destructive" });
     }
   };
 
@@ -1474,7 +1469,7 @@ export default function Home() {
       setCopiedSet(si);
       setTimeout(() => setCopiedSet(null), 1800);
     } catch (e) {
-      toast({ title: "কপি করা যায়নি", description: String(e), variant: "destructive" });
+      toast({ title: "Copy failed", description: String(e), variant: "destructive" });
     }
   };
 
@@ -1483,9 +1478,9 @@ export default function Home() {
     setBusy("copyall");
     try {
       await copyToClipboard(allSetsClipboardText(sets, exportOpts));
-      toast({ title: "📋 সব সেট কপি হয়েছে", description: "Word-এ পেস্ট করলেই পাবেন। পেজ ব্রেক চাইলে .docx ডাউনলোড করুন।" });
+      toast({ title: "📋 All sets copied", description: "Paste into Word. For page breaks, download the .docx." });
     } catch (e) {
-      toast({ title: "কপি করা যায়নি", description: String(e), variant: "destructive" });
+      toast({ title: "Copy failed", description: String(e), variant: "destructive" });
     } finally {
       setBusy(null);
     }
@@ -1502,15 +1497,15 @@ export default function Home() {
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-bold tracking-tight md:text-2xl">MCQ Shuffler Pro</h1>
             <p className="text-xs text-muted-foreground md:text-sm">
-              ফাইল আপলোড করুন → মোড বেছে কাজ করুন (🔀 শাফল+সেট • 🔢 রঙ-সিরিয়াল • 📥 রিডাউনলোড) — পেছনে ফিরে একই ফাইল অন্য মোডে চালান • .docx হুবহু প্রিজার্ভ
+              Upload a file → pick a mode and work (🔀 shuffle+sets • 🔢 color-serial • 📥 redownload) — go back to run the same files in another mode • .docx preserved exactly
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge className="gap-1 bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
-              <Zap className="h-3 w-3" /> ১০০% ফ্রি
+              <Zap className="h-3 w-3" /> 100% free
             </Badge>
             <Badge variant="secondary" className="gap-1">
-              <ShieldCheck className="h-3 w-3" /> ডেটা ব্রাউজারেই থাকে
+              <ShieldCheck className="h-3 w-3" /> Data stays in your browser
             </Badge>
           </div>
         </div>
@@ -1590,13 +1585,13 @@ export default function Home() {
                 ))}
 
                 <MultiDownloadCard
-                  title={rdDocs.length === 1 ? "৪. ডাউনলোড — বাছাই করা অংশের নতুন ফাইল" : "৪. ডাউনলোড — সব ফাইলের বাছাই করা অংশ"}
+                  title={rdDocs.length === 1 ? "4. Download — new file from picked parts" : "4. Download — picked parts of all files"}
                   description={
                     rdDocs.length === 1
-                      ? "টিক দেওয়া প্রশ্নগুলোর বাছাই করা অংশ নিয়ে নতুন .docx — ট্যাব, ইকুয়েশন, ওয়াটারমার্ক সব অক্ষত।"
-                      : "সব ফাইল পরপর এক .docx-এ (ফাইলের মাঝে পেজ ব্রেক) অথবা ZIP-এ আলাদা আলাদা নামান।"
+                      ? "A new .docx from the ticked questions' picked parts — tabs, equations, watermark all intact."
+                      : "All files in order in one .docx (page breaks between files) or download them separately in a ZIP."
                   }
-                  stats={`${rdDocs.length} টি ফাইল • সিলেক্টেড ${rdSelTotal} টি প্রশ্ন`}
+                  stats={`${rdDocs.length} file(s) • ${rdSelTotal} question(s) selected`}
                   onDownloadMerged={handleRdMerged}
                   onDownloadZip={handleRdZip}
                   mergedBusy={rdMergedBusy}
@@ -1666,9 +1661,9 @@ export default function Home() {
                   onSchemeChange={(id, scheme) => setSerialSchemes((prev) => ({ ...prev, [id]: scheme }))}
                 />
                 <MultiDownloadCard
-                  title="সব ফাইল একসাথে সিরিয়াল করুন"
-                  description="প্রতিটা ফাইলের সব প্রশ্ন পরপর নম্বর পাবে — রঙ-হেডার, ইকুয়েশন, ছবি সব অক্ষত থাকবে। রঙ-অনুযায়ী সিরিয়াল লাগলে ওই ফাইলটা একা আপলোড করুন।"
-                  stats={`${serialDocs.length} টি ফাইল • মোট ${serialDocs.reduce((a, d) => a + d.analysis.questionCount, 0)} টি প্রশ্ন`}
+                  title="Serial all files together"
+                  description="Every question in every file gets a consecutive number — color headers, equations, images all stay intact. For color-based serials, upload that file alone."
+                  stats={`${serialDocs.length} file(s) • ${serialDocs.reduce((a, d) => a + d.analysis.questionCount, 0)} question(s) in total`}
                   showSerialChoice
                   serialStrategy={serialStrategy}
                   onSerialStrategyChange={setSerialStrategy}
@@ -1707,10 +1702,10 @@ export default function Home() {
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base md:text-lg">
-                      📂 আপলোড হওয়া ফাইল ({shuffleItems.length} টি)
+                      📂 Uploaded files ({shuffleItems.length})
                     </CardTitle>
                     <CardDescription>
-                      ক্রম বদলাতে টেনে ধরুন বা তীর চাপুন — মার্জ/ZIP-এ ঠিক এই ক্রমেই আসবে। প্রতিটা ফাইল নিজের ভিতরেই শাফল হবে।
+                      Drag or use the arrows to reorder — merge/ZIP keeps exactly this order. Each file is shuffled within itself.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -1752,9 +1747,9 @@ export default function Home() {
                 <div ref={resultsRef} className="scroll-mt-4">
                   {shuffleMultiSets && (
                     <MultiDownloadCard
-                      title="শাফল সম্পন্ন — এখন ডাউনলোড করুন"
-                      description="প্রতিটা ফাইলের সেটগুলো আলাদা পেজে, সিরিয়াল ১,২,৩… করা।"
-                      stats={`${shuffleItems.length} টি ফাইল • প্রতি ফাইলে ${multiEffectiveSets} টি সেট`}
+                      title="Shuffle complete — download now"
+                      description="Each file's sets on separate pages, serials 1,2,3…."
+                      stats={`${shuffleItems.length} file(s) • ${multiEffectiveSets} set(s) per file`}
                       onDownloadMerged={handleMultiMergedDownload}
                       onDownloadZip={handleMultiZipDownload}
                       mergedBusy={multiMergedBusy}
@@ -1851,7 +1846,7 @@ export default function Home() {
 
                 <ShuffleCard
                   enabled={canShuffle}
-                  lockReason={parsed ? gateReason : "প্রথমে প্রশ্ন ডিটেক্ট করুন"}
+                  lockReason={parsed ? gateReason : "Detect questions first"}
                   selectedCount={selected.size}
                   setCount={setCount}
                   onSetCountChange={setSetCount}
@@ -1900,7 +1895,7 @@ export default function Home() {
       {/* ফুটার */}
       <footer className="mt-auto border-t bg-white/60 py-4 dark:bg-background/60">
         <div className="mx-auto max-w-5xl px-4 text-center text-xs text-muted-foreground">
-          MCQ Shuffler Pro — অফিস, স্কুল, কোচিং সেন্টার ও ভার্সিটির জন্য ফ্রি টুল। সব প্রসেসিং আপনার ব্রাউজারেই হয়, কোনো প্রশ্ন সার্ভারে যায় না।
+          MCQ Shuffler Pro — a free tool for offices, schools, coaching centers and universities. Everything runs in your browser; no question ever reaches a server.
         </div>
       </footer>
     </div>

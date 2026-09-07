@@ -4,7 +4,6 @@ import { useState, type DragEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChevronDown, ChevronUp, GripVertical, Loader2, X } from "lucide-react";
-import { numberToDigits } from "@/lib/mcq/docx-xml";
 
 export interface MultiFileItem {
   id: string;
@@ -83,7 +82,7 @@ export function MultiFileList({ items, onReorder, onRemove, disabled = false }: 
 
           {/* বাংলা সিরিয়াল নম্বর */}
           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-emerald-100 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-            {numberToDigits(i + 1, "bn")}
+            {i + 1}
           </span>
 
           {/* ফাইলের নাম — লম্বা হলে কাটা পড়বে */}
@@ -99,16 +98,16 @@ export function MultiFileList({ items, onReorder, onRemove, disabled = false }: 
                 variant="secondary"
                 className="shrink-0 border-transparent bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
               >
-                {numberToDigits(item.questionCount, "bn")} টি প্রশ্ন
+                {item.questionCount} questions
               </Badge>
             ) : (
               <Badge variant="secondary" className="shrink-0">
-                প্রস্তুত
+                Ready
               </Badge>
             ))}
           {item.status === "error" && (
             <span className="min-w-0 max-w-[45%] truncate text-xs text-red-600 dark:text-red-400">
-              {item.error ?? "ফাইলটা পড়া যায়নি"}
+              {item.error ?? "Could not read the file"}
             </span>
           )}
 
@@ -119,7 +118,7 @@ export function MultiFileList({ items, onReorder, onRemove, disabled = false }: 
               variant="ghost"
               size="icon"
               className="h-7 w-7"
-              aria-label="উপরে তুলুন"
+              aria-label="Move up"
               disabled={disabled || i === 0}
               onClick={() => onReorder(i, i - 1)}
             >
@@ -130,7 +129,7 @@ export function MultiFileList({ items, onReorder, onRemove, disabled = false }: 
               variant="ghost"
               size="icon"
               className="h-7 w-7"
-              aria-label="নিচে নামান"
+              aria-label="Move down"
               disabled={disabled || i === items.length - 1}
               onClick={() => onReorder(i, i + 1)}
             >
@@ -141,7 +140,7 @@ export function MultiFileList({ items, onReorder, onRemove, disabled = false }: 
               variant="ghost"
               size="icon"
               className="h-7 w-7 text-muted-foreground hover:text-red-600 dark:hover:text-red-400"
-              aria-label="তালিকা থেকে বাদ দিন"
+              aria-label="Remove from list"
               disabled={disabled}
               onClick={() => onRemove(item.id)}
             >

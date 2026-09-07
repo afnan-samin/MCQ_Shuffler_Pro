@@ -29,7 +29,7 @@ export function ColorShuffleInfoCard({ analysis, headersStripped, fileName, onOp
           </span>
           <div className="min-w-0">
             <CardTitle className="text-base md:text-lg">
-              এই ফাইলে রঙ-দেওয়া হেডার আছে — শাফলে হেডার বাদ যাবে
+              This file has colored headers — they'll be stripped for shuffling
             </CardTitle>
             <CardDescription className="truncate">{fileName}</CardDescription>
           </div>
@@ -37,21 +37,20 @@ export function ColorShuffleInfoCard({ analysis, headersStripped, fileName, onOp
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          শাফলের সময় <b>{headersStripped}</b> টি রঙ-হেডার <b>বাদ দিয়ে</b> সব{" "}
-          <b>{analysis.questionCount}</b> টি প্রশ্নকে <b>এক সিরিয়ালে</b> ধরে আপনার সেট-সেটিং অনুযায়ী শাফল করা
-          হবে — আউটপুটে হেডার থাকবে না, প্রতি সেটে সিরিয়াল ১,২,৩… বসবে। ফাইলের আসল সিরিয়াল সেকশনভেদে
-          রিস্টার্ট থাকলেও সেটা শাফলে সমস্যা না।
+          While shuffling, <b>{headersStripped}</b> colored header(s) are <b>stripped</b> and all{" "}
+          <b>{analysis.questionCount}</b> questions — treated as <b>one serial</b> — are shuffled per your set settings.
+          The output has no headers; each set gets serials 1,2,3… If the file's original serial restarts per section, that's fine for shuffling.
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary" className="gap-1">
-            <PaintBucket className="h-3 w-3" /> {analysis.colors.length} রঙ
+            <PaintBucket className="h-3 w-3" /> {analysis.colors.length} colors
           </Badge>
-          <Badge variant="secondary">{headersStripped} হেডার বাদ যাবে</Badge>
-          <Badge variant="secondary">{analysis.questionCount} প্রশ্ন শাফল হবে</Badge>
+          <Badge variant="secondary">{headersStripped} headers stripped</Badge>
+          <Badge variant="secondary">{analysis.questionCount} questions will shuffle</Badge>
         </div>
         <Button onClick={onOpenSerial} variant="outline" className="w-full sm:w-auto">
           <ListOrdered className="mr-2 h-4 w-4" />
-          বরং রঙ-অনুযায়ী সিরিয়াল করতে চান? সিরিয়াল মোডে খুলুন
+          Prefer color-based serials? Open in Serial mode
         </Button>
       </CardContent>
     </Card>
@@ -75,8 +74,8 @@ export function NoColorSerialCard({ questionCount, busy, onContinuous }: NoColor
             <ListOrdered className="h-5 w-5" />
           </span>
           <div className="min-w-0">
-            <CardTitle className="text-base md:text-lg">এই ফাইলে রঙ-হেডার পাওয়া যায়নি</CardTitle>
-            <CardDescription>রঙ-ভিত্তিক সেকশন সিরিয়ালে হেডারে শেডিং রঙ থাকতে হয়</CardDescription>
+            <CardTitle className="text-base md:text-lg">No colored headers found in this file</CardTitle>
+            <CardDescription>Color-based section serials need a shading color on the headers</CardDescription>
           </div>
         </div>
       </CardHeader>
@@ -84,19 +83,19 @@ export function NoColorSerialCard({ questionCount, busy, onContinuous }: NoColor
         {questionCount > 0 ? (
           <>
             <p className="text-sm text-muted-foreground">
-              তবে <b>{questionCount}</b> টি প্রশ্ন-লাইন পাওয়া গেছে — চাইলে পুরো ফাইলে{" "}
-              <b>একটানা ১,২,৩…</b> সিরিয়াল দেওয়া যাবে। রঙ-স্ট্রাকচার চাইলে Word-এ হেডারগুলোতে Home →
-              Paragraph → Shading দিয়ে রঙ বসিয়ে আবার আপলোড করুন।
+              But <b>{questionCount}</b> question line(s) were found — you can still give the whole file{" "}
+              <b>one continuous 1,2,3…</b> serial. For color structure, add shading to the headers in Word (Home →
+              Paragraph → Shading) and re-upload.
             </p>
             <Button onClick={onContinuous} disabled={busy} className="w-full sm:w-auto">
               <Download className="mr-2 h-4 w-4" />
-              {busy ? "প্রসেস হচ্ছে…" : "একটানা ১..N সিরিয়াল করে .docx ডাউনলোড"}
+              {busy ? "Processing…" : "Download continuous 1..N serial .docx"}
             </Button>
           </>
         ) : (
           <p className="text-sm text-muted-foreground">
-            কোনো প্রশ্ন-লাইনও পাওয়া যায়নি — ফাইলটা সঠিক .docx কিনা আর প্রশ্নগুলো সিরিয়াল দিয়ে শুরু কিনা
-            (যেমন: 1. / ১. / 01.) দেখে নিন।
+            No question lines found — check the file is a valid .docx and that questions start with a serial
+            (e.g. 1. / ১. / 01.).
           </p>
         )}
       </CardContent>
@@ -133,10 +132,10 @@ export function BlockedLinesCard({ blocked }: BlockedLinesCardProps) {
           </span>
           <div className="min-w-0">
             <CardTitle className="text-base md:text-lg">
-              বাদ পড়া লাইনসমূহ — {blocked.length} টি (শাফলে যাবে না)
+              Stripped lines — {blocked.length} (not going into the shuffle)
             </CardTitle>
             <CardDescription>
-              এই লাইনগুলো MCQ নয় (হেডার/শিরোনাম) — তাই শাফলের আগেই বাদ দেওয়া হয়েছে
+              These lines aren't MCQs (headers/titles) — stripped before the shuffle
             </CardDescription>
           </div>
         </div>
@@ -145,12 +144,12 @@ export function BlockedLinesCard({ blocked }: BlockedLinesCardProps) {
         <div className="flex flex-wrap items-center gap-2">
           {colorCount > 0 && (
             <Badge variant="secondary" className="gap-1">
-              <PaintBucket className="h-3 w-3" /> {colorCount} রঙ-হেডার
+              <PaintBucket className="h-3 w-3" /> {colorCount} color headers
             </Badge>
           )}
           {patternCount > 0 && (
             <Badge variant="secondary" className="gap-1">
-              <ShieldX className="h-3 w-3" /> {patternCount} নন-MCQ (টেক্সট-প্যাটার্ন)
+              <ShieldX className="h-3 w-3" /> {patternCount} non-MCQ (text pattern)
             </Badge>
           )}
         </div>
@@ -166,10 +165,10 @@ export function BlockedLinesCard({ blocked }: BlockedLinesCardProps) {
                     : "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300")
                 }
               >
-                {b.reason === "color" ? "রঙ-হেডার" : "নন-MCQ"}
+                {b.reason === "color" ? "Color header" : "Non-MCQ"}
               </span>
               <span className={"min-w-0 break-all " + (isBijoyText(b.text) ? "tokfont-bijoy" : "")}>
-                {b.text || "(খালি লাইন)"}
+                {b.text || "(empty line)"}
               </span>
             </li>
           ))}
@@ -179,11 +178,11 @@ export function BlockedLinesCard({ blocked }: BlockedLinesCardProps) {
           <Button variant="ghost" size="sm" className="w-full" onClick={() => setExpanded((v) => !v)}>
             {expanded ? (
               <>
-                <ChevronUp className="mr-1 h-4 w-4" /> গুটিয়ে নিন
+                <ChevronUp className="mr-1 h-4 w-4" /> Show less
               </>
             ) : (
               <>
-                <ChevronDown className="mr-1 h-4 w-4" /> আরও {blocked.length - PREVIEW_COUNT} টি লাইন দেখুন
+                <ChevronDown className="mr-1 h-4 w-4" /> Show {blocked.length - PREVIEW_COUNT} more lines
               </>
             )}
           </Button>
@@ -237,9 +236,9 @@ export function MultiSerialSchemeCard({ docs, schemes, onSchemeChange }: MultiSe
             <PaintBucket className="h-5 w-5" />
           </span>
           <div className="min-w-0">
-            <CardTitle className="text-base md:text-lg">প্রতি ফাইলের সিরিয়াল-স্কিম</CardTitle>
+            <CardTitle className="text-base md:text-lg">Per-file serial scheme</CardTitle>
             <CardDescription>
-              ডিফল্ট একটানা — রঙ-হেডারওয়ালা ফাইলে রঙ বেছে নিলে প্রতি সেকশনে নম্বর ১ থেকে রিস্টার্ট হবে
+              Default is continuous — for files with colored headers, pick a color and each section restarts at 1
             </CardDescription>
           </div>
         </div>
@@ -257,7 +256,7 @@ export function MultiSerialSchemeCard({ docs, schemes, onSchemeChange }: MultiSe
                   <span className="block truncate text-sm font-medium">{d.name}</span>
                 </div>
                 <Badge variant="secondary" className="shrink-0">
-                  {d.analysis.questionCount} প্রশ্ন
+                  {d.analysis.questionCount} questions
                 </Badge>
               </div>
 
@@ -275,7 +274,7 @@ export function MultiSerialSchemeCard({ docs, schemes, onSchemeChange }: MultiSe
                     )}
                   >
                     <span className="inline-block h-4 w-4 shrink-0 rounded-md border border-border bg-gradient-to-r from-emerald-400 to-sky-500 shadow-sm" />
-                    একটানা
+                    Continuous
                     {scheme.kind === "continuous" && <CheckCircle2 className="h-4 w-4 text-primary" />}
                   </button>
 
@@ -298,7 +297,7 @@ export function MultiSerialSchemeCard({ docs, schemes, onSchemeChange }: MultiSe
                         <SchemeSwatch hex={hex} />
                         <span className={cn("font-mono font-semibold", !hex && "font-sans")}>{colorKeyName(c.key)}</span>
                         <Badge variant="secondary" className="px-1.5 py-0 text-[11px]">
-                          {c.sections} সেকশন
+                          {c.sections} sections
                         </Badge>
                         {active && <CheckCircle2 className="h-4 w-4 text-primary" />}
                       </button>
@@ -306,7 +305,7 @@ export function MultiSerialSchemeCard({ docs, schemes, onSchemeChange }: MultiSe
                   })}
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground">রঙ নেই — একটানা হবে</p>
+                <p className="text-xs text-muted-foreground">No colors — continuous</p>
               )}
             </div>
           );
@@ -315,8 +314,7 @@ export function MultiSerialSchemeCard({ docs, schemes, onSchemeChange }: MultiSe
         <div className="flex items-start gap-2 rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <p>
-            <b>একটানা</b> = পুরো ফাইলে ১,২,৩… ; <b>রঙ</b> = ওই রঙের প্রতি হেডার-সেকশনে ১ থেকে শুরু। বাছাই মার্জ (.docx)
-            ও ZIP — দুই ডাউনলোডেই প্রয়োগ হয়।
+            <b>Continuous</b> = 1,2,3… across the whole file; <b>Color</b> = restart at 1 in each header-section of that color. Applies to both downloads — the merged (.docx) and the ZIP.
           </p>
         </div>
       </CardContent>

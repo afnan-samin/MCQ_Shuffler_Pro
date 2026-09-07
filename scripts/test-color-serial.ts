@@ -265,7 +265,7 @@ if (!agriMissing) {
   const cBlack = anA.colors.find((c) => c.key === "000000");
   const cGray = anA.colors.find((c) => c.key === "D0CECE");
   ok(cBlack?.name === "B1" && cBlack.sections === 126, "000000 = B1, ১২৬ Type-হেডার");
-  ok(cGray?.name === "কাস্টম রঙ" && cGray.sections === 9, "D0CECE = কাস্টম, ৯টা অধ্যায়-হেডার");
+  ok(cGray?.name === "Custom color" && cGray.sections === 9, "D0CECE = custom color label, 9 chapter-headers");
   ok(anA.questionCount === 435, "৪৩৫ প্রশ্ন ডিটেক্ট (আগে ৩৮৩ ছিল — pipe যোগে পূর্ণ)");
 
   // B1 প্ল্যান: ১২৬টা Type-সেকশন, প্রতিটায় ১ থেকে

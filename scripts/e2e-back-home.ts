@@ -42,17 +42,17 @@ try {
 
   // ধাপ ২: ফাইল স্টেজ → ৩ মোড-ট্যাব
   await page.setInputFiles("#step-upload input[type='file']", [f]);
-  await page.waitForSelector("text=ফাইল প্রস্তুত", { timeout: 30000 });
-  await page.waitForSelector('button[role="tab"]:has-text("MCQ শাফল")', { timeout: 15000 });
+  await page.waitForSelector("text=files ready", { timeout: 30000 });
+  await page.waitForSelector('button[role="tab"]:has-text("MCQ Shuffle")', { timeout: 15000 });
   console.log("✓ স্টেজ হলো → ৩ মোড-ট্যাব দৃশ্যমান");
 
   // ধাপ ৩: শাফল মোডে ঢোকা → ওয়ার্ক-বার; বাটনে অ্যারো আছে, "পেছনে" লেখা নেই
-  await page.click('button[role="tab"]:has-text("MCQ শাফল")');
+  await page.click('button[role="tab"]:has-text("MCQ Shuffle")');
   await page.waitForSelector('[data-testid="mode-work-bar"]', { timeout: 60000 });
-  const backBtn = page.locator('button[aria-label="পেছনে — হোমে ফিরুন"]');
+  const backBtn = page.locator('button[aria-label="Back — return home"]');
   if ((await backBtn.count()) !== 1) throw new Error("অ্যারো-ব্যাক বাটন নেই!");
   const btnText = (await backBtn.textContent())?.trim() ?? "";
-  if (btnText.includes("পেছনে")) throw new Error(`বাটনে এখনো "পেছনে" লেখা আছে: "${btnText}"`);
+  if (btnText.includes("Back")) throw new Error(`বাটনে এখনো লেখা আছে: "${btnText}"`);
   console.log("✓ ওয়ার্ক-বারে অ্যারো-বাটন — লেখা নেই, শুধু আইকন");
 
   // ধাপ ৪: অ্যারো-ব্যাক → হোম (আপলোড-কার্ড); ৩ মোড-বাটন আর দেখায় না
@@ -64,7 +64,7 @@ try {
 
   // ধাপ ৫: আবার একই ফাইল স্টেজ করা যায় (নতুন শুরু কাজ করছে)
   await page.setInputFiles("#step-upload input[type='file']", [f]);
-  await page.waitForSelector("text=ফাইল প্রস্তুত", { timeout: 30000 });
+  await page.waitForSelector("text=files ready", { timeout: 30000 });
   console.log("✓ হোম থেকে নতুন করে স্টেজ করা যায়");
 
   console.log("\nJS errors:", errors.length ? errors : "শূন্য ✓");

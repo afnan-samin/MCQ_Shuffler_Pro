@@ -95,7 +95,7 @@ export function buildShuffledXml(
 ): string {
   const doc = new DOMParser().parseFromString(xml, "application/xml");
   const body = doc.getElementsByTagNameNS(W_NS, "body")[0];
-  if (!body) throw new Error("document.xml-এ w:body নেই");
+  if (!body) throw new Error("document.xml has no w:body");
 
   const kids = Array.from(body.children) as Element[];
   const sectPr = kids.find((k) => k.localName === "sectPr") ?? null;

@@ -19,11 +19,11 @@ interface SerialPasteCardProps {
 
 const scriptLabelOf = (s: ParseOutput["numberScript"]) =>
   s === "bn"
-    ? "বাংলা সংখ্যা (১,২,৩)"
+    ? "Bengali numerals (১,২,৩)"
     : s === "en"
-      ? "English সংখ্যা (1,2,3)"
+      ? "English numerals (1,2,3)"
       : s === "mixed"
-        ? "বাংলা + English মিক্স"
+        ? "Mixed Bengali + English"
         : "—";
 
 /**
@@ -42,11 +42,11 @@ export function SerialPasteCard({ result, fixing, downloading, onFix, onDownload
     <Card id="serial-paste-result">
       <CardHeader>
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">২</span>
-          <CardTitle className="text-lg md:text-xl">ডিটেকশন রেজাল্ট (পেস্ট)</CardTitle>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">2</span>
+          <CardTitle className="text-lg md:text-xl">Detection result (paste)</CardTitle>
         </div>
         <CardDescription>
-          পেস্ট করা টেক্সট থেকে ডিটেক্ট হওয়া প্রশ্ন — পজিশন-অনুযায়ী ১..N সিরিয়াল বসিয়ে এক সেট .docx নামানো যায়।
+          Questions detected from the pasted text — download one .docx with serials renumbered 1..N by position.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -54,15 +54,15 @@ export function SerialPasteCard({ result, fixing, downloading, onFix, onDownload
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
           <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
             <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{questions.length}</div>
-            <div className="text-xs text-muted-foreground">মোট প্রশ্ন</div>
+            <div className="text-xs text-muted-foreground">Total questions</div>
           </div>
           <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
             <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{withOptions}</div>
-            <div className="text-xs text-muted-foreground">অপশনসহ প্রশ্ন</div>
+            <div className="text-xs text-muted-foreground">With options</div>
           </div>
           <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
             <div className="mt-1 text-sm font-semibold">{scriptLabelOf(result.numberScript)}</div>
-            <div className="text-xs text-muted-foreground">নম্বরের ধরন</div>
+            <div className="text-xs text-muted-foreground">Number style</div>
           </div>
         </div>
 
@@ -85,25 +85,25 @@ export function SerialPasteCard({ result, fixing, downloading, onFix, onDownload
                 {serialOk ? (
                   <>
                     <div className="font-semibold text-emerald-800 dark:text-emerald-300">
-                      ✅ সিরিয়াল ঠিক আছে — ডাউনলোড বাটন চালু!
+                      ✅ Serial is correct — download enabled!
                     </div>
                     <div className="mt-0.5 text-sm text-emerald-700/80 dark:text-emerald-400/80">
-                      প্রশ্ন নম্বর {serial.startAt} থেকে {lastNumber} পর্যন্ত পরপর সাজানো।
-                      {!serial.startsAtOne && " (নোট: নম্বর ১ থেকে শুরু হয়নি, কিন্তু ক্রম ঠিক আছে — ডাউনলোডে ১..N বসবে)"}
+                      Question numbers run consecutively from {serial.startAt} to {lastNumber}.
+                      {!serial.startsAtOne && " (Note: doesn't start at 1, but the order is correct — 1..N will be applied on download)"}
                     </div>
                   </>
                 ) : (
                   <>
                     <div className="font-semibold text-amber-800 dark:text-amber-300">
-                      ⚠️ সিরিয়ালে {serial.issues.length} টি জায়গায় সমস্যা পাওয়া গেছে
+                      ⚠️ Found {serial.issues.length} problem(s) in the serial
                     </div>
                     <div className="mt-1 text-sm text-amber-700/90 dark:text-amber-400/90">
                       {serial.issues.slice(0, 3).map((is, i) => (
                         <div key={i}>
-                          প্রশ্ন #{is.index + 1}: নম্বর {is.expected} হওয়ার কথা, কিন্তু পাওয়া গেছে {is.found}
+                          Question #{is.index + 1}: expected number {is.expected}, found {is.found}
                         </div>
                       ))}
-                      {serial.issues.length > 3 && <div>...আরও {serial.issues.length - 3} টি</div>}
+                      {serial.issues.length > 3 && <div>...and {serial.issues.length - 3} more</div>}
                     </div>
                   </>
                 )}
@@ -114,7 +114,7 @@ export function SerialPasteCard({ result, fixing, downloading, onFix, onDownload
               <div className="mt-3 flex flex-wrap items-center border-t border-amber-200 pt-3 dark:border-amber-800">
                 <Button size="sm" className="gap-2 bg-amber-600 hover:bg-amber-700" onClick={onFix} disabled={fixing}>
                   <Wrench className="h-4 w-4" />
-                  {fixing ? "ঠিক করা হচ্ছে..." : "🔧 অটো নম্বরিং ঠিক করুন"}
+                  {fixing ? "Fixing..." : "🔧 Fix numbering automatically"}
                 </Button>
               </div>
             )}
@@ -125,7 +125,7 @@ export function SerialPasteCard({ result, fixing, downloading, onFix, onDownload
         <div className="flex items-start gap-2 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs dark:border-amber-500/30 dark:bg-amber-950/30">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
           <p className="text-amber-800 dark:text-amber-200">
-            পেস্ট মোডে রঙ-ডিটেকশন হয় না — রঙ-ভিত্তিক সিরিয়ালের জন্য .docx ফাইল আপলোড করুন।
+            Paste mode doesn't detect colors — upload a .docx file for color-based serials.
           </p>
         </div>
 
@@ -137,14 +137,14 @@ export function SerialPasteCard({ result, fixing, downloading, onFix, onDownload
           className="h-auto w-full flex-col items-center gap-1 rounded-xl bg-emerald-600 p-4 text-white hover:bg-emerald-700 sm:w-auto"
         >
           {downloading ? (
-            <span className="flex items-center gap-2 text-sm font-semibold">তৈরি হচ্ছে...</span>
+            <span className="flex items-center gap-2 text-sm font-semibold">Generating...</span>
           ) : (
             <span className="flex items-center gap-2 text-sm font-semibold">
-              <Download /> সিরিয়াল করে .docx ডাউনলোড (১..N)
+              <Download /> Download serial .docx (1..N)
             </span>
           )}
           <span className="text-xs opacity-80">
-            প্রশ্নের ক্রম হুবহু থাকবে, প্রথম লাইনের নম্বর পজিশন-অনুযায়ী ১ থেকে বসবে
+            Question order stays exactly the same — first-line numbers start at 1 by position
           </span>
         </Button>
       </CardContent>

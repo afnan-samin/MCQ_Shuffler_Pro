@@ -1,22 +1,29 @@
-# MCQ Shuffler Pro — MCQ শাফল ও সেট তৈরির ফ্রি টুল
+# MCQ Shuffler Pro — Free MCQ Shuffler & Exam Set Generator
 
-MCQ প্রশ্ন শাফল করে একাধিক সেটে ভাগ করার সম্পূর্ণ ফ্রি ওয়েব টুল। Word (.docx), টেক্সট ও CSV ফাইল থেকে প্রশ্ন পড়ে, সিরিয়াল ডিটেক্ট ও অটো-ফিক্স করে, এক্সাম-রেডি Word ফাইল এক্সপোর্ট করে। **১০০% ক্লায়েন্ট-সাইড** — কোনো ফাইল সার্ভারে যায় না।
+A completely free web tool that shuffles MCQ questions into multiple exam sets. It reads questions from Word (.docx), text and CSV files, detects and auto-fixes serial numbers, and exports exam-ready Word files. **100% client-side** — no file ever leaves your browser.
 
-## মূল ফিচার
+## Key features
 
-- **শাফল + সেট তৈরি** — Fisher-Yates শাফল; interleaved / chunk / random ডিস্ট্রিবিউশনে একাধিক সেট, বা প্রতি সেটে সব প্রশ্ন (Original Shuffle)
-- **রঙ-সিরিয়াল** — প্রতিটি প্রশ্নের সিরিয়াল রঙিন করে মূল-সেট ম্যাপিং সহ এক্সপোর্ট
-- **মাল্টি-ফাইল মার্জ + ZIP** — একাধিক .docx একসাথে প্রসেস করে একটাই .docx বা ZIP ডাউনলোড
-- **Bijoy ↔ ইউনিকোড ডিটেকশন** — শব্দ-ধরে ধরে Bijoy (ANSI) / ইউনিকোড বাংলা / English শনাক্ত ও রঙ-প্রিভিউ; ভাঙা সিরিয়াল ডিটেক্ট + অটো-ফিক্স
-- **প্রাইভেসি** — পুরো পাইপলাইন ব্রাউজারেই চলে; কোনো API রুট নেই, কোনো আপলোড নেই
+- **Shuffle + set building** — Fisher-Yates shuffle; multiple sets with interleaved / chunk / random distributions, or all questions in every set (Original Shuffle)
+- **Color serial** — serializes questions per colored header section; per-file serial schemes with merge/ZIP export
+- **Multi-file merge + ZIP** — process several .docx files at once and download one merged .docx or a ZIP of separate files
+- **Redownload** — pick questions/parts (serial, question, options, answer, explanation) from uploaded files into a new .docx
+- **Bijoy ↔ Unicode detection** — word-by-word detection of Bijoy (ANSI) / Unicode Bengali / English with color preview; broken-serial detection + one-click auto-fix
+- **Reference tags** — keep, strip, or move `[CU-A: 22-23]`-style source tags when shuffling
+- **Privacy** — the whole pipeline runs in the browser; no API routes, no uploads
 
-## লোকাল ডেভ
+## Local development
 
 ```bash
 bun install
 bun run dev        # http://localhost:3000
 ```
 
-## টেক স্ট্যাক
+## Tech stack
 
-Next.js 16 (App Router, Turbopack) + Tailwind CSS v4 + shadcn/ui + TypeScript। ফন্ট: Kalpurush ও SutonnyMJ (`next/font/local` দিয়ে এমবেড)।
+Next.js 16 (App Router, Turbopack) + Tailwind CSS v4 + shadcn/ui + TypeScript. Fonts: Kalpurush and SutonnyMJ (embedded via `next/font/local`).
+
+## Notes for developers
+
+- The UI is English, but **functional Bengali stays**: the parser understands Bengali exam markers (`১.`, `ক)`, `উত্তর`, `উঃ`), Bengali digits (`০১২৩৪৫৬৭৮৯`), and output .docx files keep Bengali set-name styles (`সেট A/ক/১`) and `উত্তরমালা` headers — these are product decisions.
+- Unit tests live in `scripts/test-*.ts` (run with `bun run scripts/test-mcq.ts` etc.); browser E2E scripts are `scripts/e2e-*.ts` and expect the dev server on `localhost:3000`.

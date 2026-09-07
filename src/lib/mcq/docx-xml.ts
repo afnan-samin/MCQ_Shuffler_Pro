@@ -64,9 +64,9 @@ export function numberToDigits(n: number, enc: DigitEnc): string {
 }
 
 export const DIGIT_ENC_LABEL: Record<DigitEnc, string> = {
-  en: "English ডিজিট (Word-এ SutonnyMJ ফন্টে ১,২,৩ দেখায়)",
-  bn: "বাংলা Unicode ডিজিট (১,২,৩)",
-  bijoy: "Bijoy ASCII ডিজিট (SutonnyMJ এনকোডেড)",
+  en: "English digits (Word shows ১,২,৩ in the SutonnyMJ font)",
+  bn: "Bengali Unicode digits (১,২,৩)",
+  bijoy: "Bijoy ASCII digits (SutonnyMJ-encoded)",
 };
 
 // ---------- সিগমেন্ট-মুক্ত টেক্সট এক্সট্র্যাকশন ----------
@@ -426,10 +426,10 @@ export interface DocxParseResult {
 export function parseDocxXml(xml: string): DocxParseResult {
   const doc = new DOMParser().parseFromString(xml, "application/xml");
   if (doc.getElementsByTagName("parsererror").length) {
-    throw new Error("document.xml পার্স করা যায়নি — ফাইলটি করাপ্ট মনে হচ্ছে");
+    throw new Error("Could not parse document.xml — the file looks corrupt");
   }
   const body = doc.getElementsByTagNameNS(W_NS, "body")[0];
-  if (!body) throw new Error("document.xml-এ w:body পাওয়া যায়নি");
+  if (!body) throw new Error("No w:body found in document.xml");
 
   const kids = Array.from(body.children) as Element[];
 
@@ -537,7 +537,7 @@ export function parseDocxXml(xml: string): DocxParseResult {
 export async function loadDocxXml(file: Blob): Promise<string> {
   const zip = await JSZip.loadAsync(file);
   const entry = zip.file("word/document.xml");
-  if (!entry) throw new Error("এটা সঠিক .docx ফাইল না (word/document.xml নেই)");
+  if (!entry) throw new Error("Not a valid .docx file (word/document.xml missing)");
   return entry.async("string");
 }
 

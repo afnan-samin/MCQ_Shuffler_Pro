@@ -45,17 +45,17 @@ await page.goto("http://localhost:3000", { waitUntil: "networkidle" });
 await page.waitForSelector("#step-upload", { timeout: 30000 });
 await page.setInputFiles("#step-upload input[type='file']", [CHEM, HSC, NOCOLOR]);
 await page.waitForSelector('[role="tablist"]', { timeout: 30000 });
-await page.click('button[role="tab"]:has-text("MCQ সিরিয়াল")');
-await page.waitForSelector("text=সব ফাইল একসাথে সিরিয়াল করুন", { timeout: 120000 });
+await page.click('button[role="tab"]:has-text("MCQ Serial")');
+await page.waitForSelector("text=Serial all files together", { timeout: 120000 });
 const nameCount = await page.locator("span.flex-1.truncate").count();
 if (nameCount !== 3) throw new Error(`লিস্টে ৩ টা নাম দরকার, পাওয়া গেছে ${nameCount}`);
-const singleCard = await page.locator("text=রঙ-ভিত্তিক সিরিয়াল").count();
+const singleCard = await page.locator("text=Color-based serial (structured file)").count();
 if (singleCard !== 0) throw new Error("মাল্টি মোডে একক-ফাইল রঙ-কার্ড দেখা যাচ্ছে!");
 console.log("✓ সিরিয়াল: ৩ ফাইল আপলোড → ক্রম-লিস্ট + মাল্টি ডাউনলোড কার্ড (রঙ-কার্ড নেই)");
 
 // ---- ২. তীর-বাটনে রি-অর্ডার ----
 const before = await page.locator("span.flex-1.truncate").first().textContent();
-await page.locator('button[aria-label="উপরে তুলুন"]').nth(1).click();
+await page.locator('button[aria-label="Move up"]').nth(1).click();
 const after = await page.locator("span.flex-1.truncate").first().textContent();
 if (!before || !after || before === after) throw new Error(`রি-অর্ডার হয়নি: ${before} → ${after}`);
 if (!after.includes("hsc27")) throw new Error("২য় ফাইল উপরে ওঠেনি: " + after);
@@ -64,9 +64,9 @@ console.log("✓ রি-অর্ডার (তীর-বাটন):", before?.t
 // ---- ৩. মার্জ (.docx) ডাউনলোড + কন্টেন্ট ভেরিফিকেশন ----
 const [merged] = await Promise.all([
   page.waitForEvent("download", { timeout: 180000 }),
-  page.click('button:has-text("এক ফাইলে ডাউনলোড (.docx)")'),
+  page.click('button:has-text("Download as one file (.docx)")'),
 ]);
-await page.waitForSelector("text=মার্জ করা .docx ডাউনলোড হয়েছে", { timeout: 60000 });
+await page.waitForSelector("text=Merged .docx downloaded", { timeout: 60000 });
 if (!merged.suggestedFilename().includes("merged serial")) throw new Error("মার্জ ফাইলনাম ভুল: " + merged.suggestedFilename());
 const mergedXml = await readDocxXml(await merged.path());
 const pb = (mergedXml.match(/<w:br w:type="page"\/>/g) || []).length;
@@ -80,9 +80,9 @@ console.log("✓ মার্জ .docx: পেজ-ব্রেক", pb, "টি 
 // ---- ৪. ZIP ডাউনলোড + ভেরিফিকেশন ----
 const [zipDl] = await Promise.all([
   page.waitForEvent("download", { timeout: 180000 }),
-  page.click('button:has-text("আলাদা আলাদা ডাউনলোড (.zip)")'),
+  page.click('button:has-text("Download separately (.zip)")'),
 ]);
-await page.waitForSelector("text=ZIP ডাউনলোড হয়েছে", { timeout: 60000 });
+await page.waitForSelector("text=ZIP downloaded", { timeout: 60000 });
 if (zipDl.suggestedFilename() !== "MCQ-serial-files.zip") throw new Error("ZIP নাম ভুল: " + zipDl.suggestedFilename());
 const zz = await JSZip.loadAsync(fs.readFileSync(await zipDl.path()));
 const entries = Object.keys(zz.files).filter((n) => n.endsWith(".docx"));
@@ -96,32 +96,32 @@ for (const e of entries) {
 console.log("✓ ZIP:", entries.length, "টি সিরিয়াল-করা .docx —", entries.join(" | "));
 
 // ---- ৫. সিঙ্গেল-ফাইল রিগ্রেশন: ২ টা বাদ দিলে রঙ-চিপ কার্ড ফেরে ----
-await page.locator('button[aria-label="তালিকা থেকে বাদ দিন"]').nth(0).click();
+await page.locator('button[aria-label="Remove from list"]').nth(0).click();
 await page.waitForTimeout(300);
-await page.locator('button[aria-label="তালিকা থেকে বাদ দিন"]').nth(1).click();
-await page.waitForSelector("text=রঙ-ভিত্তিক সিরিয়াল", { timeout: 30000 });
+await page.locator('button[aria-label="Remove from list"]').nth(1).click();
+await page.waitForSelector("text=Color-based serial", { timeout: 30000 });
 console.log("✓ ১ ফাইলে নামলে পুরনো রঙ-চিপ কার্ড ফিরে আসে (রিগ্রেশন OK)");
 
 // ================== শাফল মোড — মাল্টি-ফাইল ==================
 // নতুন ফ্লো: কাজের ভিউতে মোড-ট্যাব থাকে না — পেছনে → হোম → নতুন ফাইল স্টেজ → শাফল ট্যাব
-await page.click('button[aria-label="পেছনে — হোমে ফিরুন"]');
+await page.click('button[aria-label="Back — return home"]');
 await page.waitForSelector("#step-upload", { timeout: 15000 });
 await page.setInputFiles("#step-upload input[type='file']", [HSC, NOCOLOR]);
-await page.waitForSelector('button[role="tab"]:has-text("MCQ শাফল")', { timeout: 30000 });
-await page.click('button[role="tab"]:has-text("MCQ শাফল")');
-await page.waitForSelector("text=আপলোড হওয়া ফাইল", { timeout: 120000 });
+await page.waitForSelector('button[role="tab"]:has-text("MCQ Shuffle")', { timeout: 30000 });
+await page.click('button[role="tab"]:has-text("MCQ Shuffle")');
+await page.waitForSelector("text=Uploaded files", { timeout: 120000 });
 console.log("✓ শাফল: ২ ফাইল আপলোড → মাল্টি লিস্ট");
 
-await page.click('button:has-text("শাফল করুন ও সেট তৈরি করুন")');
-await page.waitForSelector("text=শাফল সম্পন্ন — এখন ডাউনলোড করুন", { timeout: 120000 });
+await page.click('button:has-text("Shuffle & build sets")');
+await page.waitForSelector("text=Shuffle complete — download now", { timeout: 120000 });
 console.log("✓ সব ফাইল একসাথে শাফল হলো");
 
 // ---- মার্জ ডাউনলোড + ভেরিফিকেশন ----
 const [shMerged] = await Promise.all([
   page.waitForEvent("download", { timeout: 180000 }),
-  page.click('button:has-text("এক ফাইলে ডাউনলোড (.docx)")'),
+  page.click('button:has-text("Download as one file (.docx)")'),
 ]);
-await page.waitForSelector("text=মার্জ করা Word ফাইল ডাউনলোড হয়েছে", { timeout: 60000 });
+await page.waitForSelector("text=Merged Word file downloaded", { timeout: 60000 });
 if (!shMerged.suggestedFilename().includes("merged shuffled")) throw new Error("শাফল-মার্জ নাম ভুল: " + shMerged.suggestedFilename());
 const shXml = await readDocxXml(await shMerged.path());
 const setA = (shXml.match(/>Set A</g) || []).length;
@@ -136,9 +136,9 @@ console.log("✓ শাফল-মার্জ: Set A ×", setA, "+ পেজ-ব
 // ---- ZIP ডাউনলোড + ভেরিফিকেশন ----
 const [shZip] = await Promise.all([
   page.waitForEvent("download", { timeout: 180000 }),
-  page.click('button:has-text("আলাদা আলাদা ডাউনলোড (.zip)")'),
+  page.click('button:has-text("Download separately (.zip)")'),
 ]);
-await page.waitForSelector("text=ZIP ডাউনলোড হয়েছে", { timeout: 60000 });
+await page.waitForSelector("text=ZIP downloaded", { timeout: 60000 });
 if (shZip.suggestedFilename() !== "MCQ-shuffled-files.zip") throw new Error("শাফল-ZIP নাম ভুল: " + shZip.suggestedFilename());
 const sz = await JSZip.loadAsync(fs.readFileSync(await shZip.path()));
 const shEntries = Object.keys(sz.files).filter((n) => n.endsWith(".docx"));

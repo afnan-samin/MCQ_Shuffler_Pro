@@ -20,7 +20,7 @@ import {
 } from "./color-serial";
 import { MAX_FILE_BYTES } from "./limits";
 
-export const FILE_TOO_BIG_MSG = "ফাইলটি খুব বড় (৫০MB+ সাপোর্টেড না)";
+export const FILE_TOO_BIG_MSG = "File is too large (50MB+ not supported)";
 export const DOCX_EXT_RE = /\.docx$/i;
 
 /** ".docx"-এক্সটেনশন কেটে base-নাম (ডাউনলোড-ফাইলনেমের ভিত্তি) */

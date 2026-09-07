@@ -24,26 +24,26 @@ await page.goto("http://localhost:3000", { waitUntil: "networkidle" });
 await page.waitForSelector("#step-upload", { timeout: 30000 });
 await page.setInputFiles("#step-upload input[type='file']", HSC);
 await page.waitForSelector('[role="tablist"]', { timeout: 30000 });
-await page.click('button[role="tab"]:has-text("MCQ শাফল")');
-await page.waitForSelector("text=শাফলে হেডার বাদ যাবে", { timeout: 60000 });
-const blockedCount = await page.locator("text=শাফল মোডে করা যাবে না").count();
+await page.click('button[role="tab"]:has-text("MCQ Shuffle")');
+await page.waitForSelector("text=This file has colored headers", { timeout: 60000 });
+const blockedCount = await page.locator("text=can't be done in Shuffle mode").count();
 if (blockedCount !== 0) throw new Error("পুরনো ব্লকিং-নোটিস এখনো আসছে!");
-await page.waitForSelector("text=6 হেডার বাদ যাবে", { timeout: 15000 });
-await page.waitForSelector("text=60 প্রশ্ন শাফল হবে", { timeout: 15000 });
+await page.waitForSelector("text=6 headers stripped", { timeout: 15000 });
+await page.waitForSelector("text=60 questions will shuffle", { timeout: 15000 });
 console.log("✓ শাফল মোডে রঙ-ফাইল → ইনফো কার্ড (৬ হেডার বাদ, ৬০ প্রশ্ন এক সিরিয়ালে) — শাফল ব্লক হয়নি");
 
 // ---- ২. শাফল চালু (ডিফল্ট ৪ সেট × ১৫) ----
-await page.waitForSelector('button:has-text("শাফল করুন ও সেট তৈরি করুন")', { timeout: 60000 });
-await page.click('button:has-text("শাফল করুন ও সেট তৈরি করুন")');
-await page.waitForSelector("text=টি সেট তৈরি হয়েছে", { timeout: 60000 });
+await page.waitForSelector('button:has-text("Shuffle & build sets")', { timeout: 60000 });
+await page.click('button:has-text("Shuffle & build sets")');
+await page.waitForSelector("text=Shuffle complete — 4 sets", { timeout: 60000 });
 console.log("✓ শাফল হয়ে ৪ সেট তৈরি");
 
 // ---- ৩. রিনাম্বার ডাউনলোড ----
 const [dl] = await Promise.all([
   page.waitForEvent("download", { timeout: 180000 }),
-  page.click('button:has-text("রিনাম্বার সিরিয়াল")'),
+  page.click('button:has-text("renumbered serials")'),
 ]);
-await page.waitForSelector("text=Word ফাইল ডাউনলোড হয়েছে", { timeout: 60000 });
+await page.waitForSelector("text=Word file downloaded", { timeout: 60000 });
 const outPath = `${OUT_DIR}/hsc-shuffled-renumbered.docx`;
 await dl.saveAs(outPath);
 console.log("✓ ডাউনলোড:", dl.suggestedFilename());
@@ -96,22 +96,22 @@ if (origStripped.join("\u0000") !== outStripped.join("\u0000")) throw new Error(
 console.log("✓ ৬০ প্রশ্নের কনটেন্ট (সিরিয়াল-পরবর্তী) হুবহু প্রিজার্ভ");
 
 // ---- ৫. ইনফো-কার্ডের হাত-অফ: সিরিয়াল মোডে খুলুন ----
-await page.click('button:has-text("সিরিয়াল মোডে খুলুন")');
-await page.waitForSelector("text=রঙ-ভিত্তিক সিরিয়াল", { timeout: 20000 });
+await page.click('button:has-text("Open in Serial mode")');
+await page.waitForSelector("text=Color-based serial", { timeout: 20000 });
 await page.waitForSelector('button:has-text("B1")', { timeout: 30000 });
-const serialSel = await page.locator('[data-testid="mode-work-bar"]:has-text("MCQ সিরিয়াল")').count();
+const serialSel = await page.locator('[data-testid="mode-work-bar"]:has-text("MCQ Serial")').count();
 if (serialSel !== 1) throw new Error("হাত-অফে সিরিয়াল মোডে যায়নি (ওয়ার্ক-বারে মোড-নাম নেই)");
 console.log("✓ ইনফো-কার্ড হাত-অফ: ফাইলসহ সিরিয়াল মোডে গেছে (B1 চিপ দৃশ্যমান)");
 
 // ---- ৬. সিরিয়াল মোডে রঙহীন ফাইল → অটো নো-কালার কার্ড + একটানা ১..N ----
 // (সিরিয়াল কার্ডের নিজের ইনপুট — ওয়ার্ক-বারের ইনপুট নয়, ওটা append করে)
 await page.setInputFiles('input[data-testid="serial-file-input"]', NOCOLOR);
-await page.waitForSelector("text=এই ফাইলে রঙ-হেডার পাওয়া যায়নি", { timeout: 60000 });
+await page.waitForSelector("text=No colored headers found", { timeout: 60000 });
 const [dl2] = await Promise.all([
   page.waitForEvent("download", { timeout: 120000 }),
-  page.click('button:has-text("একটানা ১..N সিরিয়াল করে .docx ডাউনলোড")'),
+  page.click('button:has-text("Download continuous 1..N")'),
 ]);
-await page.waitForSelector("text=রঙ-অনুযায়ী সিরিয়াল করা .docx ডাউনলোড হয়েছে", { timeout: 60000 });
+await page.waitForSelector("text=Color-serial .docx downloaded", { timeout: 60000 });
 if (!dl2.suggestedFilename().includes("continuous")) throw new Error("continuous ফাইলনাম ভুল: " + dl2.suggestedFilename());
 console.log("✓ সিরিয়াল মোডে রঙহীন ফাইল → অটো একটানা ১..N ডাউনলোড:", dl2.suggestedFilename());
 
@@ -119,25 +119,25 @@ console.log("✓ সিরিয়াল মোডে রঙহীন ফাই
 // ইউজারের নিয়ম: "jeta mcq noi seta jate bad dey" + বাদ-পড়া লাইনের আলাদা লিস্ট
 const AGRI = "/home/z/my-project/upload/Agri MCQ Botany 997 mcq - Copy - type serial.docx";
 // নতুন ফ্লো: কাজের ভিউতে ট্যাব নেই — পেছনে → হোম → নতুন ফাইল স্টেজ → শাফল ট্যাব
-await page.click('button[aria-label="পেছনে — হোমে ফিরুন"]');
+await page.click('button[aria-label="Back — return home"]');
 await page.waitForSelector("#step-upload", { timeout: 15000 });
 await page.setInputFiles("#step-upload input[type='file']", AGRI);
-await page.waitForSelector('button[role="tab"]:has-text("MCQ শাফল")', { timeout: 30000 });
-await page.click('button[role="tab"]:has-text("MCQ শাফল")');
-await page.waitForSelector("text=বাদ পড়া লাইনসমূহ", { timeout: 120000 });
-await page.waitForSelector("text=136 টি (শাফলে যাবে না)", { timeout: 20000 });
-await page.waitForSelector("text=135 রঙ-হেডার", { timeout: 15000 });
-await page.waitForSelector("text=1 নন-MCQ (টেক্সট-প্যাটার্ন)", { timeout: 15000 });
+await page.waitForSelector('button[role="tab"]:has-text("MCQ Shuffle")', { timeout: 30000 });
+await page.click('button[role="tab"]:has-text("MCQ Shuffle")');
+await page.waitForSelector("text=Stripped lines", { timeout: 120000 });
+await page.waitForSelector("text=136 (not going into the shuffle)", { timeout: 20000 });
+await page.waitForSelector("text=135 color headers", { timeout: 15000 });
+await page.waitForSelector("text=1 non-MCQ (text pattern)", { timeout: 15000 });
 console.log("✓ Agri: ব্লকড-লিস্ট কার্ড — ১৩৬ লাইন (১৩৫ রঙ-হেডার + ১ নন-MCQ)");
 
 // রঙহীন "Aa¨vq-8" লাইনটা লিস্টে দেখা যায় (প্রথম ৮টার প্রিভিউতে নেই → expand লাগবে)
-await page.click('button:has-text("আরও 128 টি লাইন দেখুন")');
+await page.click('button:has-text("Show 128 more lines")');
 await page.waitForSelector("text=Aa¨vq-8", { timeout: 15000 });
 console.log("✓ রঙহীন 'Aa¨vq-8' লাইন ব্লকড-লিস্টে দেখা যাচ্ছে (expand করে)");
 
 // 435 প্রশ্ন শাফল হবে (info-কার্ড ব্যাজ)
-await page.waitForSelector("text=435 প্রশ্ন শাফল হবে", { timeout: 15000 });
-await page.waitForSelector('button:has-text("শাফল করুন ও সেট তৈরি করুন")', { timeout: 60000 });
+await page.waitForSelector("text=435 questions will shuffle", { timeout: 15000 });
+await page.waitForSelector('button:has-text("Shuffle & build sets")', { timeout: 60000 });
 console.log("✓ Agri: ৪৩৫ প্রশ্ন এক সিরিয়ালে — শাফল-ফ্লো চালু");
 
 await page.screenshot({ path: "scripts/e2e-shuffle-headers.png", fullPage: false });

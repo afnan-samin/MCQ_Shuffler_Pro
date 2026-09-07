@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { ListChecks, Droplets } from "lucide-react";
 import { lineDominantOf, type Enc } from "@/lib/mcq/encoding";
 import { TokText } from "@/components/mcq/tok-text";
-import { bnPos, type RdQuestion, type WatermarkInfo } from "@/lib/mcq/redownload";
+import { type RdQuestion, type WatermarkInfo } from "@/lib/mcq/redownload";
 import { digitsToNumber } from "@/lib/mcq/docx-xml";
 
 const PAGE = 50;
@@ -74,9 +74,9 @@ export function RedownloadQuestionsCard({
   return (
     <Card id="step-rd-questions">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base md:text-lg">৩. প্রশ্ন বাছাই — {fileName}</CardTitle>
+        <CardTitle className="text-base md:text-lg">3. Pick questions — {fileName}</CardTitle>
         <CardDescription>
-          টিক দেওয়া প্রশ্নগুলোই নতুন ফাইলে যাবে — প্রতিটার নিচে অপশন ও উত্তর দেখা যাচ্ছে।
+          Only the ticked questions go into the new file — each shows its options and answer below.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -84,17 +84,17 @@ export function RedownloadQuestionsCard({
         <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-muted/40 p-3">
           <ListChecks className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
           <Button size="sm" variant="outline" onClick={onSelectAll}>
-            সব সিলেক্ট
+            Select all
           </Button>
           <Button size="sm" variant="outline" onClick={onSelectNone}>
-            সব বাদ
+            Deselect all
           </Button>
           <div className="flex items-center gap-1.5">
             <Input
               value={rangeFrom}
               onChange={(e) => setRangeFrom(e.target.value)}
               className="h-8 w-16 text-center"
-              placeholder="থেকে"
+              placeholder="From"
               inputMode="numeric"
             />
             <span className="text-sm text-muted-foreground">—</span>
@@ -102,15 +102,15 @@ export function RedownloadQuestionsCard({
               value={rangeTo}
               onChange={(e) => setRangeTo(e.target.value)}
               className="h-8 w-16 text-center"
-              placeholder="পর্যন্ত"
+              placeholder="To"
               inputMode="numeric"
             />
             <Button size="sm" variant="outline" onClick={applyRange}>
-              রেঞ্জ সিলেক্ট
+              Select range
             </Button>
           </div>
           <span className="text-xs text-muted-foreground">
-            সিলেক্টেড {selected.size}/{questions.length} — (পজিশন নম্বর, বাংলা বা English দুটোই চলবে)
+            Selected {selected.size}/{questions.length} — (position numbers, Bengali or English both work)
           </span>
         </div>
 
@@ -135,7 +135,7 @@ export function RedownloadQuestionsCard({
 
           <div className={watermark ? "relative z-10 space-y-2" : "space-y-2"}>
             {shown.map((q) => {
-              const pos = bnPos(q.pos);
+              const pos = q.pos;
               const qDom = lineDominantOf(q.qText) ?? dominant;
               return (
                 <label
@@ -149,7 +149,7 @@ export function RedownloadQuestionsCard({
                     onCheckedChange={() => onToggle(q.id)}
                     className="mt-1"
                   />
-                  <span className="mt-0.5 w-7 shrink-0 text-right text-xs font-bold text-emerald-700/80 dark:text-emerald-400/80" title={`পজিশন ${q.pos}`}>
+                  <span className="mt-0.5 w-7 shrink-0 text-right text-xs font-bold text-emerald-700/80 dark:text-emerald-400/80" title={`Position ${q.pos}`}>
                     {pos}
                   </span>
                   <span className="min-w-0 flex-1 text-sm leading-relaxed">
@@ -179,7 +179,7 @@ export function RedownloadQuestionsCard({
                     {/* উত্তর — তার নিচে */}
                     {q.answer && (
                       <span className="mt-1 block pl-1 text-[13px]">
-                        <span className="font-medium text-emerald-800 dark:text-emerald-300">উত্তর: </span>
+                        <span className="font-medium text-emerald-800 dark:text-emerald-300">Answer: </span>
                         <span className={`font-semibold text-emerald-700 dark:text-emerald-400 ${q.serialFontBijoy && /[KLMN]/.test(q.answer) ? "tokfont-bijoy" : ""}`}>
                           {q.answer}
                         </span>
@@ -188,7 +188,7 @@ export function RedownloadQuestionsCard({
                     {/* ব্যাখ্যা — প্রথম লাইন */}
                     {q.bekkha && (
                       <span className="mt-1 block pl-1 text-[13px] text-muted-foreground">
-                        <span className="font-medium text-sky-800 dark:text-sky-300">ব্যাখ্যা: </span>
+                        <span className="font-medium text-sky-800 dark:text-sky-300">Explanation: </span>
                         <span className={`${q.serialFontBijoy ? "tokfont-bijoy" : ""}`}>
                           {(() => {
                             const first = q.bekkha.split("\n").find((l) => l.trim()) ?? "";
@@ -208,7 +208,7 @@ export function RedownloadQuestionsCard({
                 className="w-full gap-1 text-emerald-700 dark:text-emerald-400"
                 onClick={() => setVisible((v) => v + PAGE)}
               >
-                আরও দেখুন (বাকি {questions.length - visible} টি)
+                Show more ({questions.length - visible} remaining)
               </Button>
             )}
           </div>

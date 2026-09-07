@@ -34,14 +34,14 @@ const sutonny = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "MCQ Shuffler Pro — MCQ শাফল ও সেট তৈরির ফ্রি টুল",
+  title: "MCQ Shuffler Pro — Free MCQ Shuffler & Exam Set Generator",
   description:
-    "MCQ প্রশ্ন শাফল করুন, একাধিক সেটে ভাগ বা প্রতি সেটে সব প্রশ্ন (Original Shuffle) করুন। শব্দ ধরে ধরে Bijoy/ইউনিকোড/English ডিটেক্টর, সিরিয়াল ডিটেক্ট ও অটো-ফিক্স। Kalpurush + Bijoy (SutonnyMJ) ফন্ট সাপোর্ট, Word (.docx) এক্সপোর্ট — প্রতি সেট আলাদা পেজে, প্লেইন টেক্সট সিরিয়াল। একদম ফ্রি।",
+    "Shuffle MCQ questions into multiple sets, or keep all questions per set (Original Shuffle). Word-by-word Bijoy/Unicode/English detection, serial detection & auto-fix. Kalpurush + Bijoy (SutonnyMJ) font support, Word (.docx) export — one set per page, plain-text serials. Completely free.",
   keywords: ["MCQ shuffle", "MCQ set maker", "Original Shuffle", "Bijoy font", "SutonnyMJ", "Kalpurush", "বাংলা MCQ", "exam set generator", "question shuffle", "Word export"],
   // favicon: src/app/icon.svg|icon.png|apple-icon.png — App Router অটো-সার্ভ করে (basePath-সহ)
   openGraph: {
     title: "MCQ Shuffler Pro",
-    description: "MCQ শাফল, সেট তৈরি ও সিরিয়াল ডিটেক্ট — একদম ফ্রি",
+    description: "MCQ shuffle, set building & serial detection — completely free",
     type: "website",
   },
 };
@@ -53,7 +53,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="bn"
+      lang="en"
       suppressHydrationWarning
       className={`${kalpurush.variable} ${sutonny.variable}`}
     >

@@ -198,7 +198,7 @@ try {
   } catch (e) {
     threw = String(e);
   }
-  ok(threw.includes("items খালি"), `extras খালি → "items খালি" এরর (${threw.slice(0, 40)}…)`);
+  ok(threw.includes("items is empty"), `empty extras → "items is empty" error (${threw.slice(0, 40)}…)`);
 }
 
 console.log("\n== ৪) replaceDocumentXml + buildMergedDocxBlob ==");
@@ -244,7 +244,7 @@ try {
     } catch (e) {
       threw = String(e);
     }
-    ok(threw.includes("items খালি"), `একা ১টা item → বাংলা এরর (${threw.slice(0, 40)}…)`);
+    ok(threw.includes("items is empty"), `single item → items-is-empty error (${threw.slice(0, 40)}…)`);
   }
 } catch (e) {
   ok(false, `buildMergedDocxBlob: ${String(e)}`);
@@ -274,7 +274,7 @@ try {
   } catch (e) {
     threw = String(e);
   }
-  ok(threw.includes("তালিকা খালি"), `তালিকা খালি → বাংলা এরর (${threw.slice(0, 40)}…)`);
+  ok(threw.includes("file list is empty"), `empty file list → error (${threw.slice(0, 40)}…)`);
 } catch (e) {
   ok(false, `buildZipBlob: ${String(e)}`);
 }

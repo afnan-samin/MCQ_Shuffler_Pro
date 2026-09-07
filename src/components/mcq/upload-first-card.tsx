@@ -57,7 +57,7 @@ export function UploadFirstCard({
         const text = await textFile.text();
         onTextFileLoaded(text);
       } catch {
-        setUploadError("ফাইল পড়া যায়নি");
+        setUploadError("Could not read the file");
       } finally {
         setUploading(false);
       }
@@ -68,7 +68,7 @@ export function UploadFirstCard({
     setUploadError(null);
     if (!list.length) {
       // কোনো বৈধ ফাইলই না হলে (docx/txt কোনোটাই না) — আজকের মতোই এরর
-      if (rej.notAccepted.length) setUploadError("সাপোর্টেড ফাইল: .docx বা .txt");
+      if (rej.notAccepted.length) setUploadError("Supported files: .docx or .txt");
       return;
     }
     void handleFiles(list);
@@ -80,22 +80,22 @@ export function UploadFirstCard({
     <Card id="step-upload" className="border-emerald-200 dark:border-emerald-900">
       <CardHeader>
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">১</span>
-          <CardTitle className="text-lg md:text-xl">প্রথমে ফাইল আপলোড করুন</CardTitle>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">1</span>
+          <CardTitle className="text-lg md:text-xl">Upload a file first</CardTitle>
         </div>
         <CardDescription>
-          Word (.docx) আপলোড করলে ফরম্যাট হুবহু থাকবে — ট্যাব, ইকুয়েশন (math), sub/superscript, Bijoy (SutonnyMJ) কিছুই ভাঙবে না।
-          আপলোডের পরেই নিচে ৩টা মোড দেখা যাবে — যেটা দিয়ে কাজ করতে চান সেটায় ক্লিক করুন।
+          Word (.docx) uploads keep the formatting exactly — tabs, equations (math), sub/superscript, Bijoy (SutonnyMJ), nothing breaks.
+          After upload you'll see 3 modes below — click the one you want to work with.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <Tabs defaultValue="upload">
           <TabsList className="grid w-full grid-cols-2 max-w-md">
             <TabsTrigger value="upload" className="gap-1.5">
-              <FileUp className="h-4 w-4" /> ফাইল আপলোড
+              <FileUp className="h-4 w-4" /> Upload file
             </TabsTrigger>
             <TabsTrigger value="paste" className="gap-1.5">
-              <ClipboardPaste className="h-4 w-4" /> টেক্সট পেস্ট
+              <ClipboardPaste className="h-4 w-4" /> Paste text
             </TabsTrigger>
           </TabsList>
 
@@ -105,9 +105,9 @@ export function UploadFirstCard({
               multiple
               busy={busyTotal}
               disabled={busyTotal}
-              busyText="ফাইল পড়া হচ্ছে..."
-              promptText="ফাইল সিলেক্ট করতে ক্লিক করুন বা টেনে ছাড়ুন"
-              hintText="সাপোর্টেড: .docx (ফরম্যাট হুবহু থাকবে), .txt — একসাথে একাধিক .docx সিলেক্ট করা যাবে"
+              busyText="Reading file..."
+              promptText="Click to select a file or drag & drop"
+              hintText="Supported: .docx (format kept exactly), .txt — select multiple .docx files at once"
               variant="lg"
               onFiles={onDropzoneFiles}
             />
@@ -122,11 +122,11 @@ export function UploadFirstCard({
             <Textarea
               value={rawText}
               onChange={(e) => onTextChange(e.target.value)}
-              placeholder={`এখানে প্রশ্নগুলো পেস্ট করুন...
+              placeholder={`Paste your questions here...
 
-যেমন:
-১. বাংলাদেশের রাজধানী কোনটি?
-ক) চট্টগ্রাম  খ) ঢাকা  গ) খুলনা  ঘ) রাজশাহী
+Example:
+1. What is the capital of Bangladesh?
+a) Chattogram  b) Dhaka  c) Khulna  d) Rajshahi
 
 1. What is the capital of Japan?
 a) Beijing  b) Tokyo  c) Seoul  d) Bangkok`}
@@ -143,11 +143,11 @@ a) Beijing  b) Tokyo  c) Seoul  d) Bangkok`}
             className="gap-2 bg-emerald-600 hover:bg-emerald-700"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-            {busy ? "ডিটেক্ট হচ্ছে..." : "🔍 প্রশ্ন ডিটেক্ট করুন (পেস্ট মোড)"}
+            {busy ? "Detecting..." : "🔍 Detect questions (paste mode)"}
           </Button>
           {rawText.trim() && (
             <Badge variant="secondary" className="gap-1">
-              {lineCount} লাইন
+              {lineCount} lines
             </Badge>
           )}
         </div>
@@ -175,17 +175,17 @@ export function StagedFilesCard({ files, onClear }: StagedFilesCardProps) {
           </span>
           <div className="min-w-0 flex-1">
             <CardTitle className="text-base md:text-lg">
-              📁 {files.length} টি ফাইল প্রস্তুত — এখন মোড বেছে নিন
+              📁 {files.length} files ready — pick a mode now
             </CardTitle>
             <CardDescription>
-              নিচের যেকোনো মোডে ক্লিক করলে এই ফাইলগুলো সরাসরি ওই মোডে খুলে যাবে — আবার আপলোড লাগবে না।
+              Click any mode below and these files open straight into it — no re-upload needed.
             </CardDescription>
           </div>
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            aria-label="ফাইল বাতিল"
+            aria-label="Clear files"
             className="h-8 w-8 shrink-0 text-muted-foreground hover:text-red-600"
             onClick={onClear}
           >

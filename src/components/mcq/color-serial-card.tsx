@@ -35,7 +35,7 @@ export function schemeLabelOf(scheme: SerialScheme, colors: DetectedColor[]): st
   if (scheme.kind === "continuous") return "continuous";
   const c = colors.find((x) => x.key === scheme.key);
   if (!c) return "color";
-  if (c.name === "কাস্টম রঙ" && c.hex) return `custom-${c.hex}`;
+  if (c.name === "Custom color" && c.hex) return `custom-${c.hex}`;
   return c.name; // প্যালেট কোড (B1/A3…)
 }
 
@@ -54,7 +54,7 @@ export function ColorSerialCard({ analysis, fileName, busy, onSerial }: ColorSer
             <PaintBucket className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <CardTitle className="text-base md:text-lg">রঙ-ভিত্তিক সিরিয়াল (স্ট্রাকচার্ড ফাইল)</CardTitle>
+            <CardTitle className="text-base md:text-lg">Color-based serial (structured file)</CardTitle>
             <CardDescription className="truncate">{fileName}</CardDescription>
           </div>
         </div>
@@ -65,15 +65,15 @@ export function ColorSerialCard({ analysis, fileName, busy, onSerial }: ColorSer
         <div className="flex items-start gap-2 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs dark:border-amber-500/30 dark:bg-amber-950/30">
           <Shuffle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
           <p className="text-amber-800 dark:text-amber-200">
-            এই ফাইলে <b>রঙ-দেওয়া হেডার</b> ({analysis.shadedCount} টি) পাওয়া গেছে — তাই <b>শাফল বন্ধ</b>।
-            শুধু সিরিয়াল ঠিক হবে; হেডার, ইকুয়েশন, ছবি, ফন্ট — সব হুবহু অক্ষত থাকবে।
+            Found <b>colored header(s)</b> ({analysis.shadedCount}) in this file — so <b>shuffling is disabled</b>.
+            Only serials get fixed; headers, equations, images, fonts — everything stays exactly intact.
           </p>
         </div>
 
         {/* রঙ চিপস */}
         <div className="space-y-2">
           <p className="text-sm font-medium">
-            কোন রঙ অনুযায়ী সিরিয়াল করবেন? <span className="text-muted-foreground">(সেকশন = ওই রঙের হেডার)</span>
+            Serial by which color? <span className="text-muted-foreground">(section = one header of that color)</span>
           </p>
           <div className="flex flex-wrap gap-2">
             {analysis.colors.map((c) => {
@@ -93,7 +93,7 @@ export function ColorSerialCard({ analysis, fileName, busy, onSerial }: ColorSer
                   <Swatch hex={c.hex} />
                   <span className={cn("font-mono font-semibold", !c.hex && "font-sans")}>{c.name}</span>
                   <Badge variant="secondary" className="px-1.5 py-0 text-[11px]">
-                    {c.sections} সেকশন
+                    {c.sections} sections
                   </Badge>
                   {active && <CheckCircle2 className="h-4 w-4 text-primary" />}
                 </button>
@@ -112,9 +112,9 @@ export function ColorSerialCard({ analysis, fileName, busy, onSerial }: ColorSer
               )}
             >
               <span className="inline-block h-5 w-5 shrink-0 rounded-md border border-border bg-gradient-to-r from-emerald-400 to-sky-500 shadow-sm" />
-              পুরো ফাইলে একটানা
+              Continuous across the file
               <Badge variant="secondary" className="px-1.5 py-0 text-[11px]">
-                {analysis.questionCount} প্রশ্ন
+                {analysis.questionCount} questions
               </Badge>
               {sel?.kind === "continuous" && <CheckCircle2 className="h-4 w-4 text-primary" />}
             </button>
@@ -126,17 +126,17 @@ export function ColorSerialCard({ analysis, fileName, busy, onSerial }: ColorSer
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <p>
             {sel?.kind === "continuous" ? (
-              <>পুরো ফাইলে প্রশ্নগুলো পরপর ১,২,৩… নম্বর পাবে — রঙ যাই থাকুক।</>
+              <>Every question in the file gets consecutive 1,2,3… numbers — whatever the colors.</>
             ) : sel ? (
               <>
-                প্রতিটা <b>{sel.kind === "color" ? selLabel : ""}</b> হেডারের পরেই নম্বর <b>১ থেকে</b> শুরু হবে; এই
-                রঙের <b>{selSections}</b> টি সেকশন পাওয়া গেছে। ভিতরের ছোট হেডার (অন্য রঙ) নম্বর থামাবে না, কিন্তু
-                বড় হেডারের সীমানায় ক্রম শেষ হবে — দুই জায়গার প্রশ্ন কখনো মিশবে না। একই স্তরের অন্য রঙের
-                হেডার (যেমন পরের অধ্যায়ের ভিন্ন রঙ) এলেও এই ক্রম শেষ হবে; সেই সেকশনের ভিতরের প্রশ্ন
-                পুরনো নম্বরেই থাকবে।
+                After each <b>{sel.kind === "color" ? selLabel : ""}</b> header, numbering restarts <b>from 1</b>; found
+                <b>{selSections}</b> section(s) of this color. Inner small headers (other colors) don't stop the numbering, but the
+                run ends at the boundary of the bigger header — questions from the two sides never mix. A same-level header of a
+                different color (e.g. the next chapter in another color) also ends this run; questions inside that section keep
+                their old numbers.
               </>
             ) : (
-              <>রঙ সিলেক্ট করলে দেখা যাবে: প্রতিটা ওই-রঙ-হেডারের পরে নম্বর ১ থেকে শুরু, উপরের লেভেলের সীমানায় থেমে নতুন সেকশনে আবার ১।</>
+              <>Pick a color to preview: numbering restarts at 1 after each header of that color, pausing at upper-level boundaries and starting a new section.</>
             )}
           </p>
         </div>
@@ -144,7 +144,7 @@ export function ColorSerialCard({ analysis, fileName, busy, onSerial }: ColorSer
         {/* অ্যাকশন */}
         <Button className="w-full sm:w-auto" disabled={!sel || busy} onClick={() => sel && onSerial(sel, selLabel)}>
           <Download className="mr-2 h-4 w-4" />
-          {busy ? "প্রসেস হচ্ছে…" : `সিরিয়াল করে .docx ডাউনলোড${selLabel ? ` (${selLabel})` : ""}`}
+          {busy ? "Processing…" : `Download serial .docx${selLabel ? ` (${selLabel})` : ""}`}
         </Button>
       </CardContent>
     </Card>

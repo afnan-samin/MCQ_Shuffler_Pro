@@ -162,11 +162,11 @@ const TAG_RE = /<(\/?)([A-Za-z][\w.-]*(?::[A-Za-z][\w.-]*)?)((?:"[^"]*"|'[^']*'|
  */
 export function scanBodyChildren(xml: string): BodyChild[] {
   const bodyOpen = xml.indexOf("<w:body");
-  if (bodyOpen < 0) throw new Error("document.xml-এ w:body পাওয়া যায়নি");
+  if (bodyOpen < 0) throw new Error("document.xml has no w:body");
   const openEnd = xml.indexOf(">", bodyOpen);
   const bodyClose = xml.lastIndexOf("</w:body>");
   if (openEnd < 0 || bodyClose < 0 || bodyClose <= openEnd) {
-    throw new Error("document.xml-এ w:body পাওয়া যায়নি");
+    throw new Error("document.xml has no w:body");
   }
 
   const out: BodyChild[] = [];
@@ -294,9 +294,9 @@ export function colorKeyHex(key: string): string | null {
 
 /** কী থেকে দেখানোর নাম: প্যালেটে থাকলে কোড (B1), না থাকলে কাস্টম */
 export function colorKeyName(key: string): string {
-  if (key.startsWith("theme:")) return "কাস্টম রঙ (থিম)";
+  if (key.startsWith("theme:")) return "Custom color (theme)";
   const code = paletteCodeOf(key);
-  return code ?? "কাস্টম রঙ";
+  return code ?? "Custom color";
 }
 
 // ---------- হেডার-স্ট্রিপ (শাফল মোডের জন্য) ----------

@@ -47,26 +47,26 @@ try {
   // ধাপ ১: ৫১টা ফাইল আপলোড → স্টেজ
   await page.waitForSelector("#step-upload", { timeout: 30000 });
   await page.setInputFiles("#step-upload input[type='file']", paths);
-  await page.waitForSelector("text=ফাইল প্রস্তুত", { timeout: 30000 });
+  await page.waitForSelector("text=files ready", { timeout: 30000 });
   console.log("✓ ৫১টা ফাইল স্টেজ হলো");
 
   // ধাপ ২: শাফল মোডে ঢোকা → ৫০টাই লোড হবে, ওয়ার্নিং টোস্ট আসবে
-  await page.click('button[role="tab"]:has-text("MCQ শাফল")');
-  await page.waitForSelector("text=⚠️ শাফল মোডে সর্বোচ্চ ৫০ টি ফাইল", { timeout: 180000 });
+  await page.click('button[role="tab"]:has-text("MCQ Shuffle")');
+  await page.waitForSelector("text=Shuffle mode: max 50 files", { timeout: 180000 });
   console.log("✓ ৫১ দিলে ওয়ার্নিং টোস্ট: 'সর্বোচ্চ ৫০ টি ফাইল'");
-  await page.waitForSelector("text=আপলোড হওয়া ফাইল (50 টি)", { timeout: 120000 });
-  await page.waitForSelector("text=৫০/৫০ ফাইল", { timeout: 15000 });
+  await page.waitForSelector("text=Uploaded files (50)", { timeout: 120000 });
+  await page.waitForSelector("text=50/50 files", { timeout: 15000 });
   console.log("✓ লিস্টে ৫০টা ফাইল + কাউন্ট চিপ ৫০/৫০");
 
   // ধাপ ৩: পূর্ণ হলে 'আরও ফাইল' বাটন বন্ধ
-  const disabled = await page.getAttribute('button:has-text("আরও ফাইল")', "disabled");
+  const disabled = await page.getAttribute('button:has-text("Add files")', "disabled");
   if (disabled === null) throw new Error("৫০/৫০ তে 'আরও ফাইল' বাটন এখনো চালু!");
   console.log("✓ ৫০/৫০ → 'আরও ফাইল' বাটন ডিজেবলড");
 
   // ধাপ ৪: ১টা বাদ দিলে আবার চালু (min/max স্পেস কাজ করছে)
-  await page.locator('button[aria-label="তালিকা থেকে বাদ দিন"]').nth(0).click();
-  await page.waitForSelector("text=৪৯/৫০ ফাইল", { timeout: 15000 });
-  const disabled2 = await page.getAttribute('button:has-text("আরও ফাইল")', "disabled");
+  await page.locator('button[aria-label="Remove from list"]').nth(0).click();
+  await page.waitForSelector("text=49/50 files", { timeout: 15000 });
+  const disabled2 = await page.getAttribute('button:has-text("Add files")', "disabled");
   if (disabled2 !== null) throw new Error("৪৯/৫০ তে 'আরও ফাইল' বাটন বন্ধ আছে!");
   console.log("✓ ১টা বাদ → ৪৯/৫০ → যোগ-বাটন আবার চালু");
 

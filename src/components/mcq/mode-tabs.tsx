@@ -15,7 +15,7 @@ export function ModeTabs({ mode, onChange }: ModeTabsProps) {
   return (
     <div
       role="tablist"
-      aria-label="মোড বাছাই — শাফল, সিরিয়াল বা রিডাউনলোড"
+      aria-label="Mode selection — shuffle, serial, or redownload"
       className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3"
     >
       {MODE_IDS.map((id) => {

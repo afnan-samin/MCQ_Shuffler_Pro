@@ -33,9 +33,9 @@ export function RedownloadInputCard({ onFiles, loading, items, onReorder, onRemo
             <FileOutput className="h-5 w-5" />
           </span>
           <div>
-            <CardTitle className="text-base md:text-lg">১. ফাইল আপলোড — MCQ রিডাউনলোড</CardTitle>
+            <CardTitle className="text-base md:text-lg">1. Upload files — MCQ Redownload</CardTitle>
             <CardDescription>
-              যে .docx থেকে অংশ বাছাই করে নতুন ফাইল নামাবেন সেটা/সেগুলো দিন — একসাথে একাধিক নেওয়া যায়।
+              Add the .docx file(s) you want to pick parts from — multiple at once is fine.
             </CardDescription>
           </div>
         </div>
@@ -47,10 +47,10 @@ export function RedownloadInputCard({ onFiles, loading, items, onReorder, onRemo
           multiple
           busy={loading}
           disabled={loading}
-          busyText="পড়া হচ্ছে..."
-          promptText="ফাইল সিলেক্ট করতে ক্লিক করুন বা টেনে ছাড়ুন"
-          hintText="সাপোর্টেড: .docx — প্রশ্ন, অপশন, উত্তর, ব্যাখ্যা অংশ অটো ডিটেক্ট হবে"
-          ariaLabel="docx ফাইল সিলেক্ট করতে ক্লিক করুন বা টেনে ছাড়ুন"
+          busyText="Reading..."
+          promptText="Click to select a file or drag & drop"
+          hintText="Supported: .docx — questions, options, answers and explanations are auto-detected"
+          ariaLabel="Click to select docx files or drag & drop"
           icon={Upload}
           maxSizeBytes={MAX_FILE_BYTES}
           onFiles={pick}

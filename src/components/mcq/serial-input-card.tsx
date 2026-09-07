@@ -52,10 +52,10 @@ export function SerialInputCard({
     if (!files.length && !rej.notAccepted.length && !rej.tooBig.length) return;
     for (const f of rej.tooBig) toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
     if (!files.length) {
-      if (rej.notAccepted.length) setError("সিরিয়াল মোডে শুধু .docx ফাইল চলবে (রঙ ডিটেক্ট + XML প্রিজার্ভের জন্য)।");
+      if (rej.notAccepted.length) setError("Serial mode accepts .docx files only (needed for color detection + XML preservation).");
       return;
     }
-    if (rej.notAccepted.length) setError(`${rej.notAccepted.length} টি ফাইল .docx না — বাদ দেওয়া হলো।`);
+    if (rej.notAccepted.length) setError(`${rej.notAccepted.length} file(s) are not .docx — skipped.`);
     if (add && onAddFiles) onAddFiles(files);
     else onFiles(files);
   };
@@ -68,9 +68,9 @@ export function SerialInputCard({
             <ListOrdered className="h-5 w-5" />
           </span>
           <div className="min-w-0">
-            <CardTitle className="text-base md:text-lg">MCQ সিরিয়াল — ফাইল আপলোড</CardTitle>
+            <CardTitle className="text-base md:text-lg">MCQ Serial — upload files</CardTitle>
             <CardDescription className="truncate">
-              রঙ-দেওয়া হেডার (Word: Home → Paragraph → Shading) অটো ডিটেক্ট হবে — রঙ বাছলেই প্রতিটা সেকশন ১ থেকে নম্বর পাবে
+              Colored headers (Word: Home → Paragraph → Shading) are auto-detected — pick a color and every section gets numbered from 1
             </CardDescription>
           </div>
         </div>
@@ -80,10 +80,10 @@ export function SerialInputCard({
         <Tabs defaultValue="upload">
           <TabsList className="grid w-full grid-cols-2 max-w-md">
             <TabsTrigger value="upload" className="gap-1.5">
-              <FileUp className="h-4 w-4" /> ফাইল আপলোড
+              <FileUp className="h-4 w-4" /> Upload file
             </TabsTrigger>
             <TabsTrigger value="paste" className="gap-1.5">
-              <ClipboardPaste className="h-4 w-4" /> পেস্ট করুন
+              <ClipboardPaste className="h-4 w-4" /> Paste
             </TabsTrigger>
           </TabsList>
 
@@ -93,9 +93,9 @@ export function SerialInputCard({
               multiple
               busy={loading}
               disabled={loading}
-              busyText="ফাইল পড়া ও রঙ-বিশ্লেষণ হচ্ছে..."
-              promptText=".docx ফাইল সিলেক্ট করতে ক্লিক করুন বা টেনে ছাড়ুন"
-              hintText="একসাথে একাধিক .docx সিলেক্ট করা যাবে — পরে মার্জ করে এক ফাইলে (পেজ ব্রেকসহ) বা ZIP-এ আলাদা আলাদা ডাউনলোড করুন।"
+              busyText="Reading files and analyzing colors..."
+              promptText="Click to select .docx files or drag & drop"
+              hintText="Select multiple .docx files at once — then merge them into one file (with page breaks) or download them separately in a ZIP."
               variant="md"
               inputTestId="serial-file-input"
               maxSizeBytes={MAX_FILE_BYTES}
@@ -107,11 +107,11 @@ export function SerialInputCard({
             <Textarea
               value={pasteText}
               onChange={(e) => onPasteTextChange(e.target.value)}
-              placeholder={`এখানে প্রশ্নগুলো পেস্ট করুন...
+              placeholder={`Paste your questions here...
 
-যেমন:
-১. বাংলাদেশের রাজধানী কোনটি?
-ক) চট্টগ্রাম  খ) ঢাকা  গ) খুলনা  ঘ) রাজশাহী
+Example:
+1. What is the capital of Bangladesh?
+a) Chattogram  b) Dhaka  c) Khulna  d) Rajshahi
 
 1. What is the capital of Japan?
 a) Beijing  b) Tokyo  c) Seoul  d) Bangkok`}
@@ -125,10 +125,10 @@ a) Beijing  b) Tokyo  c) Seoul  d) Bangkok`}
                 className="gap-2 bg-emerald-600 hover:bg-emerald-700"
               >
                 {pasteBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                {pasteBusy ? "ডিটেক্ট হচ্ছে..." : "🔍 প্রশ্ন ডিটেক্ট করুন"}
+                {pasteBusy ? "Detecting..." : "🔍 Detect questions"}
               </Button>
               <span className="text-xs text-muted-foreground">
-                পেস্ট = টেক্সট পাইপলাইন — ডিটেক্ট করলে আপলোড করা ফাইল-লিস্ট মুছে যাবে (দুটো একসাথে থাকে না)।
+                Paste = text pipeline — detecting clears the uploaded file list (the two can't coexist).
               </span>
             </div>
           </TabsContent>
@@ -138,7 +138,7 @@ a) Beijing  b) Tokyo  c) Seoul  d) Bangkok`}
         {items.length > 0 && (
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground">
-              ফাইলের ক্রম বদলাতে টেনে ধরুন বা তীর-বাটন চাপুন — মার্জ/ZIP-এ ঠিক এই ক্রমেই আসবে।
+              Drag or use the arrow buttons to reorder — merge/ZIP keeps exactly this order.
             </p>
             <MultiFileList items={items} onReorder={onReorder} onRemove={onRemove} disabled={loading} />
             {/* “আরও ফাইল যোগ করুন” — শেয়ার্ড ড্রপজোনের লুকানো ইনপুট এই বাটন দিয়ে খোলে (ট্যাবের বাইরে — যে ট্যাবেই থাকুক কাজ করে) */}
@@ -158,7 +158,7 @@ a) Beijing  b) Tokyo  c) Seoul  d) Bangkok`}
                   onClick={() => dzTrigger.current?.open()}
                   disabled={loading}
                 >
-                  <Plus className="h-4 w-4" /> আরও ফাইল যোগ করুন
+                  <Plus className="h-4 w-4" /> Add more files
                 </Button>
               </FileDropzone>
             )}

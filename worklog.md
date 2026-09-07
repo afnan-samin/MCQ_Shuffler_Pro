@@ -752,3 +752,51 @@ Stage Summary:
 - মোড-সুইচ এখন ডাউনলোড-কার্ডের NextModesCard ("এই ফাইলগুলো দিয়ে আরও কাজ করুন") বা হোম থেকে নতুন স্টেজ-এ
 - লাইভ: https://afnan-samin.github.io/MCQ_Shuffler_Pro/ (কমিট e0d990f)
 - টোকেন ghp_f0fn… কাজ শেষ — ইউজারকে রিভোক করতে বলতে হবে
+
+---
+Task ID: 41-b
+Agent: Sub Agent (font-remap redo)
+Task: হারানো font-remap ইঞ্জিন (commit e59ea38) পিওর-লাইব্রেরি হিসেবে পুনর্নির্মাণ + টেস্ট
+
+Work Log:
+- নতুন ফাইল ২টি (অন্য কোনো ফাইল স্পর্শ নেই — page.tsx-এ চলমান রিফ্যাক্টর-এর সাথে কনফ্লিক্ট-মুক্ত):
+  `src/lib/mcq/font-remap.ts` + `scripts/test-font-remap.ts`
+- ইঞ্জিন: `applyFontRemapXml(xml, settings, options?)` — OOXML document.xml-এর প্রতিটি টেক্সটধারী `<w:r>` স্ক্যান করে (`<w:r>` OOXML-এ নেস্ট করে না → non-greedy স্ক্যান নিরাপদ; hyperlink/textbox-এর ভেতরের রানও ধরা পড়ে), রানের w:t-কনটেন্ট (এন্টিটি-ডিকোড করে) `classifyRunText` দিয়ে ক্লাসিফাই → রানের rPr-এ w:rFonts-এর w:ascii/hAnsi/eastAsia/cs ৪ অ্যাট্রিবিউট ক্যানোনিকেল অর্ডারে বসায়
+- rPr না থাকলে `<w:rPr><w:rFonts/></w:rPr>` রানের FIRST child (স্কিমা-অর্ডার); rStyle থাকলে rFonts তার ঠিক পরে; বিদ্যমান rFonts-এর থিম-অ্যাট্রিবিউট (asciiTheme/hAnsiTheme/cstheme/eastAsiaTheme) সরিয়ে w:hint-জাতীয় অ-ফন্ট অ্যাট্রিবিউট অর্ডারসহ রক্ষা
+- classifyRunText: Bijoy STRONG-মার্কার (encoding.ts-এর সেট + ø Ë ¨ © ` ˆ ˜ ⁄ প্রসারিত — Latin-1 C0–FF রেঞ্জ, কার্লি-কোট, †‡…Œœ) / WEAK (×÷±§™… — অক্ষরসহ থাকলেই) / U+0980–09FF+দন্ডি; দুই-ই থাকলে বাংলা-ক্যারেক্টার-প্রাধান্য (টাই → bijoy); ঐচ্ছিক `dominant` হিন্ট — "bijoy" দিলে মার্কারহীন খাঁটি-ASCII রানও bijoy (সংখ্যা/চিহ্ন latin-ই)
+- সিদ্ধান্ত (ডকুমেন্টেড): w:t-হীন রান (w:tab/w:br/w:fldChar) ও self-closing `<w:r/>` অস্পৃশ্য — তাই paragraph-মার্ক pPr>rPr-এর ফন্টও অস্পৃশ্য (রান-লেভেল-অনলি স্কোপ); খাঁটি-ASCII Bijoy শব্দ ডিফল্টে latin (মার্কার-ভিত্তিক কন্ট্র্যাক্ট) — dominant-হিন্ট দিয়ে ওভাররাইডযোগ্য
+- styles.xml: `applyFontRemapStylesXml` — শুধু লিগ্যাসি ফন্ট-ভ্যালু (Sutonny…/Bijoy…/Shibly… প্রিফিক্স, case-insensitive) bijoyFont-এ বদলায়; থিম-অ্যাট্রি/w:name/অন্য ফন্ট অস্পৃশ্য; কম্বাইন্ড `applyFontRemap({documentXml, stylesXml}, settings)`
+- idempotency প্রমাণিত: ক্যানোনিকেল অ্যাট্রি-অর্ডারের কারণে apply-twice ≡ once (ইউনিট + ৭২০-রান ফিক্সচার + আসল docx — তিন লেভেলেই বাইট-অভিন্ন); xml:space="preserve"/নেমস্পেস/w:t-কনটেন্ট বাইট-রক্ষা
+- টেস্ট: scripts/test-font-remap.ts — ৯৬ অ্যাসার্শন (classifyRunText ৩৪ + রান-ইউনিট ২২ + এজ-কেস ১২ + styles ৯ + সিনথেটিক ৭২০-রান ফিক্সচার ১২ + আসল hsc27-physics-bijoy.docx ইন্টিগ্রেশন ১১ + FONT_CHOICES/ডিফল্ট ৭); jsdom-এর DOMParser দিয়ে parsererror-যাচাই + `<w:r>`/`</w:r>` ব্যালেন্স-কাউন্ট — দুটোই well-formedness প্রমাণ; ৭২০ রান ১:১ রিম্যাপ (Shibly ×৪-অ্যাট্রি ×৭২০), SutonnyMJ-অবশেষ শূন্য (w:t-ধারী রানে)
+- আসল ফিক্সচারে (১১৫০ রান, ৯৯১টি w:ascii="SutonnyMJ"): bijoy-রান ২৮৫ → Shibly, latin ৬৯৮ → Arial, টেক্সটহীন রান ১২৮ + রান-বাহির্ভূত ১৪৩ (pPr-মার্ক rPr) অক্ষত — হিসাব মিলেছে
+- ভেরিফিকেশন: bun run scripts/test-font-remap.ts → ৯৬/৯৬ পাস; tsc --noEmit → আমার ২ ফাইল এরর-শূন্য (একটি প্রি-একজিস্টিং এরর src/components/mcq/input-card.tsx(110,16) "Cannot find name 'FileUp'" — অন্য এজেন্টের চলমান রিফ্যাক্টর, আমার স্কোপের বাইরে); eslint (দুই ফাইল) → ক্লিন
+
+Stage Summary:
+- font-remap ইঞ্জিন রেডি — পিওর লাইব্রেরি (DOM-নির্ভরতা নেই, ব্রাউজার+bun উভয়ে চলে), idempotent, XML-corruption-free; ভবিষ্যৎ টাস্কে page.tsx/docx-জিপ পাইপলাইনে ওয়্যার করা বাকি (applyFontRemap({documentXml, stylesXml}, settings) এন্ট্রি-পয়েন্ট প্রস্তুত)
+- classifyRunText/FONT_CHOICES/DEFAULT_FONT_REMAP_SETTINGS এক্সপোর্টেড — UI-ড্রপডাউন ও রিম্যাপ-সেটিংস কার্ডের ভিত্তি
+
+---
+Task ID: 42-finish
+Agent: Sub Agent (finish English UI conversion)
+Task: Finish the stopped UI → English conversion; sync all 8 E2E scripts; cleanup; full verification
+
+Work Log:
+- Audited all remaining Bengali hits in src/components, src/app, src/hooks, src/lib/mcq (1,280 hits total) and separated user-facing chrome from comments/digit-maps/parser-keywords/output-docx strings
+- Converted remaining user-facing strings (19 in src):
+  • Step badges ১/২/৩/৪ → 1/2/3/4 in upload-first-card, input-card, serial-paste-card, detect-card, docx-detect-card, shuffle-card, docx-sets-result, sets-result (8 edits)
+  • sets-result.tsx "Set name style" option labels → English descriptions with the real output samples quoted ("Bengali label — সেট A…", "Bengali letters — সেট ক…", "Bengali digits — সেট ১…", "English — Set 1, 2, 3…"); samples untouched because getSetName writes them into exported files
+  • User-facing throw-error messages (surface in toasts): exporter.ts print-window error; docx-xml.ts ×3 (parse-fail / w:body / not-a-valid-docx); redownload.ts ×4 (same family) → English
+- layout.tsx confirmed: lang="en", English title/description/openGraph (kept "বাংলা MCQ" only as an SEO keyword). README.md already fully English (verified, no rewrite needed)
+- E2E sync: retyped every text-based selector in all 8 e2e scripts to the new English UI (tabs, buttons, aria-labels, placeholders, toasts, badges, titles); DOM ids and data-testids untouched; fixture exam content stays Bengali
+  • e2e-mode-tabs (23 replacements), e2e-modes (57), e2e-multi-file (15), e2e-shuffle-headers (22), e2e-shuffle-limit (8), e2e-reference (5), e2e-live-bare-ref (7), e2e-back-home (4)
+  • e2e-live-bare-ref retargeted to localhost:3000 — the live GitHub Pages deployment still serves the old Bengali build (curl: lang="bn"); switch back after redeploy
+  • Assertion adaptations: "Color-based serial (structured file)" (exact) for the multi-mode negative check (new MultiDownloadCard description contains "color-based serials"); `button:text-is("Select all")` ("Deselect all" contains "select all" → strict-mode collision); back-home icon-only check includes("Back"); shuffle-headers legacy blocking-notice check uses the English translation string (count must stay 0); reference count regexes → English ("48 question(s)", "question(s) have source tags")
+- Cleanup: deleted 9 one-off debug scripts (probe-b6/doc1/doc1-ans/doc1-rd/ref-miss/uploads .ts, scan-doc1-markers.py, scan-references.py, inspect-uploads.py) + scripts/tmp-e2e/ runtime artifacts; kept fixtures/ooxml_check.py (used by test-merger-repro.ts)
+- Verification: npx tsc --noEmit → 0 errors; npx eslint src → clean; unit tests all green (test-mcq 71, test-docx 48, test-color-serial 129, test-multi-docx 65, test-redownload 41, test-reference 61, test-font-remap 96 = 511/511); dev server :3000 → 200; ALL 8 E2E green with zero console/page errors (e2e-back-home, e2e-shuffle-limit, e2e-mode-tabs, e2e-reference 6/6, e2e-live-bare-ref 10/10, e2e-shuffle-headers, e2e-multi-file, e2e-modes 55/55); curl hero shows English ("MCQ Shuffler Pro", "Upload a file first", "100% free")
+- Final Bengali audit: every remaining hit in src is a comment, Bengali digit map (০১২৩৪৫৬৭৮৯), parser/detector keyword (উত্তর, উঃ, সেট, ক খ গ ঘ, ১.), output-docx string (সেট A/ক/১ set names, উত্তরমালা), functional sample (বাংলা legend, "Bengali numerals (১,২,৩)") or encoding.ts content — no user-facing chrome left
+- No git commit made (working tree left uncommitted per task)
+
+Stage Summary:
+- English UI conversion is COMPLETE: all user-facing chrome is English, functional Bengali (parser keywords, digit maps, output-docx content, fixtures) preserved by design
+- All 8 E2E selectors now match the English UI exactly; next deployment will make the live site match (e2e-live-bare-ref currently points at localhost:3000 for this reason)
+- 511 unit assertions + 8/8 E2E suites green, zero console errors, tsc/eslint clean

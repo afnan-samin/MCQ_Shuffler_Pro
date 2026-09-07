@@ -22,12 +22,12 @@ export interface RedownloadPartsCardProps {
 const KIND_ORDER: PartKind[] = ["serial", "question", "reference", "options", "answer", "bekkha"];
 
 const KIND_HINTS: Record<Exclude<PartKind, "other">, string> = {
-  serial: "নম্বর থাকবে / রিনাম্বার হবে",
-  question: "প্রশ্নের মূল লেখা",
-  reference: "উদ্দীপক / রেফারেন্স অনুচ্ছেদ",
-  options: "ক খ গ ঘ — চারটি অপশন",
-  answer: "উত্তর (উঃ ক / উত্তরমালা)",
-  bekkha: "ব্যাখ্যা / সমাধান অংশ",
+  serial: "Numbers kept / renumbered",
+  question: "The question text itself",
+  reference: "Stimulus / reference paragraph",
+  options: "ক খ গ ঘ — the four options",
+  answer: "Answer (উঃ ক / answer key)",
+  bekkha: "Explanation / solution part",
 };
 
 /** অংশ-বাছাই কার্ড — কোন অংশগুলো নতুন ফাইলে থাকবে (ডিফল্ট: সিরিয়াল + প্রশ্ন) */
@@ -50,9 +50,9 @@ export function RedownloadPartsCard({
             <FileCheck2 className="h-5 w-5" />
           </span>
           <div>
-            <CardTitle className="text-base md:text-lg">২. অংশ বাছাই — নতুন ফাইলে কী কী থাকবে</CardTitle>
+            <CardTitle className="text-base md:text-lg">2. Pick parts — what goes into the new file</CardTitle>
             <CardDescription>
-              {filesCount} টি ফাইলে {questionsCount} টি প্রশ্ন পাওয়া গেছে — যে অংশগুলোর টিক দেবেন শুধু সেগুলোই ডাউনলোড হবে (ফরম্যাট হুবহু অক্ষত)।
+              Found {questionsCount} question(s) in {filesCount} file(s) — only the ticked parts get downloaded (format kept intact).
             </CardDescription>
           </div>
         </div>
@@ -78,7 +78,7 @@ export function RedownloadPartsCard({
                   {PART_LABELS[k]}
                   {counts[k] > 0 && (
                     <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
-                      {counts[k]} লাইন
+                      {counts[k]} lines
                     </Badge>
                   )}
                 </span>
@@ -93,13 +93,13 @@ export function RedownloadPartsCard({
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-sm font-semibold">
               <Hash className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
-              সিরিয়াল নতুন করে ১, ২, ৩…
+              Renumber serials 1, 2, 3…
             </div>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              বাছাই করা প্রশ্নগুলো ক্রমে ১ থেকে নম্বর পাবে — ফাইলের নিজের ডিজিট-স্টাইলেই। OFF হলে আসল নম্বরই থাকে।
+              Selected questions get numbered 1..N in order — in the file's own digit style. Off = original numbers kept.
             </p>
           </div>
-          <Switch checked={renumber} onCheckedChange={onRenumberChange} aria-label="সিরিয়াল রিনাম্বার টগল" />
+          <Switch checked={renumber} onCheckedChange={onRenumberChange} aria-label="Serial renumber toggle" />
         </div>
 
         {/* উত্তর-বিস্তার হিন্ট */}
@@ -107,12 +107,12 @@ export function RedownloadPartsCard({
           <div className="flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50/60 p-3 text-sm text-sky-900 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-200">
             <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-sky-600 dark:text-sky-400" />
             <p>
-              <b>উত্তর-বিস্তার চালু:</b> অপশন বাদ দিয়েছেন কিন্তু উত্তর রেখেছেন — তাই &quot;উঃ ক&quot;-টাইপ উত্তরের জায়গায় ওই অপশনের পুরো লেখা বসে যাবে (যেমন: উঃ ক) পানির ঘনত্ব…)।
+              <b>Answer expansion on:</b> You dropped options but kept answers — so &quot;উঃ ক&quot;-style answers expand into the full option text (e.g. উঃ ক) পানির ঘনত্ব…).
             </p>
           </div>
         )}
       </CardContent>
-      <Label className="sr-only">অংশ বাছাই</Label>
+      <Label className="sr-only">Part selection</Label>
     </Card>
   );
 }

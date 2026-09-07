@@ -25,8 +25,8 @@ try {
 
   // ফাইল আপলোড (স্টেজ) → শাফল-মোডে ঢোকা
   await page.setInputFiles("#step-upload input[type='file']", FILE);
-  await page.waitForSelector('button[role="tab"]:has-text("MCQ শাফল")', { timeout: 15000 });
-  await page.click('button[role="tab"]:has-text("MCQ শাফল")');
+  await page.waitForSelector('button[role="tab"]:has-text("MCQ Shuffle")', { timeout: 15000 });
+  await page.click('button[role="tab"]:has-text("MCQ Shuffle")');
   await page.waitForTimeout(800);
 
   // রেফারেন্স-সেকশন দেখা যাচ্ছে?
@@ -35,20 +35,20 @@ try {
 
   // রিপোর্ট লাইনে প্রশ্ন-সংখ্যা আছে (৪৮/৫০ প্রশ্নে ট্যাগ)
   const bodyText = await page.locator("body").innerText();
-  ok(/৪[০-৯]?\s*টি প্রশ্নে|48|৪৮/.test(bodyText.replace(/\s+/g, " ")), "রিপোর্টে প্রশ্ন-কাউন্ট দেখা যাচ্ছে");
+  ok(/48\s*question\(s\)/.test(bodyText.replace(/\s+/g, " ")), "রিপোর্টে প্রশ্ন-কাউন্ট দেখা যাচ্ছে");
 
   // "বাদ দিন" সিলেক্ট
   await page.click('label[for="ref-strip"]');
   await page.waitForTimeout(200);
 
   // শাফল চালু (ডিফল্ট সেটিংসেই) → সম্পন্ন-নোটিশের অপেক্ষা
-  await page.click('button:has-text("শাফল করুন ও সেট তৈরি করুন")');
-  await page.waitForSelector("text=শাফল সম্পন্ন", { timeout: 120000 });
+  await page.click('button:has-text("Shuffle & build sets")');
+  await page.waitForSelector("text=Shuffle complete", { timeout: 120000 });
 
   // ডাউনলোড — ডাউনলোড ইভেন্ট ধরে ফাইল সেভ (সিঙ্গেল-ফাইল ফ্লোর রিনাম্বার-বাটন)
   const [download] = await Promise.all([
     page.waitForEvent("download", { timeout: 60000 }),
-    page.click('button:has-text("রিনাম্বার সিরিয়াল")'),
+    page.click('button:has-text("renumbered serials")'),
   ]);
   const outPath = "/tmp/ref-e2e-out.docx";
   await download.saveAs(outPath);

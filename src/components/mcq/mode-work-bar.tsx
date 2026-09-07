@@ -6,8 +6,6 @@ import { ArrowLeft, FolderPlus, Loader2 } from "lucide-react";
 import { FileDropzone, type DropzoneTrigger } from "@/components/mcq/file-dropzone";
 import { MODE_META, type McqMode } from "@/lib/mcq/mode-meta";
 
-const bn = (n: number) => String(n).replace(/\d/g, (d) => "০১২৩৪৫৬৭৮৯"[Number(d)]);
-
 interface ModeWorkBarProps {
   mode: McqMode;
   /** "পেছনে" (শুধু অ্যারো) — হোমে ফেরা (আপলোড-কার্ড); লোড করা সব ডেটা রিসেট হয় */
@@ -39,15 +37,15 @@ export function ModeWorkBar({ mode, onBack, onAddFiles, busy, filesCount, maxFil
         className="px-2"
         onClick={onBack}
         disabled={busy}
-        aria-label="পেছনে — হোমে ফিরুন"
-        title="হোমে ফিরুন — লোড করা ফাইল মুছে নতুন শুরু"
+        aria-label="Back — return home"
+        title="Back home — loaded files are cleared for a fresh start"
       >
         <ArrowLeft className="h-4 w-4" />
       </Button>
 
       <div className="min-w-0 flex-1 text-center">
         <span className="text-sm font-bold sm:text-base">{meta.emoji} {meta.title}</span>
-        <span className="ml-2 hidden text-xs text-muted-foreground sm:inline">— হোমে ফিরতে অ্যারো চাপুন</span>
+        <span className="ml-2 hidden text-xs text-muted-foreground sm:inline">— press the arrow to go home</span>
       </div>
 
       {maxFiles !== undefined && filesCount !== undefined && (
@@ -59,7 +57,7 @@ export function ModeWorkBar({ mode, onBack, onAddFiles, busy, filesCount, maxFil
               : "bg-muted text-muted-foreground")
           }
         >
-          {bn(filesCount)}/{bn(maxFiles)} ফাইল
+          {filesCount}/{maxFiles} files
         </span>
       )}
 
@@ -76,11 +74,11 @@ export function ModeWorkBar({ mode, onBack, onAddFiles, busy, filesCount, maxFil
           size="sm"
           className="gap-1.5"
           disabled={busy || capped}
-          title={capped ? `সর্বোচ্চ ${bn(maxFiles!)} টি ফাইল নেওয়া যায়` : undefined}
+          title={capped ? `Max ${maxFiles!} files` : undefined}
           onClick={() => dzTrigger.current?.open()}
         >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderPlus className="h-4 w-4" />}
-          আরও ফাইল
+          Add files
         </Button>
       </FileDropzone>
     </div>

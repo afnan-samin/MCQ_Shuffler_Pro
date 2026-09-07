@@ -79,7 +79,7 @@ export function DetectCard({
   const shown = questions.slice(0, visible);
 
   const scriptLabel =
-    parsed.numberScript === "bn" ? "বাংলা সংখ্যা (১,২,৩)" : parsed.numberScript === "en" ? "English সংখ্যা (1,2,3)" : parsed.numberScript === "mixed" ? "বাংলা + English মিক্স" : "—";
+    parsed.numberScript === "bn" ? "Bengali numerals (১,২,৩)" : parsed.numberScript === "en" ? "English numerals (1,2,3)" : parsed.numberScript === "mixed" ? "Mixed Bengali + English" : "—";
 
   const applyRange = () => {
     // বাংলা ও English — দুই ডিজিটেই রেঞ্জ চলে (parseInt("৫")=NaN হতো — বাংলা রেঞ্জ নীরবে নো-অপ হতো)
@@ -94,31 +94,31 @@ export function DetectCard({
     <Card id="step-detect">
       <CardHeader>
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">২</span>
-          <CardTitle className="text-lg md:text-xl">ডিটেকশন রেজাল্ট ও প্রশ্ন সিলেকশন</CardTitle>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">2</span>
+          <CardTitle className="text-lg md:text-xl">Detection result & question selection</CardTitle>
         </div>
-        <CardDescription>কোন কোন প্রশ্ন শাফল হবে সেগুলো টিক দিয়ে সিলেক্ট করুন।</CardDescription>
+        <CardDescription>Tick the questions you want to shuffle.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
         {/* স্ট্যাটস */}
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
             <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{stats.total}</div>
-            <div className="text-xs text-muted-foreground">মোট প্রশ্ন ডিটেক্ট</div>
+            <div className="text-xs text-muted-foreground">Questions detected</div>
           </div>
           <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
             <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{stats.withOptions}</div>
-            <div className="text-xs text-muted-foreground">অপশনসহ প্রশ্ন</div>
+            <div className="text-xs text-muted-foreground">With options</div>
           </div>
           <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
             <div className="mt-1 text-sm font-semibold">{scriptLabel}</div>
-            <div className="text-xs text-muted-foreground">নম্বরের ধরন</div>
+            <div className="text-xs text-muted-foreground">Number style</div>
           </div>
           <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
             <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">
               {selected.size}
             </div>
-            <div className="text-xs text-muted-foreground">সিলেক্টেড</div>
+            <div className="text-xs text-muted-foreground">Selected</div>
           </div>
         </div>
 
@@ -127,28 +127,28 @@ export function DetectCard({
           <div className="rounded-xl border border-sky-200 bg-sky-50/50 p-4 dark:border-sky-900 dark:bg-sky-950/20">
             <div className="flex flex-wrap items-center gap-2">
               <ScanText className="h-5 w-5 text-sky-700 dark:text-sky-400" />
-              <span className="font-semibold text-sky-900 dark:text-sky-200">শব্দ ধরে ধরে ডিটেক্টর</span>
+              <span className="font-semibold text-sky-900 dark:text-sky-200">Word-by-word detector</span>
               <span className="text-xs text-sky-700/80 dark:text-sky-400/80">
-                — প্রতিটি শব্দ চেক করা হয়েছে: কোনটা Bijoy, কোনটা ইউনিকোড, কোনটা English
+                — every word checked: Bijoy, Unicode, or English
               </span>
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
               <div className="rounded-lg border bg-white p-2 text-center dark:bg-background">
                 <div className="text-lg font-bold">{encStats.total}</div>
-                <div className="text-[11px] text-muted-foreground">মোট শব্দ চেক</div>
+                <div className="text-[11px] text-muted-foreground">Words checked</div>
               </div>
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-center dark:border-amber-900 dark:bg-amber-950/30">
                 <div className="text-lg font-bold text-amber-800 dark:text-amber-300">
                   {encStats.bijoy} <span className="text-xs font-medium">({Math.round((encStats.bijoy / encStats.total) * 100)}%)</span>
                 </div>
-                <div className="text-[11px] text-amber-700 dark:text-amber-400">Bijoy টাইপ (SutonnyMJ)</div>
+                <div className="text-[11px] text-amber-700 dark:text-amber-400">Bijoy (SutonnyMJ)</div>
               </div>
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-center dark:border-emerald-900 dark:bg-emerald-950/30">
                 <div className="text-lg font-bold text-emerald-800 dark:text-emerald-300">
                   {encStats.unicode} <span className="text-xs font-medium">({Math.round((encStats.unicode / encStats.total) * 100)}%)</span>
                 </div>
-                <div className="text-[11px] text-emerald-700 dark:text-emerald-400">ইউনিকোড বাংলা (অভ্র)</div>
+                <div className="text-[11px] text-emerald-700 dark:text-emerald-400">Unicode Bengali (Avro)</div>
               </div>
               <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-2 text-center dark:border-indigo-900 dark:bg-indigo-950/30">
                 <div className="text-lg font-bold text-indigo-800 dark:text-indigo-300">
@@ -169,10 +169,10 @@ export function DetectCard({
 
             <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
               <span className="flex items-center gap-1.5">
-                <span className="tok tok-bijoy px-1">Avi evsjv</span> = Bijoy → SutonnyMJ ফন্টে দেখানো হচ্ছে
+                <span className="tok tok-bijoy px-1">Avi evsjv</span> = Bijoy → shown in SutonnyMJ font
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="tok tok-unicode px-1">বাংলা</span> = ইউনিকোড
+                <span className="tok tok-unicode px-1">বাংলা</span> = Unicode
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="tok tok-english px-1">English</span> = English
@@ -200,25 +200,25 @@ export function DetectCard({
                 {serial.status === "ok" ? (
                   <>
                     <div className="font-semibold text-emerald-800 dark:text-emerald-300">
-                      ✅ সিরিয়াল ঠিক আছে — শাফল করার জন্য রেডি!
+                      ✅ Serial is correct — ready to shuffle!
                     </div>
                     <div className="mt-0.5 text-sm text-emerald-700/80 dark:text-emerald-400/80">
-                      প্রশ্ন নম্বর {serial.startAt} থেকে {questions[questions.length - 1].originalNumber} পর্যন্ত পরপর সাজানো।
-                      {!serial.startsAtOne && " (নোট: নম্বর ১ থেকে শুরু হয়নি, কিন্তু ক্রম ঠিক আছে)"}
+                      Question numbers run consecutively from {serial.startAt} to {questions[questions.length - 1].originalNumber}.
+                      {!serial.startsAtOne && " (Note: doesn't start at 1, but the order is correct)"}
                     </div>
                   </>
                 ) : (
                   <>
                     <div className="font-semibold text-amber-800 dark:text-amber-300">
-                      ⚠️ সিরিয়ালে {Math.min(serial.issues.length, 30)} টি জায়গায় সমস্যা পাওয়া গেছে
+                      ⚠️ Found {Math.min(serial.issues.length, 30)} problem(s) in the serial
                     </div>
                     <div className="mt-1 text-sm text-amber-700/90 dark:text-amber-400/90">
                       {serial.issues.slice(0, 3).map((is, i) => (
                         <div key={i}>
-                          প্রশ্ন #{is.index + 1}: নম্বর {is.expected} হওয়ার কথা, কিন্তু পাওয়া গেছে {is.found}
+                          Question #{is.index + 1}: expected number {is.expected}, found {is.found}
                         </div>
                       ))}
-                      {serial.issues.length > 3 && <div>...আরও {serial.issues.length - 3} টি</div>}
+                      {serial.issues.length > 3 && <div>...and {serial.issues.length - 3} more</div>}
                     </div>
                   </>
                 )}
@@ -229,12 +229,12 @@ export function DetectCard({
               <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-amber-200 pt-3 dark:border-amber-800">
                 <Button size="sm" className="gap-2 bg-amber-600 hover:bg-amber-700" onClick={onAutoFix} disabled={fixing}>
                   <Wrench className="h-4 w-4" />
-                  {fixing ? "ঠিক করা হচ্ছে..." : "🔧 অটো নম্বরিং ঠিক করুন"}
+                  {fixing ? "Fixing..." : "🔧 Fix numbering automatically"}
                 </Button>
                 <div className="flex items-center gap-2">
                   <Switch id="allow-broken" checked={allowBroken} onCheckedChange={onAllowBrokenChange} />
                   <Label htmlFor="allow-broken" className="text-sm cursor-pointer">
-                    যেভাবে আছে তেভাবে চালান
+                    Run as-is
                   </Label>
                 </div>
               </div>
@@ -246,17 +246,17 @@ export function DetectCard({
         <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-muted/40 p-3">
           <ListChecks className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
           <Button size="sm" variant="outline" onClick={onSelectAll}>
-            সব সিলেক্ট
+            Select all
           </Button>
           <Button size="sm" variant="outline" onClick={onSelectNone}>
-            সব বাদ
+            Deselect all
           </Button>
           <div className="flex items-center gap-1.5">
             <Input
               value={rangeFrom}
               onChange={(e) => setRangeFrom(e.target.value)}
               className="h-8 w-16 text-center"
-              placeholder="থেকে"
+              placeholder="From"
               inputMode="numeric"
             />
             <span className="text-sm text-muted-foreground">—</span>
@@ -264,14 +264,14 @@ export function DetectCard({
               value={rangeTo}
               onChange={(e) => setRangeTo(e.target.value)}
               className="h-8 w-16 text-center"
-              placeholder="পর্যন্ত"
+              placeholder="To"
               inputMode="numeric"
             />
             <Button size="sm" variant="outline" onClick={applyRange}>
-              রেঞ্জ সিলেক্ট
+              Select range
             </Button>
           </div>
-          <span className="text-xs text-muted-foreground">(পজিশন নম্বর, যেমন ১ থেকে ৫০)</span>
+          <span className="text-xs text-muted-foreground">(position numbers, e.g. 1 to 50)</span>
         </div>
 
         {/* প্রশ্ন লিস্ট — Bijoy শব্দ SutonnyMJ ফন্টে */}
@@ -299,14 +299,14 @@ export function DetectCard({
                 </span>
                 {q.options.length > 0 && (
                   <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-[10px]">
-                    {q.options.length} অপশন
+                    {q.options.length} options
                   </Badge>
                 )}
                 {q.lines.length > 1 + q.options.length && (
-                  <span className="ml-2 text-xs text-muted-foreground">(+{q.lines.length - 1 - q.options.length} লাইন)</span>
+                  <span className="ml-2 text-xs text-muted-foreground">(+{q.lines.length - 1 - q.options.length} lines)</span>
                 )}
               </span>
-              <span className="sr-only">প্রশ্ন পজিশন {pos + 1}</span>
+              <span className="sr-only">Question position {pos + 1}</span>
             </label>
           ))}
           {visible < questions.length && (
@@ -317,7 +317,7 @@ export function DetectCard({
               onClick={() => setVisible((v) => v + PAGE)}
             >
               <ChevronDown className="h-4 w-4" />
-              আরও দেখুন (বাকি {questions.length - visible} টি)
+              Show more ({questions.length - visible} remaining)
             </Button>
           )}
         </div>
