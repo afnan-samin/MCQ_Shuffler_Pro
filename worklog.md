@@ -943,3 +943,21 @@ Stage Summary:
 - প্রজেক্ট production-ready: ৯টি নতুন কমিট পুশড, লাইভ সাইটে ইংরেজি UI + ফন্ট-রিম্যাপ + PDF এক্সপোর্ট + থিম কন্ট্রোল; ০ বাগ ০ এরর (tsc/eslint/৫৩০ ইউনিট/১০ E2E/স্ট্যাটিক বিল্ড সব গ্রিন)
 - গাইড ডেলিভারড: download/MCQ-Shuffler-Pro-Project-Guide.pdf — "কার্ড-নাম ধরে এডিট" ওয়ার্কফ্লোর জন্য কমপ্লিট ম্যাপ
 - ⚠️ টোকেন নিরাপত্তা: ghp_***REDACTED*** চ্যাটে লিকড — কাজ শেষ, ব্যবহারকারীকে github.com/settings/tokens-এ REVOKE করতে বলতে হবে (আগের টোকেনটিও রিভোক করা হয়েছিল জেনারেল প্যাটার্ন হিসেবে)
+
+---
+Task ID: 51
+Agent: Main Agent (Super Z)
+Task: ২টা নতুন ফিচার — ① Mode Change বাটন (ব্যাক-বাটনের পরে) ② Shuffle আউটপুটে আপলোড ফাইলের ফরম্যাট হুবহু প্রিজার্ভ (serial মোডের মত; বাকি মোডগুলোর অডিটসহ)
+
+Work Log:
+- ফরম্যাট-অডিট: color-serial = in-place XML মিউটেশন (প্রিজার্ভ ✓); redownload = ব্লকের বাইরের টাইটেল/নির্দেশনা সবসময় থাকে + অরিজিনাল অর্ডার (✓); shuffle = buildShuffledXml body খালি করে শুধু প্রশ্ন-ব্লক + সেট-হেডার রাখত — প্রি-কনটেন্ট (টাইটেল/প্রতিষ্ঠান/নির্দেশনা), প্রশ্নের মাঝের সেকশন-হেডার/স্পেসিং, পোস্ট-কনটেন্ট (উত্তরমালা) সব ড্রপ হতো ✗
+- docx-exporter.ts buildShuffledXml রিরাইট: pre-content (প্রথম প্রশ্নের আগে) একবার টপে; প্রতি প্রশ্নের leading-gap (আগের প্রশ্নের শেষ → এই প্রশ্নের শুরু) প্রশ্নের সাথেই শাফল; post-content (শেষ প্রশ্নের পরে) সব সেটের পরে একবার; সব cloneNode(true) — tab/math/ফন্ট হুবহু; makeSetHeaderPara এখন firstBodyFont (body-র প্রথম w:rFonts) থেকে ascii/hAnsi/cs/eastAsia নিয়ে ডকুমেন্টের নিজের ফন্টে "Set A" রেন্ডার করে (rPr child-order: rFonts সবার আগে); serial-fix (buildSerialFixedDocxBlob) = অরিজিনাল স্ট্রাকচার হুবহু, শুধু সিরিয়াল-ডিজিট বদলায়
+- mode-work-bar.tsx: ব্যাক-অ্যারোর ঠিক পরে "Mode Change" ড্রপডাউন (ArrowLeftRight + ChevronDown আইকন) — বাকি ২ মোডের মেনুআইটেম (icon+tabTitle+description); click-outside + Escape বন্ধ; aria-haspopup/expanded + role=menu/menuitem; data-testid mode-change-btn/menu/mode-change-<mode>; page.tsx-এ onModeChange={changeMode} — carryToMode-এ আপলোড করা ফাইল টার্গেট মোডে নিজে থেকেই বহন হয় (NextModesCard-এর একই পথ)
+- টেস্ট: test-docx.ts ৪৮→৫৭ (৪b: PHYSICS হেডার প্রিজার্ভ গণনা, A/B সেপারেটর, সেট-হেডার ফন্ট, serial-fix সেপারেটর-ক্রম অরিজিনাল-হুবহু; ৯: সিনথেটিক টাইটেল+END পোস্ট-কনটেন্ট প্রিজার্ভ + ক্রম); e2e-font-remap.ts OFF-কাউন্ট ডাইনামিক (src + প্রতি সেট-হেডার ১); নতুন scripts/e2e-mode-change.ts (১০ assertion: বাটন-অবস্থান, ২-মোড মেনু, serial→redownload→shuffle রাউন্ড-ট্রিপ, প্রতি হপে ফাইল-বহন যাচাই — serial লিস্টে নাম, shuffle-এ 1/50 ব্যাজ, Escape-বন্ধ)
+- ভেরিফিকেশন সব গ্রিন: tsc 0; eslint ক্লিন; ইউনিট ৫৩৯/৫৩৯ (mcq ৭১ + docx ৫৭ + color-serial ১২৯ + multi-docx ৬৫ + redownload ৪১ + reference ৬১ + font-remap ১১৫); E2E ১১টি স্যুট সব পাস + JS/কনসোল-এরর শূন্য (modes ৫৫, mode-change ১০, font-remap ২০, pdf-export ২৩, reference ৬, live-bare-ref ১০, shuffle-headers/multi-file/mode-tabs/back-home/shuffle-limit); STATIC_EXPORT=1 বিল্ড সফল (basePath /MCQ_Shuffler_Pro ভেরিফাইড)
+- কমিট 0b55b4a (লোকাল main) — পুশ/ডিপ্লয় ব্লকড: টোকেন ghp_XBef…ArlUq GitHub-এ "Invalid username or token" দেয় (চ্যাটে লিকের পরে রিভোকড/মৃত); নতুন টোকেন ছাড়া push+Pages-deploy সম্ভব নয়
+
+Stage Summary:
+- Shuffle মোডের ডাউনলোড এখন আপলোড করা ফাইলের হুবহু লুক: টাইটেল/হেডার/নির্দেশনা/সেকশন-লাইন/স্পেসিং/উত্তরমালা সব থাকে, শুধু প্রশ্নের ক্রম+সিরিয়াল বদলায়; সেট-হেডারও ফাইলের নিজের ফন্টে
+- "Mode Change" বাটনে এখন যেকোনো মোড থেকে সরাসরি অন্য মোডে যাওয়া যায় — ফাইল সাথে চলে, হোমে ফিরতে/রি-আপলোড লাগে না
+- ⚠️ পুশ পেন্ডিং: নতুন GitHub টোকেন (classic, repo scope) লাগবে → push + deploy-pages.sh রান করতে হবে
