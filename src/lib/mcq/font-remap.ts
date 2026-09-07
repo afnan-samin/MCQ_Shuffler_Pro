@@ -30,6 +30,8 @@
 //   bijoyFont দিয়ে বদলানো হয় — থিম-অ্যাট্রিবিউট/অন্য ফন্ট অস্পৃশ্য (simple)।
 // ============================================================
 
+import { isCommonEnglishWord } from "./encoding";
+
 // ---------- পাবলিক টাইপ ----------
 
 /** রান-টেক্সটের স্ক্রিপ্ট শ্রেণি */
@@ -115,7 +117,12 @@ export function classifyRunText(text: string, dominant: RemapDominant = null): R
   if (hasBn && hasBijoy) return bn > strong + weak ? "unicode-bengali" : "bijoy";
   if (hasBn) return "unicode-bengali";
   if (hasBijoy) return "bijoy";
-  if (dominant === "bijoy" && /[A-Za-z]/.test(text)) return "bijoy";
+  if (dominant === "bijoy" && /[A-Za-z]/.test(text)) {
+    // কমন-English শব্দের রান Bijoy-প্রধান ডকেও English ফন্টেই থাকুক
+    const words = text.split(/\s+/).filter((w) => /[A-Za-z]/.test(w));
+    if (words.length > 0 && words.every(isCommonEnglishWord)) return "latin";
+    return "bijoy";
+  }
   return "latin";
 }
 
@@ -129,8 +136,8 @@ function escapeXmlAttr(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-/** ক্লাসিফিকেশনের জন্য w:t-কনটেন্টের এন্টিটি ডিকোড (এক পাস, আন-অ্যাম্প-শেষে) */
-function decodeXmlEntities(s: string): string {
+/** w:t-কনটেন্টের এন্টিটি ডিকোড (এক পাস, আন-অ্যাম্প-শেষে) — repack-docx-ও ব্যবহার করে */
+export function decodeXmlEntities(s: string): string {
   return s
     .replace(/&#x([0-9A-Fa-f]+);/g, (_, h: string) => String.fromCodePoint(parseInt(h, 16)))
     .replace(/&#(\d+);/g, (_, d: string) => String.fromCodePoint(parseInt(d, 10)))
@@ -238,6 +245,20 @@ export interface FontRemapOptions {
 }
 
 /**
+ * রানের নিজস্ব rPr>rFonts-এর w:ascii/w:hAnsi ফন্ট (থাকলে) — মার্কারহীন
+ * খাঁটি-ASCII Bijoy রান শনাক্তে ground-truth (আপলোড করা Bijoy ফাইলে
+ * প্রায় সব বাংলা রানই Sutonny…/Bijoy…/Shibly… জাতীয় ফন্ট বহন করে)।
+ */
+function runAsciiFontOf(runInner: string): string | null {
+  const rprM = RPR_RE.exec(runInner);
+  if (!rprM || rprM[0].endsWith("/>")) return null;
+  const rfM = RFIND_RE.exec(rprM[0]);
+  if (!rfM) return null;
+  const am = rfM[0].match(/(?:\sw:ascii|\sw:hAnsi)="([^"]*)"/);
+  return am ? am[1] : null;
+}
+
+/**
  * word/document.xml-এর প্রতিটি টেক্সটধারী <w:r>-এর ফন্ট রিম্যাপ করে।
  * w:t-হীন রান (w:tab/w:br/w:drawing/w:fldChar) ও self-closing <w:r/> অস্পৃশ্য।
  * Idempotent + XML-corruption-free (নেমস্পেস/xml:space/কনটেন্ট রক্ষা)।
@@ -259,7 +280,13 @@ export function applyFontRemapXml(
       text += decodeXmlEntities(tm[2] ?? "");
     }
     if (!hasT) return m; // w:t নেই — w:tab/w:br/ফিল্ড-কোড রান অস্পৃশ্য
-    const cls = classifyRunText(text, dominant);
+    let cls = classifyRunText(text, dominant);
+    if (cls === "latin") {
+      // রানের নিজস্ব ফন্ট লিগ্যাসি Bijoy হলে সেটাই ground-truth — মার্কারহীন
+      // খাঁটি-ASCII বাংলা রান ("Avgvi"-জাতীয়) English ফন্টে চলে যায় না
+      const runFont = runAsciiFontOf(runInner);
+      if (runFont && LEGACY_BIJOY_FONT_VALUE_RE.test(runFont)) cls = "bijoy";
+    }
     const font = fontForClass(cls, settings);
     const openEnd = m.length - runInner.length - "</w:r>".length;
     return m.slice(0, openEnd) + remapRunInner(runInner, font) + "</w:r>";
@@ -274,7 +301,7 @@ export function applyFontRemapXml(
  * স্টাইল-লেভেলে স্যাম্পল-টেক্সট নির্ণয় অনির্ভরযোগ্য, তাই ক্লাসিফাই নয় —
  * শুধু পরিচিত লিগ্যাসি নাম bijoyFont দিয়ে বদলানো হয়)।
  */
-const LEGACY_BIJOY_FONT_VALUE_RE = /^(?:sutonny|bijoy|shibly)/i;
+export const LEGACY_BIJOY_FONT_VALUE_RE = /^(?:sutonny|bijoy|shibly)/i;
 
 const STYLE_FONTVAL_RE = /((?:w:ascii|w:hAnsi|w:cs|w:eastAsia)=")([^"]*)(")/g;
 

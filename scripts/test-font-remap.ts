@@ -492,6 +492,30 @@ console.log("\n── ওয়্যারিং — zip-লেভেল রি
     ok((await partOf(outNoStyles, "word/document.xml"))!.includes(`w:ascii="Shibly"`), "styles না থাকলেও document.xml রিম্যাপ হয়");
   }
 
+  // ---- ডকুমেন্ট-dominant অটো-ডিটেকশন (Bijoy-প্রধান ফাইলের বাস্তব বাগ ফিক্স) ----
+  // মার্কারহীন খাঁটি-ASCII বাংলা রান ("Avgvi Rvbvb"-জাতীয়) আগে latin ধরে
+  // Times New Roman পেত — ফলে বাংলা English ফন্টে ডাউনলোড হতো। এখন
+  // ① রানের নিজস্ব লিগ্যাসি-Bijoy ফন্ট এবং ② ডকুমেন্ট-dominant হিন্ট দুটোই কাজ করে।
+  {
+    const BIJOY_DOC = wrapDoc(
+      `<w:p><w:r><w:rPr><w:rFonts w:ascii="SutonnyMJ"/></w:rPr><w:t>wefxK ø«-«ˆ</w:t></w:r></w:p>` +
+        `<w:p><w:r><w:rPr><w:rFonts w:ascii="SutonnyMJ"/></w:rPr><w:t>Avgvi Rvbvb</w:t></w:r></w:p>` +
+        `<w:p><w:r><w:rPr><w:rFonts w:ascii="SutonnyMJ"/></w:rPr><w:t>cÖwZwfwU wek¦</w:t></w:r></w:p>` +
+        `<w:p><w:r><w:t>Which option is correct?</w:t></w:r></w:p>`,
+    );
+    const outBijoy = await repackDocxRemapped(await makeDocxBlob(BIJOY_DOC), BIJOY_DOC, S);
+    const bijoyOut = (await partOf(outBijoy, "word/document.xml"))!;
+    ok(
+      countStr(bijoyOut, `w:ascii="Shibly"`) === 3,
+      "dominant-অটো: Bijoy-প্রধান ডকে মার্কারহীন ASCII বাংলা রানও bijoyFont (৩টিই)"
+    );
+    ok(
+      countStr(bijoyOut, `w:ascii="Arial"`) === 1,
+      "dominant-অটো: English কমন-ওয়ার্ড রান latin-ই থাকে"
+    );
+    ok(wellFormed(bijoyOut), "dominant-অটো: আউটপুট XML well-formed");
+  }
+
   // ---- replaceDocumentXml + buildMergedDocxBlob (মার্জ-পাথ) ----
   {
     const baseBlob = await makeDocxBlob(DOC_XML, STYLES_XML);

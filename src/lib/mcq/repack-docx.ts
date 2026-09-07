@@ -8,12 +8,63 @@
 
 import JSZip from "jszip";
 
-import { applyFontRemap, type FontSettings } from "./font-remap";
+import { analyzeText } from "./encoding";
+import {
+  applyFontRemap,
+  decodeXmlEntities,
+  LEGACY_BIJOY_FONT_VALUE_RE,
+  type FontSettings,
+  type RemapDominant,
+} from "./font-remap";
 
 export const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 /** সোর্স docx-এ থাকলে রিম্যাপ হওয়া স্টাইল-পার্ট */
 export const STYLES_XML_PATH = "word/styles.xml";
+
+// ---------- ডকুমেন্ট-dominant নির্ণয় (font-remap-এর dominant-হিন্ট) ----------
+
+const RUN_SCAN_RE = /<w:r(?:\s[^>]*)?>([\s\S]*?)<\/w:r>/g;
+const WT_TEXT_RE = /<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g;
+const RPR_TAG_RE = /<w:rPr(?:\s[^>]*)?>[\s\S]*?<\/w:rPr>/;
+const RUN_FONT_ATTR_RE = /(?:\sw:ascii|\sw:hAnsi)="([^"]*)"/;
+const BN_CHAR_RE = /[\u0980-\u09FF]/;
+const ALPHA_BN_CHAR_RE = /[A-Za-z\u0980-\u09FF]/;
+
+/**
+ * document.xml থেকে ডকুমেন্টের প্রধান লিপি নির্ণয় — রিম্যাপের dominant-হিন্ট।
+ * ① ফন্ট-ট্রুথ: অর্ধেকের বেশি আলফা-টেক্সট লিগ্যাসি Bijoy ফন্টের (Sutonny…/Bijoy…/
+ *    Shibly… জাতীয়) রানে থাকলে ডকুমেন্ট Bijoy — মার্কারহীন খাঁটি-ASCII বাংলাও
+ *    বিজয় ফন্ট পায় (আগে এরাই Times New Roman-এ চলে যেত — মূল বাগ)।
+ * ② না হলে analyzeText (শব্দ-ধরে ক্লাসিফায়ার): bijoy/unicode → হিন্ট;
+ *    english/null → হিন্ট নেই (টেক্সট-মার্কার-ভিত্তিক আচরণ)।
+ */
+function remapDominantOf(xml: string): RemapDominant {
+  let bijoyFontLen = 0;
+  let bnLen = 0;
+  let otherLen = 0;
+  for (const m of xml.matchAll(RUN_SCAN_RE)) {
+    const inner = m[1] ?? "";
+    let text = "";
+    for (const t of inner.matchAll(WT_TEXT_RE)) text += decodeXmlEntities(t[1] ?? "");
+    if (!ALPHA_BN_CHAR_RE.test(text)) continue;
+    if (BN_CHAR_RE.test(text)) {
+      bnLen += text.length; // ইউনিকোড-বাংলা অক্ষর টেক্সট-ট্রুথ — ফন্ট যা-ই হোক
+      continue;
+    }
+    const rprM = inner.match(RPR_TAG_RE);
+    const fontM = rprM ? rprM[0].match(RUN_FONT_ATTR_RE) : null;
+    if (fontM && LEGACY_BIJOY_FONT_VALUE_RE.test(fontM[1])) bijoyFontLen += text.length;
+    else otherLen += text.length;
+  }
+  const alphaTotal = bijoyFontLen + bnLen + otherLen;
+  if (alphaTotal > 0 && bijoyFontLen * 2 >= alphaTotal) return "bijoy";
+  const plain = Array.from(xml.matchAll(WT_TEXT_RE), (t) => decodeXmlEntities(t[1] ?? "")).join("\n");
+  const d = analyzeText(plain).dominant;
+  if (d === "bijoy") return "bijoy";
+  if (d === "unicode") return "unicode-bengali";
+  return null;
+}
 
 /**
  * docx (বা লোড-করা JSZip)-এর নির্দিষ্ট পার্ট বদলে নতুন blob —
@@ -69,6 +120,7 @@ export async function repackDocxRemapped(
   const remapped = applyFontRemap(
     { documentXml, stylesXml: stylesXml ?? undefined },
     fontSettings,
+    { dominant: remapDominantOf(documentXml) },
   );
   const parts: Record<string, string | Uint8Array> = {
     "word/document.xml": remapped.documentXml,

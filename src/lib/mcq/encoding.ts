@@ -88,6 +88,13 @@ export function classifyWord(word: string, dominant: Enc | null): Enc {
   // ৭) কনটেক্সট নেই — ASCII শব্দ ডিফল্টভাবে English
   return "english";
 }
+/**
+ * শব্দটি (যেকোনো দৈর্ঘ্যের) কমন-English লিস্টে আছে কিনা —
+ * font-remap Bijoy-প্রধান ডকের English রান রক্ষায় ব্যবহার করে।
+ */
+export function isCommonEnglishWord(word: string): boolean {
+  return ENGLISH_COMMON.has(word.toLowerCase().replace(/[^a-z']/g, ""));
+}
 
 /** একটি লাইনের নিজস্ব strong কনটেক্সট (এক্সপোর্টে লাইন-ভিত্তিক ফন্টের জন্য) */
 export function lineDominantOf(line: string): Enc | null {

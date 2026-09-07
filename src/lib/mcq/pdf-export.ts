@@ -1,9 +1,12 @@
 // ============================================================
 // PDF export — converts a generated .docx Blob into a .pdf Blob,
 // 100% in the browser (no server):
-//   docx Blob → docx-preview renders pages into a hidden offscreen
-//   container → html2canvas-pro captures each rendered page → jsPDF
-//   places every capture as A4 portrait page image(s).
+//   docx Blob → docx-preview renders real pages into a hidden offscreen
+//   container → html-to-image captures each rendered page via SVG
+//   foreignObject (browser-native text rendering — Bengali complex-script
+//   shaping and layout CSS stay exact; embedded webfonts are inlined)
+//   → jsPDF places every capture as A4 portrait page image(s).
+//   html2canvas-pro remains as a per-page fallback.
 //
 // PAGE SLICING: docx-preview's `breakPages` only sections at explicit
 // page breaks — a continuous document (no page breaks) renders as ONE
@@ -79,8 +82,9 @@ function sliceCountOf(w: number, h: number): number {
  */
 export async function docxBlobToPdfBlob(docx: Blob, baseName: string): Promise<Blob> {
   // Dynamic imports — browser-only, keeps the main bundle lean
-  const [{ renderAsync }, { default: html2canvas }, { jsPDF }] = await Promise.all([
+  const [{ renderAsync }, { toCanvas }, { default: html2canvas }, { jsPDF }] = await Promise.all([
     import("docx-preview"),
+    import("html-to-image"),
     import("html2canvas-pro"),
     import("jspdf"),
   ]);
@@ -103,6 +107,9 @@ export async function docxBlobToPdfBlob(docx: Blob, baseName: string): Promise<B
     await renderAsync(docx, host, undefined, {
       inWrapper: true,
       breakPages: true,
+      // Word-এর ক্যাশড পেজ-ব্রেক (lastRenderedPageBreak) ব্যবহার করে আসল
+      // পেজ-সীমায় সেকশন ভাগ হয় — কন্টিনিউয়াস ডকেও স্লাইসিং প্রায় লাগে না
+      ignoreLastRenderedPageBreak: false,
       ignoreWidth: false,
       ignoreHeight: false,
       ignoreFonts: false,
@@ -165,16 +172,29 @@ export async function docxBlobToPdfBlob(docx: Blob, baseName: string): Promise<B
     for (let i = 0; i < targets.length; i++) {
       let canvas: HTMLCanvasElement;
       try {
-        canvas = await html2canvas(targets[i], {
-          scale,
+        // প্রাথমিক পথ — foreignObject সিরিয়ালাইজেশন (html-to-image): ব্রাউজারের
+        // নিজস্ব রেন্ডার-ইঞ্জিন টেক্সট আঁকে, তাই বাংলা যুক্তাক্ষর/কমপ্লেক্স-স্ক্রিপ্ট
+        // শেপিং ও লেআউট CSS নিখুঁত থাকে; অ্যাপের এমবেড করা ওয়েবফন্ট
+        // (SutonnyMJ/Kalpurush) স্বয়ংক্রিয়ভাবে SVG-তে inline হয়।
+        canvas = await toCanvas(targets[i], {
+          pixelRatio: scale,
           backgroundColor: "#ffffff",
-          useCORS: true,
-          logging: false,
+          cacheBust: false,
         });
-      } catch (e) {
-        throw new PdfExportError(
-          `could not rasterize page ${pdfPages + 1} of "${baseName}" for PDF: ${e instanceof Error ? e.message : String(e)}`
-        );
+      } catch (primaryError) {
+        // ফলব্যাক — html2canvas-pro (আগের পথ)
+        try {
+          canvas = await html2canvas(targets[i], {
+            scale,
+            backgroundColor: "#ffffff",
+            useCORS: true,
+            logging: false,
+          });
+        } catch {
+          throw new PdfExportError(
+            `could not rasterize page ${pdfPages + 1} of "${baseName}" for PDF: ${primaryError instanceof Error ? primaryError.message : String(primaryError)}`
+          );
+        }
       }
 
       // Slice a taller-than-A4 canvas into one page per A4-height chunk
