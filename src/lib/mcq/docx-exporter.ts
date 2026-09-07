@@ -21,6 +21,14 @@ import {
 import type { FontSettings } from "./font-remap";
 import { repackDocxRemapped } from "./repack-docx";
 
+/** ডকুমেন্টের প্রথম ফন্ট-অ্যাট্রিবিউট সেট (সেট-হেডারে ডকুমেন্টের নিজের ফন্ট বসাতে) */
+interface BodyFontAttrs {
+  ascii: string;
+  hAnsi: string;
+  cs: string;
+  eastAsia: string;
+}
+
 export interface ShuffleExportOptions {
   renumber: boolean;
   includeSetHeader: boolean;
@@ -40,8 +48,23 @@ function wEl(doc: Document, name: string): Element {
   return doc.createElementNS(W_NS, name);
 }
 
-/** ছোট সেট-হেডার: bold, centered — pure ASCII ("Set A") */
-function makeSetHeaderPara(doc: Document, name: string): Element {
+/** body-children-এ পাওয়া প্রথম অর্থবহ w:rFonts-এর অ্যাট্রিবিউট — না পাওয়া গেলে null */
+function firstBodyFont(kids: Element[]): BodyFontAttrs | null {
+  for (const el of kids) {
+    const fonts = el.getElementsByTagNameNS(W_NS, "rFonts");
+    for (let i = 0; i < fonts.length; i++) {
+      const f = fonts[i];
+      const get = (a: string) => f.getAttributeNS(W_NS, a) || f.getAttribute(`w:${a}`) || "";
+      const attrs: BodyFontAttrs = { ascii: get("ascii"), hAnsi: get("hAnsi"), cs: get("cs"), eastAsia: get("eastAsia") };
+      if (attrs.ascii || attrs.hAnsi || attrs.cs || attrs.eastAsia) return attrs;
+    }
+  }
+  return null;
+}
+
+/** ছোট সেট-হেডার: bold, centered — pure ASCII ("Set A"); docFont দিলে ডকুমেন্টের
+ * নিজের ফন্ট-ফ্যামিলিতেই রেন্ডার হয় (Bijoy ফাইলেও হেডার ফন্ট-মিসম্যাচ হয় না) */
+function makeSetHeaderPara(doc: Document, name: string, docFont?: BodyFontAttrs | null): Element {
   const p = wEl(doc, "w:p");
   const pPr = wEl(doc, "w:pPr");
   const spacing = wEl(doc, "w:spacing");
@@ -53,6 +76,15 @@ function makeSetHeaderPara(doc: Document, name: string): Element {
 
   const r = wEl(doc, "w:r");
   const rPr = wEl(doc, "w:rPr");
+  if (docFont) {
+    // OOXML rPr child-order: rFonts সবার আগে (b/sz-এর পরে নয়)
+    const rFonts = wEl(doc, "w:rFonts");
+    if (docFont.ascii) rFonts.setAttributeNS(W_NS, "w:ascii", docFont.ascii);
+    if (docFont.hAnsi) rFonts.setAttributeNS(W_NS, "w:hAnsi", docFont.hAnsi);
+    if (docFont.cs) rFonts.setAttributeNS(W_NS, "w:cs", docFont.cs);
+    if (docFont.eastAsia) rFonts.setAttributeNS(W_NS, "w:eastAsia", docFont.eastAsia);
+    rPr.appendChild(rFonts);
+  }
   rPr.appendChild(wEl(doc, "w:b"));
   rPr.appendChild(wEl(doc, "w:bCs"));
   const sz = wEl(doc, "w:sz");
@@ -86,6 +118,16 @@ function makePageBreakPara(doc: Document): Element {
 /**
  * অরিজিনাল document.xml থেকে শাফল্ড ভার্সনের XML বানায়।
  * ব্লক এলিমেন্ট cloneNode হয় — তাই tab/math/ফরম্যাটিং হুবহু থাকে।
+ *
+ * ফরম্যাট-প্রিজার্ভেশন (আপলোড করা ফাইলের লুক হুবহু): প্রশ্ন-ব্লকের বাইরের
+ * কনটেন্টও থাকে —
+ *   • প্রি-কনটেন্ট: প্রথম প্রশ্নের আগের সব (পরীক্ষার টাইটেল/প্রতিষ্ঠান/নির্দেশনা)
+ *     — একবার, ডকুমেন্টের একদম উপরে
+ *   • লিডিং-গ্যাপ: আগের প্রশ্নের শেষ থেকে এই প্রশ্নের শুরুর মাঝের প্যারা
+ *     (সেকশন-হেডার/ফাঁকা-স্পেসিং) — প্রশ্নের সাথেই শাফল হয়
+ *   • পোস্ট-কনটেন্ট: শেষ প্রশ্নের পরের সব (উত্তরমালা/সমাপ্তি-লাইন) — একবার,
+ *     সব সেটের পরে
+ * সেট-হেডার ("Set A") ডকুমেন্টের নিজের ফন্ট-ফ্যামিলিতে বসে — ফন্ট-মিসম্যাচ নেই।
  */
 export function buildShuffledXml(
   xml: string,
@@ -100,6 +142,27 @@ export function buildShuffledXml(
   const kids = Array.from(body.children) as Element[];
   const sectPr = kids.find((k) => k.localName === "sectPr") ?? null;
   const byId = new Map(questions.map((q) => [q.id, q]));
+
+  // ---- প্রশ্ন-ব্লকের বাইরের কনটেন্ট-জোন (ফরম্যাট-প্রিজার্ভেশন) ----
+  const docOrder = [...questions].sort((a, b) => a.blockStart - b.blockStart);
+  const sliceElems = (from: number, to: number): Element[] => {
+    const out: Element[] = [];
+    for (let i = Math.max(0, from); i < to && i < kids.length; i++) {
+      const el = kids[i];
+      if (el && el.localName !== "sectPr") out.push(el);
+    }
+    return out;
+  };
+  const firstStart = docOrder.length ? docOrder[0].blockStart : kids.length;
+  const lastEnd = docOrder.length ? docOrder[docOrder.length - 1].blockEnd : -1;
+  const preContent = sliceElems(0, firstStart);
+  const gapBefore = new Map<number, Element[]>();
+  let prevEnd = firstStart - 1;
+  for (const q of docOrder) {
+    gapBefore.set(q.id, sliceElems(prevEnd + 1, q.blockStart));
+    prevEnd = q.blockEnd;
+  }
+  const postContent = sliceElems(lastEnd + 1, kids.length);
 
   // রেফারেন্স-মোড (keep বাদে) — প্রতি প্রশ্নের edited-ব্লক একবারই বানাই,
   // প্রতিটি সেট এখান থেকে আবার ক্লোন নেয় (রিনাম্বার-মিউটেশন আইসোলেটেড থাকে)
@@ -117,16 +180,24 @@ export function buildShuffledXml(
           return els;
         });
 
+  // সেট-হেডারের ফন্ট = ডকুমেন্টের প্রথম ফন্ট (Bijoy ফাইলে SutonnyMJ-ই থাকে)
+  const docFont = firstBodyFont(kids);
+
   // body খালি করি — এলিমেন্টগুলো kids অ্যারেতে ধরা আছে, সেখান থেকেই ক্লোন হবে
   while (body.firstChild) body.removeChild(body.firstChild);
 
+  // প্রি-কনটেন্ট (টাইটেল/নির্দেশনা) — হুবহু ক্লোন, একবার
+  for (const el of preContent) body.appendChild(el.cloneNode(true));
+
   sets.forEach((setIds, si) => {
     if (si > 0) body.appendChild(makePageBreakPara(doc));
-    if (opts.includeSetHeader) body.appendChild(makeSetHeaderPara(doc, englishSetName(si)));
+    if (opts.includeSetHeader) body.appendChild(makeSetHeaderPara(doc, englishSetName(si), docFont));
 
     setIds.forEach((qid, qi) => {
       const q = byId.get(qid);
       if (!q) return;
+      // প্রশ্নের লিডিং-গ্যাপ (সেকশন-হেডার/ফাঁকা-স্পেসিং) — প্রশ্নের সাথেই চলে
+      for (const el of gapBefore.get(q.id) ?? []) body.appendChild(el.cloneNode(true));
       const edited = editedMap?.get(q.id) ?? null;
       let rel = -1;
       for (let i = q.blockStart; i <= q.blockEnd; i++) {
@@ -147,6 +218,9 @@ export function buildShuffledXml(
       }
     });
   });
+
+  // পোস্ট-কনটেন্ট (উত্তরমালা/সমাপ্তি) — হুবহু ক্লোন, সব সেটের পরে একবার
+  for (const el of postContent) body.appendChild(el.cloneNode(true));
 
   if (sectPr) body.appendChild(sectPr);
 

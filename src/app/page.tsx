@@ -1680,10 +1680,11 @@ export default function Home() {
           </>
         ) : (
           <>
-            {/* কাজ-চলাকালীন বার — ৩ মোড আর দেখানো হয় না; বাঁয়ে পেছনে (হোমে ফেরা), ডানে আরও ফাইল */}
+            {/* কাজ-চলাকালীন বার — ৩ মোড আর দেখানো হয় না; বাঁয়ে পেছনে (হোমে ফেরা) + Mode Change (অন্য মোডে ফাইলসহ সুইচ), ডানে আরও ফাইল */}
             <ModeWorkBar
               mode={mode}
               onBack={backToHome}
+              onModeChange={changeMode}
               onAddFiles={handleAddMoreFiles}
               busy={shuffleLoading || docxLoading || serialLoading || rdLoading || detecting || shuffling || multiShuffling || multiMergedBusy || multiZipBusy || serialBusy || serialMergedBusy || serialZipBusy || serialPasteBusy || serialPasteFixing || serialPasteDlBusy || rdMergedBusy || rdZipBusy || fixing}
               filesCount={mode === "shuffle" ? shuffleFileCount : mode === "serial" ? serialFileCount : rdFileCount}

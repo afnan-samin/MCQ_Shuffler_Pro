@@ -118,6 +118,30 @@ function countRunTabsIn(x: string): number {
   ok(out1Parse.questions[0].serialFontBijoy === true, "আউটপুটেও SutonnyMJ ফন্ট বজায়");
   ok(out1.lastIndexOf("<w:sectPr") > out1.lastIndexOf(">Set B<"), "sectPr একদম শেষে আছে");
 
+  console.log("\n== ৪b) ফরম্যাট-প্রিজার্ভেশন (প্রশ্ন-ব্লকের বাইরের কনটেন্ট) ==");
+  // রিয়েল ফিক্সচার: প্রি-কনটেন্ট ("A"+"PHYSICS") একবার + সেকশন-গ্যাপ ("B".."F"+"PHYSICS") প্রশ্নের সাথে
+  const physCount = (out1.match(/<w:t[^>]*>PHYSICS<\/w:t>/g) || []).length;
+  ok(physCount === 11, `PHYSICS হেডার প্রিজার্ভ: প্রি-১ + গ্যাপ ৫×২ সেট = ১১ [পেয়েছি ${physCount}]`);
+  ok(out1Parse.separators.includes("A") && out1Parse.separators.includes("B"), "A/B সেপারেটর-প্যারাও আউটপুটে থাকে");
+  // সেট-হেডার এখন ডকুমেন্টের নিজের ফন্ট-ফ্যামিলিতে
+  const srcDoc = new DOMParser().parseFromString(xmlText, "application/xml");
+  let srcAscii = "";
+  for (const rf of Array.from(srcDoc.getElementsByTagNameNS(W_NS, "rFonts"))) {
+    const a = rf.getAttribute("w:ascii") ?? "";
+    if (a) { srcAscii = a; break; }
+  }
+  const outDoc = new DOMParser().parseFromString(out1, "application/xml");
+  let headerFontAscii = "";
+  for (const t of Array.from(outDoc.getElementsByTagNameNS(W_NS, "t"))) {
+    if (t.textContent === "Set A") {
+      const r = t.parentNode as Element;
+      const rf = r.getElementsByTagNameNS(W_NS, "rFonts");
+      if (rf.length) headerFontAscii = rf[0].getAttribute("w:ascii") ?? "";
+      break;
+    }
+  }
+  ok(srcAscii !== "" && headerFontAscii === srcAscii, `সেট-হেডার ডকুমেন্টের নিজের ফন্টে ("${srcAscii}") [পেয়েছি "${headerFontAscii}"]`);
+
   console.log("\n== ৫) শাফল্ড এক্সপোর্ট (রিনাম্বার OFF — আসল নম্বর) ==");
   const out2 = buildShuffledXml(xmlText, parse.questions, [allIds, allIds], {
     renumber: false,
@@ -137,6 +161,10 @@ function countRunTabsIn(x: string): number {
   ok(out3Parse.questions.every((q, i) => q.serial === i + 1), "সিরিয়াল ১..৬০ পরপর");
   ok(!out3.includes(">Set A<") && (out3.match(/<w:br w:type="page"/g) || []).length === 0, "কোনো সেট-হেডার/পেজ-ব্রেক নেই");
   ok(!/[\u0980-\u09FF]/.test(out3), "এখানেও Unicode নেই");
+  ok(
+    JSON.stringify(out3Parse.separators) === JSON.stringify(parse.separators),
+    "সিরিয়াল-ফিক্স: সেপারেটর-ক্রম অরিজিনাল ডকুমেন্টের হুবহু (ফরম্যাট-প্রিজার্ভ)"
+  );
 
   console.log("\n== ৭) ZIP রাউন্ডট্রিপ (Word ফাইল হিসেবে বৈধ) ==");
   const zipOut = await JSZip.loadAsync(buf);
@@ -179,6 +207,40 @@ console.log("\n== ৮) সিরিয়াল-সিলিং ইউনিফ�
   // টিয়ার-৩ ডেসিমাল-গার্ড অপরিবর্তিত (num ≤ 999): ট্যাব/অপশন-লেড ছাড়া 2000 প্রশ্ন নয়
   const rTier3 = parseDocxXml(docXml(p("2000. ডেসিমাল-গার্ডের শিকার") + p("সাধারণ কনটিনিউয়েশন লাইন")));
   ok(rTier3.questions.length === 0, "টিয়ার-৩ ডেসিমাল-গার্ড অপরিবর্তিত: 2000 (ট্যাব/অপশন-লেড ছাড়া, >999) প্রশ্ন নয়");
+}
+
+console.log("\n== ৯) সিনথেটিক: টাইটেল (প্রি) + সমাপ্তি-লাইন (পোস্ট) প্রিজার্ভ ==");
+{
+  const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  const p = (text: string) =>
+    `<w:p xmlns:w="${W}"><w:r><w:t xml:space="preserve">${text}</w:t></w:r></w:p>`;
+  const docXml = (body: string) =>
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${W}"><w:body>${body}<w:sectPr/></w:body></w:document>`;
+
+  // টাইটেল (separator-শ্রেণি) + ২ প্রশ্ন + শেষে "END" সমাপ্তি-লাইন (separator → ব্লক-বাইরে)
+  const syn = docXml(
+    p("MADRASAH BOARD 2024") +
+      p("১. প্রথম প্রশ্ন") + p("ক) এক") + p("খ) দুই") +
+      p("২. দ্বিতীয় প্রশ্ন") + p("ক) তিন") + p("খ) চার") +
+      p("END")
+  );
+  const synParse = parseDocxXml(syn);
+  ok(synParse.questions.length === 2, `সিনথেটিক: ২ প্রশ্ন [পেয়েছি ${synParse.questions.length}]`);
+  // উল্টো ক্রমে ১ সেট — শুধু প্রশ্ন শাফল হয়, টাইটেল/সমাপ্তি জায়গায় থাকে
+  const synOut = buildShuffledXml(
+    syn,
+    synParse.questions,
+    [[synParse.questions[1].id, synParse.questions[0].id]],
+    { renumber: true, includeSetHeader: false }
+  );
+  ok(synOut.includes(">MADRASAH BOARD 2024<"), "টাইটেল (প্রি-কনটেন্ট) আউটপুটে আছে");
+  ok(synOut.includes(">END<"), "সমাপ্তি-লাইন (পোস্ট-কনটেন্ট) আউটপুটে আছে");
+  const tPos = synOut.indexOf("MADRASAH BOARD 2024");
+  const qPos = synOut.indexOf("দ্বিতীয় প্রশ্ন");
+  const ePos = synOut.indexOf(">END<");
+  ok(tPos >= 0 && tPos < qPos && qPos < ePos, "ক্রম অক্ষত: টাইটেল → প্রশ্ন → সমাপ্তি");
+  const synReParse = parseDocxXml(synOut);
+  ok(synReParse.questions.length === 2 && synReParse.questions[0].serial === 1, "শাফলের পরেও ২ প্রশ্ন, সিরিয়াল ১..২");
 }
 
 console.log(`\n========================================`);

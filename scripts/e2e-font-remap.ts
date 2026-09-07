@@ -154,7 +154,10 @@ try {
   const docOff = await readPart(OFF_PATH, "word/document.xml");
   const stylesOff = await readPart(OFF_PATH, "word/styles.xml");
   ok(!docOff.includes("Noto Sans Bengali") && !docOff.includes("Shibly") && !docOff.includes("Times New Roman"), "OFF: document.xml-এ নতুন কোনো ফন্ট নেই");
-  ok((docOff.match(/w:ascii="SutonnyMJ"/g) || []).length === SRC_SUTONNY_COUNT, `OFF: সোর্সের ${SRC_SUTONNY_COUNT}টা w:ascii="SutonnyMJ" হুবহু অক্ষত`);
+  // সেট-হেডার ("Set A"…) এখন ডকুমেন্টের নিজের ফন্ট-ফ্যামিলি নেয় → প্রতি সেট-হেডারে
+  // ঠিক ১টা করে w:ascii="SutonnyMJ" যোগ হয়; প্রশ্ন-রানগুলো সোর্সের হুবহু
+  const offSetHeaders = (docOff.match(/>Set [A-Z0-9]+</g) || []).length;
+  ok((docOff.match(/w:ascii="SutonnyMJ"/g) || []).length === SRC_SUTONNY_COUNT + offSetHeaders, `OFF: সোর্সের ${SRC_SUTONNY_COUNT}টা + প্রতি সেট-হেডারে ১টা (${offSetHeaders} সেট) = ${SRC_SUTONNY_COUNT + offSetHeaders} w:ascii="SutonnyMJ" হুবহু অক্ষত`);
   ok(docOff.includes("বাংলা নমুনা প্রশ্ন") && docOff.includes("†KvW wKQz"), "OFF: প্রশ্ন-টেক্সট অক্ষত");
   ok(stylesOff === STYLES_XML, "OFF: styles.xml সোর্সের সাথে বাইট-অভিন্ন");
   ok((await page.getAttribute('button[aria-label="Font remap toggle"]', "data-state")) === "unchecked", "কার্ড-সামারি OFF দেখাচ্ছে (Remap is OFF)");
