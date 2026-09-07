@@ -961,3 +961,22 @@ Stage Summary:
 - Shuffle মোডের ডাউনলোড এখন আপলোড করা ফাইলের হুবহু লুক: টাইটেল/হেডার/নির্দেশনা/সেকশন-লাইন/স্পেসিং/উত্তরমালা সব থাকে, শুধু প্রশ্নের ক্রম+সিরিয়াল বদলায়; সেট-হেডারও ফাইলের নিজের ফন্টে
 - "Mode Change" বাটনে এখন যেকোনো মোড থেকে সরাসরি অন্য মোডে যাওয়া যায় — ফাইল সাথে চলে, হোমে ফিরতে/রি-আপলোড লাগে না
 - ⚠️ পুশ পেন্ডিং: নতুন GitHub টোকেন (classic, repo scope) লাগবে → push + deploy-pages.sh রান করতে হবে
+
+---
+Task ID: 52
+Agent: Main Agent (Super Z)
+Task: নতুন টোকেন ghp_Mm2R…husW0 দিয়ে পেন্ডিং push (3 কমিট) + gh-pages ডিপ্লয় + লাইভ যাচাই (Task 51-এর শেষ ব্লকড ধাপ)
+
+Work Log:
+- রিপো স্টেট যাচাই: local main = origin/main (21edd68) + 3 কমিট এগিয়ে (a06d509, 0b55b4a, cbb051c), working tree ক্লিন, behind 0 — Task 51-এর সব কাজ (Mode Change বাটন + shuffle ফরম্যাট-প্রিজার্ভ + টেস্ট) ইতিমধ্যে কমিটেড ও ভেরিফাইড (ইউনিট ৫৩৯/৫৩৯, E2E ১১ স্যুট, tsc ০, eslint ক্লিন)
+- নতুন টোকেন API-তে যাচাই → HTTP 200 ✓
+- git push → 21edd68..cbb051c main→main, ahead 0 কনফার্মড
+- STATIC_EXPORT=1 NEXT_PUBLIC_BASE_PATH=/MCQ_Shuffler_Pro npx next build → সফল (6 routes)
+- bash scripts/deploy-pages.sh <token> → টোকেন ✓, gh-pages force-push ✓, Pages সোর্স আপডেট ✓, লাইভ পোল → 🎉 200
+- লাইভ যাচাই: https://afnan-samin.github.io/MCQ_Shuffler_Pro/ → lang="en", সব অ্যাসেট /MCQ_Shuffler_Pro basePath যুক্ত, পেজ-চাংক 567c2274…js-এ "Mode Change" স্ট্রিং উপস্থিত (নতুন ফিচার ডিপ্লয়ড কনফার্মড)
+- .next-static ডিলিট (রিপো পরিষ্কার)
+
+Stage Summary:
+- সব পেন্ডিং কাজ শেষ: Tasks 1→52 কমপ্লিট, লাইভ সাইটে Mode Change বাটন + shuffle-সহ সব মোডে ফরম্যাট-প্রিজার্ভ চালু
+- লাইভ: https://afnan-samin.github.io/MCQ_Shuffler_Pro/
+- ⚠️ টোকেন নিরাপত্তা: ghp_Mm2R…husW0 চ্যাটে পাঠানো হয়েছে — ব্যবহারকারীকে কাজ শেষে github.com/settings/tokens-এ REVOKE করতে বলা হয়েছে (আগের দুই টোকেনও রিভোকড)
