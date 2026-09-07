@@ -925,3 +925,21 @@ Stage Summary:
 - PDF export paginates continuous/long documents correctly (one A4 per slice, no 2pt-text giant pages), aborts cleanly above 300 pages with an actionable English message, picks scale 2/1.5 by estimated page count, and never double-wraps its own errors
 - Invalid .docx files are rejected at staging with per-file English toasts; silently-dropped non-.docx rejections now surface "N file(s) skipped — only .docx is supported" in every loader/dropzone flow; single-file shuffle load is properly awaited behind the re-entrancy guard
 - Font settings hydration is choice-list-safe, font card is timer-leak-free and a11y-wired; dead download wrappers + legacy tailwind.config.ts removed; README documents the PDF font behavior + 300-page cap; e2e-pdf-export regression-guards the slicing fix with a real continuous fixture
+
+---
+Task ID: 44-50
+Agent: Main Agent (Super Z)
+Task: DOCX/PDF download selector + multi-agent review + production push/deploy + PDF project guide (token ghp_XBef…ArlUq)
+
+Work Log:
+- Task 42 (English UI): প্রথম এজেন্ট স্টপের পর 42-finish এজেন্টে সম্পূর্ণ — ১৯ ফাইলের স্টেপ-ব্যাজ/সেট-নেম অপশন/৮টি thrown error ইংরেজিকরণ; ৮ E2E-র সিলেক্টর ইংরেজি UI-তে রি-টার্গেট (ids/testids অক্ষত); ডেড প্রোব-স্ক্রিপ্ট ৯টি ডিলিট; কমিট 7d07cde; ইউনিট ৫১১/৫১১ + E2E ৮/৮
+- Task 43 ∥ 43-T (প্যারালাল): FontSettingsCard + applyFontRemap ১১টি এক্সপোর্ট কল-সাইটে ওয়্যার (repackDocxRemapped কোর; disabled=byte-identical; localStorage mcq-font-settings); নতুন e2e-font-remap ২০/২০, test-font-remap ৯৬→১১৫ — কমিট 030015e। থিম: src/config/theme.ts এক-জায়গা কন্ট্রোল (fonts/colors light+dark/radius/popup) → theme-css.ts → layout injection → globals.css var-chain; emerald-*→brand-* ২৪৬ ক্লাস মাইগ্রেশন ১৯ ফাইলে; এক-জায়গা-পরিবর্তন প্রুফ (brand-600 #059669→#2563eb→revert, কম্পিউটেড স্টাইল ভেরিফাইড) — কমিট 2374251
+- Task 44: "Download as" DOCX(ডিফল্ট)/PDF টগল ৬টি ডাউনলোড কার্ডে; pdf-export.ts (docx-preview→html2canvas-pro→jsPDF, dynamic import, A4); PDF মাল্টি-ফাইল→একই ZIP নামে *.pdf; e2e-pdf-export ২০/২০; স্ট্যাটিক এক্সপোর্ট বিল্ড ওকে — কমিট db7e6cc
+- Task 45 (রিভিউ ওয়েভ, ২ এজেন্ট প্যারালাল + ১ ফিক্স এজেন্ট): code-review — M1 destructive-foreground টোকেন অনুপস্থিত (টোস্ট কনট্রাস্ট WCAG ফেল), M2 PDF পেজ/মেমরি গার্ড নেই; runtime-audit — বড়/কন্টিনিউয়াস docx PDF-এ এক এ-৪ পাতায় চাপা পড়ে (unusable), স্টেজিং-এ ইনভ্যালিড docx ঢুকে যায়; ১১-পয়েন্ট ফিক্স (F1–F11): টোকেন+var-chain, PDF A4-স্লাইসিং+৩০০-পেজ ক্যাপ+অ্যাডাপটিভ স্কেল, isValidDocxZip স্টেজিং গেট+notDocx টোস্ট, await-রেস, .txt ৫MB ক্যাপ, টাইমার/a11y/hydration স্যানিটাইজ, ডেড-কোড ডিলিট (৪ fn + tailwind.config.ts), README লিমিট, e2e-pdf-export লং-ডক কেস (৪৮-পেজ অ্যাসার্শন) — কমিট 0d8188e + 8d00b00
+- Task 46-47: ফাইনাল ভেরিফিকেশন — tsc ০, eslint ক্লিন, ইউনিট ৫৩০/৫৩০ (৭১+৪৮+১২৯+৬৫+৪১+৬১+১১৫), E2E ১০/১০ (modes ৫৫, font-remap ২০, pdf-export ২৩, reference ৬, live-bare-ref ১০ + ৫টি পাস), স্ট্যাটিক এক্সপোর্ট সফল; নতুন টোকেনে main push (০a95e16→8d00b00, ৮ কমিট) + gh-pages ডিপ্লয় → লাইভ https://afnan-samin.github.io/MCQ_Shuffler_Pro/ (lang=en, basePath অ্যাসেট, ফন্ট প্রিলোড ভেরিফাইড)
+- Task 48-49: read-only এজেন্ট scripts/guide-data.md (৫৮KB, ৬০৯ লাইন — ২৩ কম্পোনেন্ট × button→handler→lib ম্যাপ, মাদার/চাইল্ড ক্লাসিফিকেশন, প্লেবুক, রেসিপি; সব লেবেল rg-ভেরিফাইড); pdf স্কিল creative-flow পাইপলাইনে ২২-পেজ গাইড — poster_validate (font-fallback/divider/হাইব্রিড ফিক্স), cover_validate আইসোলেটেড পাস, html2pdf-next (Paged.js), pdf_qa পাস (ফন্ট এমবেডেড, overflow শূন্য, fill-ratio ঠিক), মেটাডেটা সেট, বাংলা গ্লিফ রেন্ডার চেক (সেট A/ক/১ ✓); ডেলিভারি download/MCQ-Shuffler-Pro-Project-Guide.pdf (৮৬০KB, ভেক্টর) + .html সোর্স
+
+Stage Summary:
+- প্রজেক্ট production-ready: ৯টি নতুন কমিট পুশড, লাইভ সাইটে ইংরেজি UI + ফন্ট-রিম্যাপ + PDF এক্সপোর্ট + থিম কন্ট্রোল; ০ বাগ ০ এরর (tsc/eslint/৫৩০ ইউনিট/১০ E2E/স্ট্যাটিক বিল্ড সব গ্রিন)
+- গাইড ডেলিভারড: download/MCQ-Shuffler-Pro-Project-Guide.pdf — "কার্ড-নাম ধরে এডিট" ওয়ার্কফ্লোর জন্য কমপ্লিট ম্যাপ
+- ⚠️ টোকেন নিরাপত্তা: ghp_***REDACTED*** চ্যাটে লিকড — কাজ শেষ, ব্যবহারকারীকে github.com/settings/tokens-এ REVOKE করতে বলতে হবে (আগের টোকেনটিও রিভোক করা হয়েছিল জেনারেল প্যাটার্ন হিসেবে)
