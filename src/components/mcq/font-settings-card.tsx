@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -56,6 +56,14 @@ export function FontSettingsCard({ settings, onChange }: FontSettingsCardProps) 
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<FontSettings>(settings);
   const [savedFlash, setSavedFlash] = useState(false);
+  // savedFlash-টাইমারের id ref-এ — unmount-এ ক্লিয়ার (state-আপডেট-অন-আনমাউন্টেড এড়াতে)
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (savedTimerRef.current !== null) clearTimeout(savedTimerRef.current);
+    },
+    []
+  );
 
   /** খোলার সময় ড্রাফট প্রয়োগ-করা সেটিংস থেকে সিঙ্ক (confirm/reset-এর পরেও সঠিক) */
   const toggleOpen = () => {
@@ -68,7 +76,12 @@ export function FontSettingsCard({ settings, onChange }: FontSettingsCardProps) 
   const confirm = () => {
     onChange(draft);
     setSavedFlash(true);
-    setTimeout(() => setSavedFlash(false), 1800);
+    // আগের টাইমার থাকলে বাতিল — দ্রুত পরপর কনফার্মে ফ্ল্যাশ আগেভাগে নিভে যায় না
+    if (savedTimerRef.current !== null) clearTimeout(savedTimerRef.current);
+    savedTimerRef.current = setTimeout(() => {
+      savedTimerRef.current = null;
+      setSavedFlash(false);
+    }, 1800);
   };
 
   const reset = () => {
@@ -97,6 +110,7 @@ export function FontSettingsCard({ settings, onChange }: FontSettingsCardProps) 
           <button
             type="button"
             aria-expanded={open}
+            aria-controls="font-settings-content"
             aria-label={open ? "Collapse font settings" : "Expand font settings"}
             className="rounded-md p-1 text-muted-foreground hover:bg-muted"
             onClick={(e) => {
@@ -110,7 +124,7 @@ export function FontSettingsCard({ settings, onChange }: FontSettingsCardProps) 
       </CardHeader>
 
       {open && (
-        <CardContent className="space-y-4">
+        <CardContent id="font-settings-content" className="space-y-4">
           {/* কী রিম্যাপ হয় — তথ্য-লাইন */}
           <p className="rounded-xl border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
             Bengali (Unicode) text runs get <b className="text-foreground">{draft.unicodeFont}</b>,

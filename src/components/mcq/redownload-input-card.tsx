@@ -18,9 +18,13 @@ export interface RedownloadInputCardProps {
 
 /** রিডাউনলোড মোডের ইনপুট — একাধিক .docx আপলোড + ক্রম-লিস্ট */
 export function RedownloadInputCard({ onFiles, loading, items, onReorder, onRemove }: RedownloadInputCardProps) {
-  const pick = (files: File[], rej: { tooBig: File[] }) => {
+  const pick = (files: File[], rej: { tooBig: File[]; notAccepted: File[] }) => {
     // সাইজ-সীমা ছাড়ানো ফাইল লোডারে না গিয়েই টোস্ট — লোডারের গার্ডের হুবহু মেসেজ
     for (const f of rej.tooBig) toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
+    // এক্সটেনশন-ফিল্টারে বাদ পড়া ফাইলের ফিডব্যাক — আগে নীরবে বাদ যেত
+    if (rej.notAccepted.length) {
+      toast({ title: `${rej.notAccepted.length} file(s) skipped — only .docx is supported`, variant: "destructive" });
+    }
     if (!files.length) return;
     onFiles(files, items.length > 0);
   };

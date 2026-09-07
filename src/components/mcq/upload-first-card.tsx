@@ -20,6 +20,9 @@ interface UploadFirstCardProps {
   busy: boolean;
 }
 
+/** .txt/.csv ইনপুটের সাইজ-সীমা — বড় টেক্সট ফাইল ব্রাউজার ফ্রিজ করে */
+const TEXT_MAX_BYTES = 5 * 1024 * 1024; // 5MB
+
 /**
  * ধাপ ১ — সবার আগে ফাইল আপলোড (মোড-বাটন তখনো দেখায় না)।
  * আপলোড হলে পেজে ৩টা মোড-বাটন দেখা যাবে — ইউজার যেকোনো একটায় ক্লিক করে কাজ শুরু করবে।
@@ -52,6 +55,10 @@ export function UploadFirstCard({
       return;
     }
     if (textFile) {
+      if (textFile.size > TEXT_MAX_BYTES) {
+        setUploadError("Text file too large (5MB max)");
+        return;
+      }
       setUploading(true);
       try {
         const text = await textFile.text();

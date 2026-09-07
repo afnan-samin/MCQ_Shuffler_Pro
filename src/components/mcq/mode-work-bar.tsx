@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, FolderPlus, Loader2 } from "lucide-react";
 import { FileDropzone, type DropzoneTrigger } from "@/components/mcq/file-dropzone";
 import { MODE_META, type McqMode } from "@/lib/mcq/mode-meta";
+import { toast } from "@/hooks/use-toast";
 
 interface ModeWorkBarProps {
   mode: McqMode;
@@ -66,7 +67,13 @@ export function ModeWorkBar({ mode, onBack, onAddFiles, busy, filesCount, maxFil
         accept=".docx"
         inputTestId="mode-work-bar-input"
         triggerRef={dzTrigger}
-        onFiles={(fs) => onAddFiles(fs)}
+        onFiles={(fs, rej) => {
+          // রিজেক্টেড বাকেটের ফিডব্যাক — accept-ফিল্টারে বাদ পড়া ফাইল নীরবে না গুমিয়ে জানাই
+          if (rej.notAccepted.length) {
+            toast({ title: `${rej.notAccepted.length} file(s) skipped — only .docx is supported`, variant: "destructive" });
+          }
+          onAddFiles(fs);
+        }}
       >
         <Button
           type="button"

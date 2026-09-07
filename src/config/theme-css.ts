@@ -63,6 +63,7 @@ function colorVars(c: ThemeColorSet): string[] {
     ["accent", c.accent],
     ["accent-foreground", c.accentForeground],
     ["destructive", c.destructive],
+    ["destructive-foreground", c.destructiveForeground],
     ["success", c.success],
     ["warning", c.warning],
     ["border", c.border],

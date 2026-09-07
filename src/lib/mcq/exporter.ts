@@ -197,7 +197,7 @@ async function maybeRemapPackedDocx(blob: Blob, fontSettings?: FontSettings): Pr
   return repackDocxRemapped(zip, documentXml, fontSettings);
 }
 
-/** .docx blob বানায় (ডাউনলোড নয়) — exportDocx-এর বিল্ডার-অর্ধ; PDF-কনভার্সন পাথও এটাই ব্যবহার করে.
+/** .docx blob বানায় (ডাউনলোড নয়) — PDF-কনভার্সন পাথও এটাই ব্যবহার করে.
  * fontSettings দিলে প্যাক-হওয়া document.xml (+ styles.xml) font-remap হয় (zip-লেখার আগে, শেষ ধাপ) */
 export async function buildSetsDocxBlob(
   sets: McqQuestion[][],
@@ -225,13 +225,6 @@ export async function buildSetsDocxBlob(
   const packed = await Packer.toBlob(doc);
   const blob = await maybeRemapPackedDocx(packed, fontSettings);
   return { blob, fileName: opts.fileName ?? `MCQ-Sets-${fileNameStamp()}.docx` };
-}
-
-/** .docx বানিয়ে ডাউনলোড করায় — প্রতিটি সেট আলাদা পেজে.
- * fontSettings দিলে প্যাক-হওয়া document.xml (+ styles.xml) font-remap হয় (zip-লেখার আগে, শেষ ধাপ) */
-export async function exportDocx(sets: McqQuestion[][], opts: ExportOptions, fontSettings?: FontSettings): Promise<void> {
-  const { blob, fileName } = await buildSetsDocxBlob(sets, opts, fontSettings);
-  downloadBlob(blob, fileName);
 }
 
 // ---------- .doc (HTML ভিত্তিক — পুরনো Word-ও খুলতে পারে) ----------

@@ -2,7 +2,11 @@
 // PDF-export E2E — "Download as" DOCX/PDF toggle in every mode
 // ============================================================
 // Self-sufficient (gen-e2e-fixtures generator pattern): generates its own
-// minimal docx fixtures with JSZip — no upload/ fixtures needed.
+// minimal docx fixtures with JSZip — no upload/ fixtures needed EXCEPT the
+// long-document case (step 7), which uses the continuous real-world fixture
+// upload/"Physics 1st Paper Chapter-01 (Raw).docx" (no explicit page breaks
+// → docx-preview renders ONE giant section → the page-slicing fix must
+// produce a multi-page PDF; regression-guarded by counting /Type /Page).
 // Flow:
 //   1) Upload 1 docx → shuffle mode → format toggle shows DOCX active (default)
 //   2) Download → filename *.docx, file starts with "PK" (zip magic)
@@ -11,7 +15,10 @@
 //   5) Add a 2nd file (multi-file merge/ZIP view) → PDF persisted →
 //      merged download is %PDF; ZIP keeps its docx-era name and contains
 //      ONLY *.pdf entries, each starting with "%PDF" (unzipped via JSZip)
-//   6) Zero console/page errors
+//   6) Toggle back to DOCX (persisted)
+//   7) LONG-document case: continuous fixture → shuffle → PDF → the
+//      downloaded PDF has MULTIPLE pages (> 3) — slicing fix regression guard
+//   8) Zero console/page errors
 // Run: dev server on localhost:3000 → bun run scripts/e2e-pdf-export.ts
 // ============================================================
 import { chromium } from "playwright";
@@ -24,6 +31,8 @@ const OUT_DOCX = "/tmp/pdf-e2e-download.docx";
 const OUT_PDF = "/tmp/pdf-e2e-single.pdf";
 const MERGED_PDF = "/tmp/pdf-e2e-multi-merged.pdf";
 const ZIP_PDF = "/tmp/pdf-e2e-multi.zip";
+const LONG_DOCX = "/home/z/my-project/upload/Physics 1st Paper Chapter-01 (Raw).docx";
+const LONG_PDF = "/tmp/pdf-e2e-long.pdf";
 
 let passed = 0;
 let failed = 0;
@@ -84,6 +93,11 @@ const startsWithPk = (path: string) => {
 const startsWithPdf = (path: string) => {
   const b = readFileSync(path);
   return b.length > 5 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46; // "%PDF"
+};
+/** PDF পেজ-সংখ্যা — "/Type /Page" অকরেন্স ("/Type /Pages" বাদ — lookahead) */
+const countPdfPages = (path: string) => {
+  const raw = readFileSync(path).toString("latin1");
+  return (raw.match(/\/Type\s*\/Page(?![a-zA-Z])/g) ?? []).length;
 };
 
 async function clickDownload(page: import("playwright").Page, text: string, outPath: string): Promise<string> {
@@ -177,6 +191,33 @@ try {
   await page.click('[data-testid="format-docx"]');
   const storedBack = await page.evaluate(() => localStorage.getItem("mcq-download-format"));
   ok(storedBack === "docx", `DOCX-এ ফেরাও persist হয় (${storedBack})`);
+
+  // ---- 7) লং-ডকুমেন্ট কেস — continuous fixture (কোনো explicit page-break নেই) →
+  //         স্লাইসিং-ফিক্স ছাড়া এক দৈত্য-সেকশন এক A4-তে চাপা পড়ত; এখন মাল্টি-পেজ PDF ----
+  if (!readFileSync(LONG_DOCX)) throw new Error(`লং-ডক ফিক্সচার নেই: ${LONG_DOCX}`);
+  await page.click('[data-testid="format-pdf"]');
+  await page.click('button[aria-label="Back — return home"]');
+  await page.waitForSelector("#step-upload", { timeout: 15000 });
+  await page.setInputFiles("#step-upload input[type='file']", LONG_DOCX);
+  await page.waitForSelector('button[role="tab"]:has-text("MCQ Shuffle")', { timeout: 30000 });
+  await page.click('button[role="tab"]:has-text("MCQ Shuffle")');
+  await page.waitForSelector('button:has-text("Shuffle & build sets")', { timeout: 120000 });
+  // raw চ্যাপ্টারে সিরিয়াল ভাঙা থাকতে পারে — গেট লক থাকলে "Run as-is" অন করি
+  const longShuffleBtn = page.locator('button:has-text("Shuffle & build sets")');
+  if (await longShuffleBtn.isDisabled()) {
+    await page.click("#docx-allow-broken");
+    await page.waitForSelector('button:has-text("Shuffle & build sets"):not([disabled])', { timeout: 15000 });
+  }
+  await longShuffleBtn.click();
+  await page.waitForSelector("text=Shuffle complete", { timeout: 120000 });
+  const longName = await clickDownload(page, "renumbered serials", LONG_PDF);
+  ok(longName.endsWith(".pdf"), `লং-ডক PDF ফাইলনাম .pdf দিয়ে শেষ (${longName})`);
+  ok(startsWithPdf(LONG_PDF), "লং-ডক ডাউনলোড বাইট '%PDF' দিয়ে শুরু");
+  const longPages = countPdfPages(LONG_PDF);
+  ok(
+    longPages > 3,
+    `লং-ডক PDF মাল্টি-পেজ (পেজ=${longPages}, > 3) — স্লাইসিং-ফিক্স কাজ করছে`
+  );
 
   console.log("\nJS errors:", errors.length ? errors : "শূন্য ✓");
   if (errors.length) throw new Error("ব্রাউজার JS-এরর পাওয়া গেছে");

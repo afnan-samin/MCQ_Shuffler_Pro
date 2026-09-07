@@ -64,6 +64,7 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -101,6 +102,7 @@
   --accent: var(--st-accent);
   --accent-foreground: var(--st-accent-foreground);
   --destructive: var(--st-destructive);
+  --destructive-foreground: var(--st-destructive-foreground);
   --success: var(--st-success);
   --warning: var(--st-warning);
   --border: var(--st-border);
@@ -139,6 +141,7 @@
   --accent: var(--st-accent);
   --accent-foreground: var(--st-accent-foreground);
   --destructive: var(--st-destructive);
+  --destructive-foreground: var(--st-destructive-foreground);
   --success: var(--st-success);
   --warning: var(--st-warning);
   --border: var(--st-border);

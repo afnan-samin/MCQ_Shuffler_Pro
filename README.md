@@ -17,7 +17,7 @@ A completely free web tool that shuffles MCQ questions into multiple exam sets. 
 Every download card shows a **"Download as"** toggle before you download: **DOCX (default)** or **PDF**. The choice is remembered in your browser (`localStorage: mcq-download-format`).
 
 - **DOCX** — byte-faithful Word output (original formatting, tabs, equations, fonts); this is the recommended format.
-- **PDF** — the generated DOCX is rendered in your browser (docx-preview → canvas → jsPDF) and packed as PDF. Single outputs download as `.pdf`; multi-file outputs pack all PDFs into the same ZIP that the DOCX path would produce (entries renamed `*.pdf`). This is **best-effort**: PDF is a rendered snapshot, and legacy Bijoy fonts (SutonnyMJ, etc.) appear correctly only if those fonts are installed on the viewer's device — otherwise the browser substitutes a fallback font.
+- **PDF** — the generated DOCX is rendered in your browser (docx-preview → canvas → jsPDF) and packed as PDF. Single outputs download as `.pdf`; multi-file outputs pack all PDFs into the same ZIP that the DOCX path would produce (entries renamed `*.pdf`). This is **best-effort**: PDF is a rendered snapshot, and legacy Bijoy fonts (SutonnyMJ, etc.) appear correctly only if those fonts are installed on the viewer's device — otherwise the browser substitutes a fallback font. Documents that rely on style-level/theme fonts (rather than run-level fonts) keep those fonts in the PDF, and export is capped at **300 pages per file** — for longer documents, download as DOCX instead.
 
 The legacy `.doc (legacy Word)` button and the Print button are unaffected by the toggle.
 

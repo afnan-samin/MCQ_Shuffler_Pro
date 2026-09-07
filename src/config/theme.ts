@@ -78,6 +78,9 @@ export interface ThemeColorSet {
   accentForeground: string;
   /** Error / delete color. */
   destructive: string;
+  /** Text/icon color used ON TOP of the destructive color (error toasts etc.).
+   *  Keep it white — the destructive red is dark enough for white text. */
+  destructiveForeground: string;
   /** Success color (new token — free for future use). */
   success: string;
   /** Warning color (new token — free for future use). */
@@ -165,6 +168,7 @@ export const siteTheme: SiteTheme = {
       accent: "#f5f5f5",
       accentForeground: "#171717",
       destructive: "#e7000b",
+      destructiveForeground: "#ffffff",
       success: "#16a34a",
       warning: "#d97706",
       border: "#e5e5e5",
@@ -209,6 +213,7 @@ export const siteTheme: SiteTheme = {
       accent: "#262626",
       accentForeground: "#fafafa",
       destructive: "#ff6467",
+      destructiveForeground: "#ffffff",
       success: "#22c55e",
       warning: "#f59e0b",
       border: "rgb(255 255 255 / 0.1)",

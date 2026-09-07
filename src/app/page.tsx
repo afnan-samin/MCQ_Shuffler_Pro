@@ -82,12 +82,13 @@ import {
   type WatermarkInfo,
 } from "@/lib/mcq/redownload";
 import { renumberQuestionsByPosition } from "@/lib/mcq/serial-paste";
-import { DEFAULT_FONT_REMAP_SETTINGS, type FontSettings } from "@/lib/mcq/font-remap";
+import { DEFAULT_FONT_REMAP_SETTINGS, FONT_CHOICES, type FontSettings } from "@/lib/mcq/font-remap";
 import { FontSettingsCard } from "@/components/mcq/font-settings-card";
 import {
   FILE_TOO_BIG_MSG,
   prepareShuffleXml,
   runFilePipeline,
+  isValidDocxZip,
 } from "@/lib/mcq/file-pipeline";
 import { MAX_FILE_BYTES, SHUFFLE_MAX_FILES } from "@/lib/mcq/limits";
 import { toast } from "@/hooks/use-toast";
@@ -97,6 +98,24 @@ const STORAGE_KEY = "mcq-shuffler-text";
 const MODE_KEY = "mcq-shuffler-mode";
 /** আউটপুট ফাইলের ফন্ট-রিম্যাপ সেটিংস — সব মোডের ডাউনলোডে এক সেটিংস (persisted) */
 const FONT_SETTINGS_KEY = "mcq-font-settings";
+
+/**
+ * Persisted ফন্ট-সেটিংস হাইড্রেশন-গার্ড — FONT_CHOICES-এ নেই এমন ভ্যালু
+ * (পুরনো সেভ/হাতে-এডিট localStorage) ড্রপ করে ওই স্লটের ডিফল্টে ফেরায়,
+ * নাহলে Radix Select খালি ভ্যালু রেন্ডার করে ভেঙে পড়ে।
+ */
+function sanitizeFontSettings(raw: unknown): FontSettings {
+  const r = (raw ?? {}) as Partial<FontSettings>;
+  /** তালিকায় থাকলে ভ্যালু, নাহলে ওই স্লটের ডিফল্ট */
+  const pick = (v: string | undefined, list: readonly string[], fallback: string): string =>
+    typeof v === "string" && list.includes(v) ? v : fallback;
+  return {
+    englishFont: pick(r.englishFont, FONT_CHOICES.english, DEFAULT_FONT_REMAP_SETTINGS.englishFont),
+    bijoyFont: pick(r.bijoyFont, FONT_CHOICES.bijoy, DEFAULT_FONT_REMAP_SETTINGS.bijoyFont),
+    unicodeFont: pick(r.unicodeFont, FONT_CHOICES.unicode, DEFAULT_FONT_REMAP_SETTINGS.unicodeFont),
+    enabled: typeof r.enabled === "boolean" ? r.enabled : DEFAULT_FONT_REMAP_SETTINGS.enabled,
+  };
+}
 /** "Download as" ফরম্যাট-টগলের শেষ পছন্দ (DOCX ডিফল্ট — অনুপস্থিত/ভাঙা মানে DOCX) */
 const DOWNLOAD_FORMAT_KEY = "mcq-download-format";
 // মাল্টি-ফাইল লিস্টের আইটেম-id (reorder/remove-এর জন্য স্টেবল কী দরকার)
@@ -278,6 +297,27 @@ export default function Home() {
   const serialFileCount = serialDocs.length;
   const rdFileCount = rdDocs.length;
 
+  /**
+   * স্টেজিং-সময় .docx ভ্যালিডেশন (F3) — প্রতিটা .docx-এর হালকা JSZip চেক
+   * (zip খোলা যায় + word/document.xml আছে; XML পার্স নয়)। ব্যর্থ ফাইল বাদ +
+   * English টোস্ট; সবগুলো ব্যর্থ হলে স্টেজই হয় না (আপলোড-কার্ডেই থাকে)।
+   */
+  const stageFiles = useCallback(async (files: File[]) => {
+    const valid: File[] = [];
+    for (const f of files) {
+      if (await isValidDocxZip(f)) {
+        valid.push(f);
+      } else {
+        toast({
+          title: "Could not read the file",
+          description: `${f.name} is not a valid .docx`,
+          variant: "destructive",
+        });
+      }
+    }
+    // সব ব্যর্থ → স্টেজ নয় — আপলোড-কার্ডেই থাকে ("files ready" ভুল ইঙ্গিত নয়)
+    if (valid.length) setStagedFiles(valid);
+  }, []);
   const resultsRef = useRef<HTMLDivElement>(null);
   /** লোডার রি-এন্ট্রান্সি গার্ড — state নয়, ref (stale-closure এড়াতে); চলমান লোড থাকলে নতুন কল নীরবে বাদ */
   const loadersBusyRef = useRef(false);
@@ -291,11 +331,12 @@ export default function Home() {
     }
   }, []);
 
-  // ফন্ট-রিম্যাপ সেটিংস হাইড্রেট (প্রথম লোডে একবারই)
+  // ফন্ট-রিম্যাপ সেটিংস হাইড্রেট (প্রথম লোডে একবারই) — FONT_CHOICES-এর বাইরের
+  // ভ্যালু ড্রপ (Radix Select খালি রেন্ডার না করে ডিফল্টে ফেরে)
   useEffect(() => {
     try {
       const raw = localStorage.getItem(FONT_SETTINGS_KEY);
-      if (raw) setFontSettings({ ...DEFAULT_FONT_REMAP_SETTINGS, ...JSON.parse(raw) });
+      if (raw) setFontSettings(sanitizeFontSettings(JSON.parse(raw)));
     } catch { // ভাঙা JSON/কোটা — ডিফল্টেই থাকুক
     }
   }, []);
@@ -682,6 +723,10 @@ export default function Home() {
       const run = await runFilePipeline(files, { parse: (xml) => analyzeColorDocx(xml) });
       // সাইজ-গার্ড — পাইপলাইন রিপোর্ট করে, টোস্ট এখানেই (আগের হুবহু মেসেজ)
       for (const f of run.tooBig) toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
+      // এক্সটেনশন-গার্ডে বাদ পড়া ফাইলের ফিডব্যাক — আগে নীরবে বাদ যেত
+      if (run.notDocx.length) {
+        toast({ title: `${run.notDocx.length} file(s) skipped — only .docx is supported`, variant: "destructive" });
+      }
       const added: SerialState[] = run.items.map((it) => ({
         id: nextMultiId(),
         file: it.file,
@@ -1118,6 +1163,10 @@ export default function Home() {
       });
       // সাইজ-গার্ড — পাইপলাইন রিপোর্ট করে, টোস্ট এখানেই (আগের হুবহু মেসেজ)
       for (const f of run.tooBig) toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
+      // এক্সটেনশন-গার্ডে বাদ পড়া ফাইলের ফিডব্যাক — আগে নীরবে বাদ যেত
+      if (run.notDocx.length) {
+        toast({ title: `${run.notDocx.length} file(s) skipped — only .docx is supported`, variant: "destructive" });
+      }
       const added: RdDocState[] = run.items.map((it) => ({
         id: nextMultiId(),
         file: it.file,
@@ -1335,13 +1384,19 @@ export default function Home() {
       if (!isAppend && list.length === 1) {
         setShuffleItems(null);
         setShuffleMultiSets(null);
-        handleDocxFile(list[0]);
+        // await — গার্ড (loadersBusyRef) handleDocxFile শেষ না হওয়া পর্যন্ত ধরে রাখে;
+        // আন-অওয়েটেড থাকলে গার্ড আগেই মুক্ত হয়ে প্যারালাল লোডের রেস হত
+        await handleDocxFile(list[0]);
         return;
       }
       setShuffleLoading(true);
       const run = await runFilePipeline(list, { parse: (xml) => prepareShuffleXml(xml) });
       // সাইজ-গার্ডের টোস্ট পাইপলাইন-রিপোর্ট থেকে — ডাবল-টোস্ট এড়াতে এরর-লিস্টে নেই
       for (const f of run.tooBig) toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
+      // এক্সটেনশন-গার্ডে বাদ পড়া ফাইলের ফিডব্যাক — আগে নীরবে বাদ যেত
+      if (run.notDocx.length) {
+        toast({ title: `${run.notDocx.length} file(s) skipped — only .docx is supported`, variant: "destructive" });
+      }
       const loaded: ShuffleItemState[] = run.items.map((it) => ({
         id: nextMultiId(),
         file: it.file,
@@ -1608,7 +1663,7 @@ export default function Home() {
         {!hasAnyInput ? (
           /* ধাপ ১ — কোনো ইনপুট নেই: আগে ফাইল আপলোড (মোড-বাটন এখনো দেখায় না) */
           <UploadFirstCard
-            onFiles={(fs) => setStagedFiles(fs)}
+            onFiles={(fs) => void stageFiles(fs)}
             onTextFileLoaded={loadAndDetect}
             rawText={rawText}
             onTextChange={handleTextChange}

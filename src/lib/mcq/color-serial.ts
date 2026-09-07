@@ -715,7 +715,7 @@ function collectWtSegs(sub: string): WtSegment[] {
   return segs;
 }
 
-/** রঙ-সিরিয়াল করা .docx blob (ডাউনলোড নয়) — downloadColorSerialDocx-এর বিল্ডার-অর্ধ; PDF-কনভার্সন পাথও এটাই ব্যবহার করে.
+/** রঙ-সিরিয়াল করা .docx blob (ডাউনলোড নয়) — PDF-কনভার্সন পাথও এটাই ব্যবহার করে.
  * fontSettings দিলে সিরিয়াল-এডিট শেষে document.xml (+ styles.xml) font-remap হয় */
 export async function buildColorSerialDocxBlob(params: {
   originalFile: Blob;
@@ -728,27 +728,6 @@ export async function buildColorSerialDocxBlob(params: {
   const newXml = applyColorSerialXml(params.xml, params.plan);
   const blob = await repackDocxRemapped(params.originalFile, newXml, params.fontSettings);
   return { blob, fileName: `${params.baseName} (color serial - ${params.schemeLabel}).docx` };
-}
-
-/** রঙ-সিরিয়াল করা .docx ডাউনলোড — অরিজিনাল zip-এর বাকি সব (ছবি/স্টাইল/সেটিংস) অক্ষত.
- * fontSettings দিলে সিরিয়াল-এডিট শেষে document.xml (+ styles.xml) font-remap হয় */
-export async function downloadColorSerialDocx(params: {
-  originalFile: Blob;
-  xml: string;
-  plan: Map<number, number>;
-  baseName: string;
-  schemeLabel: string;
-  fontSettings?: FontSettings;
-}): Promise<void> {
-  const { blob, fileName } = await buildColorSerialDocxBlob(params);
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
 export type { DigitEnc };

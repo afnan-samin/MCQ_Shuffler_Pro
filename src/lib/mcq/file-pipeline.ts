@@ -10,6 +10,7 @@
 // ফল: items/failures/tooBig/notDocx — টোস্ট/স্টেট কলারেই (আগের আচরণ হুবহু)।
 // ============================================================
 
+import JSZip from "jszip";
 import { loadDocxXml, parseDocxXml, type DocxParseResult } from "./docx-xml";
 import {
   analyzeColorDocx,
@@ -22,6 +23,21 @@ import { MAX_FILE_BYTES } from "./limits";
 
 export const FILE_TOO_BIG_MSG = "File is too large (50MB+ not supported)";
 export const DOCX_EXT_RE = /\.docx$/i;
+
+/**
+ * LIGHT .docx validity check — loads the zip and verifies that
+ * `word/document.xml` exists. No XML parsing, no rendering (fast enough
+ * to run at staging time, before files are accepted into the app).
+ * A renamed .zip/.txt/.pdf with a .docx extension fails here.
+ */
+export async function isValidDocxZip(file: Blob): Promise<boolean> {
+  try {
+    const zip = await JSZip.loadAsync(file);
+    return !!zip.file("word/document.xml");
+  } catch {
+    return false;
+  }
+}
 
 /** ".docx"-এক্সটেনশন কেটে base-নাম (ডাউনলোড-ফাইলনেমের ভিত্তি) */
 export const docxBaseName = (name: string): string => name.replace(/\.docx$/i, "");
