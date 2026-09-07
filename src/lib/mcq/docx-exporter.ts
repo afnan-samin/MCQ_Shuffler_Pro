@@ -19,7 +19,8 @@ import {
   type RefMode,
 } from "./reference";
 import { downloadBlob } from "./exporter";
-import { repackDocx } from "./repack-docx";
+import type { FontSettings } from "./font-remap";
+import { repackDocxRemapped } from "./repack-docx";
 
 export interface ShuffleExportOptions {
   renumber: boolean;
@@ -159,12 +160,14 @@ export function buildShuffledXml(
   return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n' + bodyXml;
 }
 
-/** অরিজিনাল zip-এর বাকি সব এন্ট্রি অক্ষত রেখে document.xml বদলানো (শেয়ার্ড repack কোর) */
-async function zipWithXml(originalFile: Blob, newXml: string): Promise<Blob> {
-  return repackDocx(originalFile, { "word/document.xml": newXml });
+/** অরিজিনাল zip-এর বাকি সব এন্ট্রি অক্ষত রেখে document.xml বদলানো (শেয়ার্ড repack কোর);
+ * fontSettings দিলে নতুন document.xml (+ সোর্সের styles.xml থাকলে সেটাও) font-remap হয় */
+async function zipWithXml(originalFile: Blob, newXml: string, fontSettings?: FontSettings): Promise<Blob> {
+  return repackDocxRemapped(originalFile, newXml, fontSettings);
 }
 
-/** শাফল্ড সেটগুলো এক .docx-এ ডাউনলোড — প্রতি সেট আলাদা পেজে */
+/** শাফল্ড সেটগুলো এক .docx-এ ডাউনলোড — প্রতি সেট আলাদা পেজে.
+ * fontSettings দিলে শাফল-XML বানানোর পরে document.xml (+ styles.xml) font-remap হয় */
 export async function downloadShuffledDocx(params: {
   originalFile: Blob;
   xml: string;
@@ -173,9 +176,10 @@ export async function downloadShuffledDocx(params: {
   baseName: string;
   suffix: string;
   opts: ShuffleExportOptions;
+  fontSettings?: FontSettings;
 }): Promise<void> {
   const newXml = buildShuffledXml(params.xml, params.questions, params.sets, params.opts);
-  const blob = await zipWithXml(params.originalFile, newXml);
+  const blob = await zipWithXml(params.originalFile, newXml, params.fontSettings);
   downloadBlob(blob, `${params.baseName}${params.suffix}.docx`);
 }
 
@@ -189,6 +193,7 @@ export async function downloadSerialFixedDocx(params: {
   questions: DocxQuestion[];
   baseName: string;
   refMode?: RefMode;
+  fontSettings?: FontSettings;
 }): Promise<void> {
   const allIds = params.questions.map((q) => q.id);
   const newXml = buildShuffledXml(params.xml, params.questions, [allIds], {
@@ -196,6 +201,6 @@ export async function downloadSerialFixedDocx(params: {
     includeSetHeader: false,
     refMode: params.refMode,
   });
-  const blob = await zipWithXml(params.originalFile, newXml);
+  const blob = await zipWithXml(params.originalFile, newXml, params.fontSettings);
   downloadBlob(blob, `${params.baseName} (serial fixed).docx`);
 }

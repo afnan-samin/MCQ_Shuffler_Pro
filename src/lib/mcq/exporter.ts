@@ -4,10 +4,13 @@
 // Bijoy (SutonnyMJ) ও Unicode বাংলা উভয় ফন্ট সাপোর্ট
 // ============================================================
 
+import JSZip from "jszip";
 import { AlignmentType, Document, Packer, Paragraph, TextRun } from "docx";
 import type { McqQuestion } from "./parser";
 import { getSetName, setToText, type NameStyle } from "./set-engine";
 import { splitLineSegments, type Enc } from "./encoding";
+import type { FontSettings } from "./font-remap";
+import { repackDocxRemapped } from "./repack-docx";
 
 export type FontMode = "auto" | "legacy" | "unicode" | "english";
 
@@ -181,8 +184,22 @@ function buildDocxParagraphs(sets: McqQuestion[][], opts: ExportOptions): Paragr
   return paras;
 }
 
-/** .docx বানিয়ে ডাউনলোড করায় — প্রতিটি সেট আলাদা পেজে */
-export async function exportDocx(sets: McqQuestion[][], opts: ExportOptions): Promise<void> {
+/**
+ * docx-লাইব্রেরি দিয়ে বানানো fresh docx-এ font remap — Packer-এর পরে document.xml
+ * (সোর্সে styles.xml থাকলে সেটাও) রিম্যাপ করে আবার প্যাক (repackDocxRemapped কোর)।
+ * fontSettings না দিলে/enabled=false হলে হুবহু আগের blob — বাইট-অভিন্ন আচরণ।
+ */
+async function maybeRemapPackedDocx(blob: Blob, fontSettings?: FontSettings): Promise<Blob> {
+  if (!fontSettings?.enabled) return blob;
+  const zip = await JSZip.loadAsync(blob);
+  const documentXml = await zip.file("word/document.xml")?.async("string");
+  if (!documentXml) return blob;
+  return repackDocxRemapped(zip, documentXml, fontSettings);
+}
+
+/** .docx বানিয়ে ডাউনলোড করায় — প্রতিটি সেট আলাদা পেজে.
+ * fontSettings দিলে প্যাক-হওয়া document.xml (+ styles.xml) font-remap হয় (zip-লেখার আগে, শেষ ধাপ) */
+export async function exportDocx(sets: McqQuestion[][], opts: ExportOptions, fontSettings?: FontSettings): Promise<void> {
   const doc = new Document({
     styles: {
       default: {
@@ -201,7 +218,8 @@ export async function exportDocx(sets: McqQuestion[][], opts: ExportOptions): Pr
     ],
   });
 
-  const blob = await Packer.toBlob(doc);
+  const packed = await Packer.toBlob(doc);
+  const blob = await maybeRemapPackedDocx(packed, fontSettings);
   downloadBlob(blob, opts.fileName ?? `MCQ-Sets-${fileNameStamp()}.docx`);
 }
 

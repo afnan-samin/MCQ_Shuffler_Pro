@@ -8,7 +8,12 @@
 
 import JSZip from "jszip";
 
+import { applyFontRemap, type FontSettings } from "./font-remap";
+
 export const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+/** সোর্স docx-এ থাকলে রিম্যাপ হওয়া স্টাইল-পার্ট */
+export const STYLES_XML_PATH = "word/styles.xml";
 
 /**
  * docx (বা লোড-করা JSZip)-এর নির্দিষ্ট পার্ট বদলে নতুন blob —
@@ -37,4 +42,40 @@ export async function repackDocx(
   for (const o of others) zip.file(o.path, await o.data);
   for (const p of extra) zip.file(p.path, p.data);
   return zip.generateAsync({ type: "blob", mimeType, compression: "DEFLATE" });
+}
+
+/**
+ * repackDocx + ঐচ্ছিক font-remap — সব docx-আউটপুট পাইপলাইনের এক প্রবেশদ্বার।
+ * documentXml (ইতিমধ্যে সব অন্য XML-মিউটেশন শেষ হওয়ার পরের স্ট্রিং)
+ * রিম্যাপ হয়; সোর্স zip-এ word/styles.xml থাকলে সেটাও রিম্যাপ হয়
+ * (applyFontRemapStylesXml — শুধু লিগ্যাসি Bijoy ফন্ট-ভ্যালু), না থাকলে স্পর্শ হয় না।
+ * fontSettings না দিলে/enabled=false হলে হুবহু repackDocx — বাইট-অভিন্ন আচরণ।
+ * `extraParts` = অতিরিক্ত বদলে-যাওয়া পার্ট (rels/[Content_Types] ইত্যাদি),
+ * `extra` = নতুন পার্ট (মার্জের রিল-টার্গেট ছবি ইত্যাদি)।
+ */
+export async function repackDocxRemapped(
+  source: Blob | JSZip,
+  documentXml: string,
+  fontSettings?: FontSettings,
+  extraParts: Record<string, string | Uint8Array> = {},
+  extra: Array<{ path: string; data: Uint8Array }> = [],
+  mimeType: string = DOCX_MIME,
+): Promise<Blob> {
+  if (!fontSettings?.enabled) {
+    return repackDocx(source, { "word/document.xml": documentXml, ...extraParts }, extra, mimeType);
+  }
+  const src = source instanceof JSZip ? source : await JSZip.loadAsync(source);
+  const stylesXml = (await src.file(STYLES_XML_PATH)?.async("string")) ?? null;
+  const remapped = applyFontRemap(
+    { documentXml, stylesXml: stylesXml ?? undefined },
+    fontSettings,
+  );
+  const parts: Record<string, string | Uint8Array> = {
+    "word/document.xml": remapped.documentXml,
+    ...extraParts,
+  };
+  if (remapped.stylesXml != null && remapped.stylesXml !== stylesXml) {
+    parts[STYLES_XML_PATH] = remapped.stylesXml;
+  }
+  return repackDocx(src, parts, extra, mimeType);
 }

@@ -42,7 +42,8 @@
 
 import JSZip from "jszip";
 
-import { DOCX_MIME, repackDocx } from "./repack-docx";
+import { type FontSettings } from "./font-remap";
+import { DOCX_MIME, repackDocxRemapped } from "./repack-docx";
 
 export { DOCX_MIME };
 
@@ -260,10 +261,16 @@ export function buildMergedDocumentXml(baseXml: string, extraInnerXmls: string[]
 /**
  * যেকোনো .docx blob-এর word/document.xml বদলে নতুন XML দিয়ে নতুন blob —
  * বাকি সব এন্ট্রি (styles/headers/media/settings) byte-হুবহু কপি।
+ * fontSettings দিলে নতুন document.xml (+ সোর্সের word/styles.xml থাকলে সেটাও)
+ * font-remap হয় — zip-সিরিয়ালাইজের ঠিক আগে, অন্য সব মিউটেশনের পরে।
  * (repack-docx.ts-এর শেয়ার্ড কোর — color-serial/docx-exporter-ও এটাই ব্যবহার করে)
  */
-export async function replaceDocumentXml(file: Blob, newXml: string): Promise<Blob> {
-  return repackDocx(file, { "word/document.xml": newXml });
+export async function replaceDocumentXml(
+  file: Blob,
+  newXml: string,
+  fontSettings?: FontSettings,
+): Promise<Blob> {
+  return repackDocxRemapped(file, newXml, fontSettings);
 }
 
 // ---------- ৬) একাধিক docx → এক মার্জড docx (রিল-ইন্টিগ্রেশনসহ) ----------
@@ -404,7 +411,10 @@ function ensureCtCover(ct: string, partPath: string): string {
  * (ছবি ইত্যাদি) ইউনিক নামে কপি + rels/[Content_Types] আপডেট + xmlns-ইউনিয়ন।
  * বিস্তারিত ফাইল-হেডারের রিল-ইন্টিগ্রেশন কমেন্টে।
  */
-export async function buildMergedDocxBlob(items: Array<{ xml: string; file: Blob }>): Promise<Blob> {
+export async function buildMergedDocxBlob(
+  items: Array<{ xml: string; file: Blob }>,
+  fontSettings?: FontSettings,
+): Promise<Blob> {
   if (items.length < 2) throw new Error("items is empty — the merge needs at least 2 docx (base + extra)");
   const baseZip = await JSZip.loadAsync(items[0].file);
 
@@ -523,10 +533,18 @@ export async function buildMergedDocxBlob(items: Array<{ xml: string; file: Blob
   }
 
   // ---- zip রি-বিল্ড: base-এর সব এন্ট্রি byte-হুবহু + বদলে যাওয়া ৩টা + নতুন পার্ট ----
-  const parts: Record<string, string> = { "word/document.xml": mergedXml };
-  if (relsOut) parts[RELS_PATH] = relsOut;
-  if (ctOut) parts[CT_PATH] = ctOut;
-  return repackDocx(baseZip, parts, newParts);
+  // fontSettings দিলে মার্জড document.xml (+ base-এর word/styles.xml) রিম্যাপ হয় —
+  // মার্জ শেষে/zip-লেখার আগে একবারই (প্রতি-আইটেম রিম্যাপের ডাবল-কাজ এড়াতে কন্টেইনার-লেভেলেই)
+  return repackDocxRemapped(
+    baseZip,
+    mergedXml,
+    fontSettings,
+    {
+      ...(relsOut ? { [RELS_PATH]: relsOut } : {}),
+      ...(ctOut ? { [CT_PATH]: ctOut } : {}),
+    },
+    newParts,
+  );
 }
 
 // ---------- ৭) একাধিক blob → এক .zip ----------

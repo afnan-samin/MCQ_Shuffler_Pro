@@ -422,6 +422,107 @@ ok(DEFAULT_FONT_REMAP_SETTINGS.englishFont === "Times New Roman", "ডিফল�
 ok(DEFAULT_FONT_REMAP_SETTINGS.bijoyFont === "SutonnyMJ", "ডিফল্ট: bijoyFont");
 ok(DEFAULT_FONT_REMAP_SETTINGS.unicodeFont === "Noto Serif Bengali", "ডিফল্ট: unicodeFont");
 
+// ---------- ৭. ওয়্যারিং — repackDocxRemapped / replaceDocumentXml / buildMergedDocxBlob ----------
+
+console.log("\n── ওয়্যারিং — zip-লেভেল রিম্যাপ (repack-docx কোর) ──");
+{
+  const {
+    repackDocxRemapped,
+  } = await import("../src/lib/mcq/repack-docx");
+  const { buildMergedDocxBlob, replaceDocumentXml } = await import("../src/lib/mcq/multi-docx");
+
+  const CT_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>`;
+  const RELS_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
+  const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="${W_NS}"><w:style w:type="paragraph" w:styleId="Normal"><w:rPr><w:rFonts w:ascii="SutonnyMJ" w:hAnsi="SutonnyMJ"/></w:rPr></w:style></w:styles>`;
+
+  /** bijoy + unicode + latin তিন রানের মিনিমাল document.xml */
+  const DOC_XML = wrapDoc(
+    `<w:p><w:r><w:rPr><w:rFonts w:ascii="SutonnyMJ" w:hAnsi="SutonnyMJ"/></w:rPr><w:t>Avgvi †KvW</w:t></w:r></w:p>` +
+      `<w:p><w:r><w:rPr><w:rFonts w:ascii="SutonnyMJ"/></w:rPr><w:t>বাংলা প্রশ্ন</w:t></w:r></w:p>` +
+      `<w:p><w:r><w:t>Chemistry Board</w:t></w:r></w:p>`,
+  );
+  const SETTINGS_PART = `<?xml version="1.0"?><w:settings xmlns:w="${W_NS}"><w:zoom w:percent="100"/></w:settings>`;
+
+  async function makeDocxBlob(documentXml: string, stylesXml?: string): Promise<Blob> {
+    const zip = new JSZip();
+    zip.file("[Content_Types].xml", CT_XML);
+    zip.file("_rels/.rels", RELS_XML);
+    zip.file("word/document.xml", documentXml);
+    if (stylesXml != null) zip.file("word/styles.xml", stylesXml);
+    zip.file("word/settings.xml", SETTINGS_PART);
+    // bun-এ JSZip-এর blob-ইনপুট সাপোর্ট নেই (FileReader নেই) — uint8array-ই পাঠাই
+    // (browser-এ একই কল-সাইট Blob পায়; JSZip দুটোই হুবহু একভাবে আন-প্যাক করে)
+    return (await zip.generateAsync({ type: "uint8array" })) as unknown as Blob;
+  }
+  async function partOf(blob: Blob, path: string): Promise<string | null> {
+    // bun-এ JSZip blob-ইনপুট চেনে না — arrayBuffer দিয়েই (browser-এও নিরাপদ)
+    const z = await JSZip.loadAsync(await blob.arrayBuffer());
+    const f = z.file(path);
+    return f ? await f.async("string") : null;
+  }
+
+  // ---- বন্ধ (undefined + enabled:false) → বাইট-অভিন্ন ----
+  {
+    const srcBlob = await makeDocxBlob(DOC_XML, STYLES_XML);
+    const outOff = await repackDocxRemapped(srcBlob, DOC_XML, undefined);
+    ok((await partOf(outOff, "word/document.xml")) === DOC_XML, "repackDocxRemapped(undefined): document.xml বাইট-অভিন্ন");
+    ok((await partOf(outOff, "word/styles.xml")) === STYLES_XML, "repackDocxRemapped(undefined): styles.xml বাইট-অভিন্ন");
+    const outDisabled = await repackDocxRemapped(srcBlob, DOC_XML, { ...S, enabled: false });
+    ok((await partOf(outDisabled, "word/document.xml")) === DOC_XML, "repackDocxRemapped(enabled:false): document.xml বাইট-অভিন্ন");
+    ok((await partOf(outDisabled, "word/settings.xml")) === SETTINGS_PART, "অন্য পার্ট (settings.xml) byte-হুবহু কপি");
+  }
+
+  // ---- চালু → document + styles রিম্যাপ, অন্য পার্ট অক্ষত ----
+  {
+    const srcBlob = await makeDocxBlob(DOC_XML, STYLES_XML);
+    const out = await repackDocxRemapped(srcBlob, DOC_XML, S);
+    const docOut = (await partOf(out, "word/document.xml"))!;
+    ok(countStr(docOut, `w:ascii="Shibly"`) === 1 && /Avgvi †KvW/.test(docOut), "ওয়্যারিং: bijoy-রান → Shibly (টেক্সট অক্ষত)");
+    ok(countStr(docOut, `w:ascii="SolaimanLipi"`) === 1 && /বাংলা প্রশ্ন/.test(docOut), "ওয়্যারিং: unicode-রান → SolaimanLipi");
+    ok(countStr(docOut, `w:ascii="Arial"`) === 1 && /Chemistry Board/.test(docOut), "ওয়্যারিং: latin-রান (rPr নেই) → Arial");
+    ok(countStr(docOut, `w:ascii="SutonnyMJ"`) === 0, "ওয়্যারিং: document.xml-এ লিগ্যাসি ফন্ট শূন্য");
+    const stylesOut = (await partOf(out, "word/styles.xml"))!;
+    ok(/w:ascii="Shibly"/.test(stylesOut) && !stylesOut.includes("SutonnyMJ"), "ওয়্যারিং: styles.xml লিগ্যাসি ভ্যালু → bijoyFont");
+    ok((await partOf(out, "word/settings.xml")) === SETTINGS_PART, "রিম্যাপ-চালুতেও অন্য পার্ট byte-হুবহু");
+    ok(wellFormed(docOut) && wellFormed(stylesOut), "ওয়্যারিং: দুই XML-ই well-formed");
+
+    // styles.xml সোর্সে নেই → আউটপুটেও নেই, document রিম্যাপ হয়
+    const outNoStyles = await repackDocxRemapped(await makeDocxBlob(DOC_XML), DOC_XML, S);
+    ok((await partOf(outNoStyles, "word/styles.xml")) === null, "সোর্সে styles.xml নেই → আউটপুটেও নেই (কৃত্রিম পার্ট যোগ হয় না)");
+    ok((await partOf(outNoStyles, "word/document.xml"))!.includes(`w:ascii="Shibly"`), "styles না থাকলেও document.xml রিম্যাপ হয়");
+  }
+
+  // ---- replaceDocumentXml + buildMergedDocxBlob (মার্জ-পাথ) ----
+  {
+    const baseBlob = await makeDocxBlob(DOC_XML, STYLES_XML);
+    const extraBlob = await makeDocxBlob(DOC_XML);
+    const items = [
+      { xml: DOC_XML, file: baseBlob },
+      { xml: DOC_XML, file: extraBlob },
+    ];
+    const mergedOn = await buildMergedDocxBlob(items, S);
+    const mergedDoc = (await partOf(mergedOn, "word/document.xml"))!;
+    ok(
+      countStr(mergedDoc, `w:ascii="Shibly"`) === 2 && countStr(mergedDoc, `w:ascii="SolaimanLipi"`) === 2,
+      "মার্জ (চালু): base+extra দুই body-ই রিম্যাপ্ট (bijoy×2 + unicode×2)"
+    );
+    ok(/w:ascii="Shibly"/.test((await partOf(mergedOn, "word/styles.xml"))!), "মার্জ (চালু): base-এর styles.xml রিম্যাপ্ট");
+
+    const mergedOff = await buildMergedDocxBlob(items);
+    const mergedOffDoc = (await partOf(mergedOff, "word/document.xml"))!;
+    ok(
+      countStr(mergedOffDoc, `w:ascii="SutonnyMJ"`) === 4 && !mergedOffDoc.includes("Shibly"),
+      "মার্জ (বন্ধ): document.xml আগের আচরণ হুবহু (রিম্যাপ শূন্য — ২ ডক × ২ w:ascii)"
+    );
+    ok((await partOf(mergedOff, "word/styles.xml")) === STYLES_XML, "মার্জ (বন্ধ): styles.xml byte-হুবহু");
+
+    const singleOn = await replaceDocumentXml(baseBlob, DOC_XML, S);
+    ok((await partOf(singleOn, "word/document.xml"))!.includes(`w:ascii="SolaimanLipi"`), "replaceDocumentXml (চালু): রিম্যাপ্ট");
+    const singleOff = await replaceDocumentXml(baseBlob, DOC_XML);
+    ok((await partOf(singleOff, "word/document.xml")) === DOC_XML, "replaceDocumentXml (বন্ধ): বাইট-অভিন্ন");
+  }
+}
+
 // ---------- ফলাফল ----------
 
 console.log(`\n${passed} passed, ${failed} failed`);

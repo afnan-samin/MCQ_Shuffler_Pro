@@ -24,7 +24,8 @@ import {
   numberToDigits,
   type DigitEnc,
 } from "./docx-xml";
-import { repackDocx } from "./repack-docx";
+import { repackDocxRemapped } from "./repack-docx";
+import type { FontSettings } from "./font-remap";
 
 // ---------- রঙের প্যালেট (ইউজারের "color shading palatte.docx" থেকে) ----------
 // Word-এর Paragraph → Shading গ্রিড: কলাম A–J, রো ১–৭ → ৭০টা রঙ
@@ -714,16 +715,18 @@ function collectWtSegs(sub: string): WtSegment[] {
   return segs;
 }
 
-/** রঙ-সিরিয়াল করা .docx ডাউনলোড — অরিজিনাল zip-এর বাকি সব (ছবি/স্টাইল/সেটিংস) অক্ষত */
+/** রঙ-সিরিয়াল করা .docx ডাউনলোড — অরিজিনাল zip-এর বাকি সব (ছবি/স্টাইল/সেটিংস) অক্ষত.
+ * fontSettings দিলে সিরিয়াল-এডিট শেষে document.xml (+ styles.xml) font-remap হয় */
 export async function downloadColorSerialDocx(params: {
   originalFile: Blob;
   xml: string;
   plan: Map<number, number>;
   baseName: string;
   schemeLabel: string;
+  fontSettings?: FontSettings;
 }): Promise<void> {
   const newXml = applyColorSerialXml(params.xml, params.plan);
-  const blob = await repackDocx(params.originalFile, { "word/document.xml": newXml });
+  const blob = await repackDocxRemapped(params.originalFile, newXml, params.fontSettings);
 
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

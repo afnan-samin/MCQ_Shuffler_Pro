@@ -81,6 +81,8 @@ import {
   type WatermarkInfo,
 } from "@/lib/mcq/redownload";
 import { renumberQuestionsByPosition } from "@/lib/mcq/serial-paste";
+import { DEFAULT_FONT_REMAP_SETTINGS, type FontSettings } from "@/lib/mcq/font-remap";
+import { FontSettingsCard } from "@/components/mcq/font-settings-card";
 import {
   FILE_TOO_BIG_MSG,
   prepareShuffleXml,
@@ -92,6 +94,8 @@ import { Dices, ShieldCheck, Zap } from "lucide-react";
 
 const STORAGE_KEY = "mcq-shuffler-text";
 const MODE_KEY = "mcq-shuffler-mode";
+/** আউটপুট ফাইলের ফন্ট-রিম্যাপ সেটিংস — সব মোডের ডাউনলোডে এক সেটিংস (persisted) */
+const FONT_SETTINGS_KEY = "mcq-font-settings";
 // মাল্টি-ফাইল লিস্টের আইটেম-id (reorder/remove-এর জন্য স্টেবল কী দরকার)
 let multiIdCounter = 0;
 const nextMultiId = () => `mf-${++multiIdCounter}-${Date.now().toString(36)}`;
@@ -178,6 +182,9 @@ export default function Home() {
   const [shuffling, setShuffling] = useState(false);
   // রেফারেন্স-ট্যাগ ([CU-A: 22-23] স্টাইল) কী করা হবে — ডিফল্ট রাখা
   const [refMode, setRefMode] = useState<RefMode>("keep");
+
+  // ---- আউটপুট ফাইলের ফন্ট-রিম্যাপ — ডাউনলোডের সময় document.xml (+styles.xml)-এ প্রয়োগ হয় ----
+  const [fontSettings, setFontSettings] = useState<FontSettings>(DEFAULT_FONT_REMAP_SETTINGS);
 
   // ---- রেজাল্ট ----
   const [sets, setSets] = useState<McqQuestion[][] | null>(null);
@@ -274,6 +281,24 @@ export default function Home() {
     try {
       const m = localStorage.getItem(MODE_KEY);
       if (m === "shuffle" || m === "serial" || m === "redownload") setMode(m);
+    } catch { // কোটা/প্রাইভেসি-মোড — নীরবে উপেক্ষা
+    }
+  }, []);
+
+  // ফন্ট-রিম্যাপ সেটিংস হাইড্রেট (প্রথম লোডে একবারই)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(FONT_SETTINGS_KEY);
+      if (raw) setFontSettings({ ...DEFAULT_FONT_REMAP_SETTINGS, ...JSON.parse(raw) });
+    } catch { // ভাঙা JSON/কোটা — ডিফল্টেই থাকুক
+    }
+  }, []);
+
+  /** ফন্ট-সেটিংস কমিট (কার্ডের "Use fonts"/"Reset") — state + localStorage দুটোতেই */
+  const updateFontSettings = useCallback((s: FontSettings) => {
+    setFontSettings(s);
+    try {
+      localStorage.setItem(FONT_SETTINGS_KEY, JSON.stringify(s));
     } catch { // কোটা/প্রাইভেসি-মোড — নীরবে উপেক্ষা
     }
   }, []);
@@ -683,6 +708,7 @@ export default function Home() {
         plan,
         baseName: serialDoc.baseName,
         schemeLabel: label,
+        fontSettings,
       });
       toast({
         title: "✅ Color-serial .docx downloaded",
@@ -716,7 +742,7 @@ export default function Home() {
         const xml = applyColorSerialXml(d.xml, plan);
         items.push({ xml, file: await replaceDocumentXml(d.file, xml) });
       }
-      const merged = await buildMergedDocxBlob(items);
+      const merged = await buildMergedDocxBlob(items, fontSettings);
       downloadBlob(merged, `${serialDocs[0].baseName} (merged serial).docx`);
       toast({
         title: "✅ Merged .docx downloaded",
@@ -742,7 +768,7 @@ export default function Home() {
         // প্রতি ফাইলের নিজের স্কিম (ডিফল্ট একটানা — আগের আচরণ হুবহু)
         const plan = planSerialByColor(d.analysis, serialSchemes[d.id] ?? { kind: "continuous" });
         const xml = applyColorSerialXml(d.xml, plan);
-        out.push({ name: `${d.baseName} (serial).docx`, blob: await replaceDocumentXml(d.file, xml) });
+        out.push({ name: `${d.baseName} (serial).docx`, blob: await replaceDocumentXml(d.file, xml, fontSettings) });
       }
       const zip = await buildZipBlob(out);
       downloadBlob(zip, "MCQ-serial-files.zip");
@@ -820,7 +846,7 @@ export default function Home() {
         includeHeader: false,
         includeSetHeader: false,
         fileName: `MCQ-Serial-${renumbered.length}q.docx`,
-      });
+      }, fontSettings);
       toast({
         title: "✅ Serial .docx downloaded",
         description: `${renumbered.length} question(s) numbered 1..N by position — order and options exactly intact.`,
@@ -897,6 +923,7 @@ export default function Home() {
         baseName: docx.baseName,
         suffix: doRenumber ? " (shuffled, renumbered)" : " (shuffled, original serial)",
         opts: { renumber: doRenumber, includeSetHeader: true, refMode },
+        fontSettings,
       });
       toast({
         title: "✅ Word file downloaded",
@@ -921,6 +948,7 @@ export default function Home() {
         questions: docx.parse.questions,
         baseName: docx.baseName,
         refMode,
+        fontSettings,
       });
       toast({
         title: "🔧 Serial-fixed .docx downloaded",
@@ -1137,8 +1165,8 @@ export default function Home() {
     try {
       const blob =
         items.length === 1
-          ? await replaceDocumentXml(items[0].file, items[0].xml)
-          : await buildMergedDocxBlob(items);
+          ? await replaceDocumentXml(items[0].file, items[0].xml, fontSettings)
+          : await buildMergedDocxBlob(items, fontSettings);
       const name =
         items.length === 1 ? `${items[0].baseName} (redownload).docx` : "MCQ-Redownload-merged.docx";
       downloadBlob(blob, name);
@@ -1163,7 +1191,7 @@ export default function Home() {
     try {
       const files: Array<{ name: string; blob: Blob }> = [];
       for (const it of items) {
-        const blob = await replaceDocumentXml(it.file, it.xml);
+        const blob = await replaceDocumentXml(it.file, it.xml, fontSettings);
         files.push({ name: `${it.baseName} (redownload).docx`, blob });
       }
       const zip = await buildZipBlob(files);
@@ -1368,7 +1396,7 @@ export default function Home() {
         items.push({ xml, file: await replaceDocumentXml(it.file, xml) });
       }
       if (items.length < 2) throw new Error("Not enough files to merge");
-      const merged = await buildMergedDocxBlob(items);
+      const merged = await buildMergedDocxBlob(items, fontSettings);
       downloadBlob(merged, `${shuffleItems[0].baseName} (merged shuffled).docx`);
       toast({
         title: "✅ Merged Word file downloaded",
@@ -1395,7 +1423,7 @@ export default function Home() {
           includeSetHeader: true,
           refMode,
         });
-        out.push({ name: `${it.baseName} (shuffled).docx`, blob: await replaceDocumentXml(it.file, xml) });
+        out.push({ name: `${it.baseName} (shuffled).docx`, blob: await replaceDocumentXml(it.file, xml, fontSettings) });
       }
       if (!out.length) throw new Error("No files to download");
       const zip = await buildZipBlob(out);
@@ -1433,7 +1461,7 @@ export default function Home() {
     if (!sets) return;
     setBusy("docx");
     try {
-      await exportDocx(sets, exportOpts);
+      await exportDocx(sets, exportOpts, fontSettings);
       toast({ title: "✅ Word file downloaded", description: "Each set is on its own page." });
     } catch (e) {
       toast({ title: "Download failed", description: String(e), variant: "destructive" });
@@ -1487,11 +1515,11 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-emerald-50/60 via-background to-background">
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-brand-50/60 via-background to-background">
       {/* হেডার */}
       <header className="border-b bg-white/80 backdrop-blur dark:bg-background/80">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-4">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm">
             <Dices className="h-6 w-6" />
           </div>
           <div className="min-w-0 flex-1">
@@ -1501,7 +1529,7 @@ export default function Home() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Badge className="gap-1 bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+            <Badge className="gap-1 bg-brand-100 text-brand-800 hover:bg-brand-100">
               <Zap className="h-3 w-3" /> 100% free
             </Badge>
             <Badge variant="secondary" className="gap-1">
@@ -1584,6 +1612,8 @@ export default function Home() {
                   />
                 ))}
 
+                <FontSettingsCard settings={fontSettings} onChange={updateFontSettings} />
+
                 <MultiDownloadCard
                   title={rdDocs.length === 1 ? "4. Download — new file from picked parts" : "4. Download — picked parts of all files"}
                   description={
@@ -1633,6 +1663,9 @@ export default function Home() {
                 onDownload={handleSerialPasteDownload}
               />
             )}
+
+            {/* আউটপুট ফাইলের ফন্ট-রিম্যাপ কার্ড — সিঙ্গেল (রঙ-সিরিয়াল/কন্টিনিউয়াস) ও মাল্টি (মার্জ/ZIP) ডাউনলোড দুই পাথেই প্রয়োগ হয় */}
+            <FontSettingsCard settings={fontSettings} onChange={updateFontSettings} />
 
             {/* ঠিক ১ টা ফাইল — পুরনো রঙ-চিপ কার্ড */}
             {serialDocs.length === 1 && serialDoc ? (
@@ -1744,6 +1777,9 @@ export default function Home() {
                   onRefModeChange={setRefMode}
                 />
 
+                {/* আউটপুট ফাইলের ফন্ট-রিম্যাপ — মার্জ/ZIP ডাউনলোডে প্রয়োগ হয় */}
+                <FontSettingsCard settings={fontSettings} onChange={updateFontSettings} />
+
                 <div ref={resultsRef} className="scroll-mt-4">
                   {shuffleMultiSets && (
                     <MultiDownloadCard
@@ -1809,6 +1845,9 @@ export default function Home() {
                   onRefModeChange={setRefMode}
                 />
 
+                {/* আউটপুট ফাইলের ফন্ট-রিম্যাপ — ডাউনলোড ও সিরিয়াল-ফিক্স দুটোতেই প্রয়োগ হয় */}
+                <FontSettingsCard settings={fontSettings} onChange={updateFontSettings} />
+
                 <div ref={resultsRef} className="scroll-mt-4">
                   {setsDocx && docx.parse && (
                     <DocxSetsResult
@@ -1860,6 +1899,9 @@ export default function Home() {
                   refMode={refMode}
                   onRefModeChange={setRefMode}
                 />
+
+                {/* আউটপুট ফাইলের ফন্ট-রিম্যাপ — .docx এক্সপোর্টে প্রয়োগ হয় */}
+                <FontSettingsCard settings={fontSettings} onChange={updateFontSettings} />
 
                 <div ref={resultsRef} className="scroll-mt-4">
                   {sets && (
