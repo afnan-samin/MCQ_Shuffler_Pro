@@ -42,7 +42,9 @@
 
 import JSZip from "jszip";
 
-export const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+import { DOCX_MIME, repackDocx } from "./repack-docx";
+
+export { DOCX_MIME };
 
 /** পেজ-ব্রেক প্যারা (body-এর ভিতরে ঢোকে, নেমস্পেস root-এ ডিক্লেয়ার্ড থাকে বলে নিরাপদ) */
 export const PAGE_BREAK_P = '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
@@ -258,18 +260,10 @@ export function buildMergedDocumentXml(baseXml: string, extraInnerXmls: string[]
 /**
  * যেকোনো .docx blob-এর word/document.xml বদলে নতুন XML দিয়ে নতুন blob —
  * বাকি সব এন্ট্রি (styles/headers/media/settings) byte-হুবহু কপি।
- * downloadColorSerialDocx-এর হুবহু JSZip কপি-প্যাটার্ন।
+ * (repack-docx.ts-এর শেয়ার্ড কোর — color-serial/docx-exporter-ও এটাই ব্যবহার করে)
  */
 export async function replaceDocumentXml(file: Blob, newXml: string): Promise<Blob> {
-  const src = await JSZip.loadAsync(file);
-  const others: Array<{ path: string; data: Promise<Uint8Array> }> = [];
-  src.forEach((path, entry) => {
-    if (!entry.dir && path !== "word/document.xml") others.push({ path, data: entry.async("uint8array") });
-  });
-  const zip = new JSZip();
-  zip.file("word/document.xml", new TextEncoder().encode(newXml));
-  for (const o of others) zip.file(o.path, await o.data);
-  return zip.generateAsync({ type: "blob", mimeType: DOCX_MIME, compression: "DEFLATE" });
+  return repackDocx(file, { "word/document.xml": newXml });
 }
 
 // ---------- ৬) একাধিক docx → এক মার্জড docx (রিল-ইন্টিগ্রেশনসহ) ----------
@@ -529,19 +523,10 @@ export async function buildMergedDocxBlob(items: Array<{ xml: string; file: Blob
   }
 
   // ---- zip রি-বিল্ড: base-এর সব এন্ট্রি byte-হুবহু + বদলে যাওয়া ৩টা + নতুন পার্ট ----
-  const enc = new TextEncoder();
-  const zip = new JSZip();
-  zip.file("word/document.xml", enc.encode(mergedXml));
-  if (relsOut) zip.file(RELS_PATH, enc.encode(relsOut));
-  if (ctOut) zip.file(CT_PATH, enc.encode(ctOut));
-  const skip = new Set<string>(["word/document.xml", ...(relsOut ? [RELS_PATH] : []), ...(ctOut ? [CT_PATH] : [])]);
-  const others: Array<{ path: string; data: Promise<Uint8Array> }> = [];
-  baseZip.forEach((path, entry) => {
-    if (!entry.dir && !skip.has(path)) others.push({ path, data: entry.async("uint8array") });
-  });
-  for (const o of others) zip.file(o.path, await o.data);
-  for (const p of newParts) zip.file(p.path, p.data);
-  return zip.generateAsync({ type: "blob", mimeType: DOCX_MIME, compression: "DEFLATE" });
+  const parts: Record<string, string> = { "word/document.xml": mergedXml };
+  if (relsOut) parts[RELS_PATH] = relsOut;
+  if (ctOut) parts[CT_PATH] = ctOut;
+  return repackDocx(baseZip, parts, newParts);
 }
 
 // ---------- ৭) একাধিক blob → এক .zip ----------

@@ -1,9 +1,12 @@
 "use client";
 
-import { useRef, useState, type DragEvent } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MultiFileList, type MultiFileItem } from "@/components/mcq/multi-file-list";
+import { FileDropzone } from "@/components/mcq/file-dropzone";
 import { FileOutput, Upload } from "lucide-react";
+import { MAX_FILE_BYTES } from "@/lib/mcq/limits";
+import { FILE_TOO_BIG_MSG } from "@/lib/mcq/file-pipeline";
+import { toast } from "@/hooks/use-toast";
 
 export interface RedownloadInputCardProps {
   onFiles: (files: File[], append: boolean) => void;
@@ -15,20 +18,11 @@ export interface RedownloadInputCardProps {
 
 /** রিডাউনলোড মোডের ইনপুট — একাধিক .docx আপলোড + ক্রম-লিস্ট */
 export function RedownloadInputCard({ onFiles, loading, items, onReorder, onRemove }: RedownloadInputCardProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [dragOver, setDragOver] = useState(false);
-
-  const pick = (fl: FileList | null) => {
-    if (!fl?.length) return;
-    const files = Array.from(fl).filter((f) => /\.docx$/i.test(f.name));
+  const pick = (files: File[], rej: { tooBig: File[] }) => {
+    // সাইজ-সীমা ছাড়ানো ফাইল লোডারে না গিয়েই টোস্ট — লোডারের গার্ডের হুবহু মেসেজ
+    for (const f of rej.tooBig) toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
     if (!files.length) return;
     onFiles(files, items.length > 0);
-  };
-
-  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setDragOver(false);
-    if (!loading) pick(e.dataTransfer.files);
   };
 
   return (
@@ -47,43 +41,20 @@ export function RedownloadInputCard({ onFiles, loading, items, onReorder, onRemo
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div
-          role="button"
-          tabIndex={0}
-          aria-label="docx ফাইল সিলেক্ট করতে ক্লিক করুন বা টেনে ছাড়ুন"
-          onClick={() => !loading && inputRef.current?.click()}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") inputRef.current?.click();
-          }}
-          onDragOver={(e) => {
-            e.preventDefault();
-            if (!loading) setDragOver(true);
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={handleDrop}
-          className={`flex min-h-[110px] cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-5 text-center transition-colors ${
-            dragOver ? "border-emerald-600 bg-emerald-50" : "border-border hover:border-emerald-400 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20"
-          } ${loading ? "pointer-events-none opacity-60" : ""}`}
-        >
-          <Upload className="h-7 w-7 text-emerald-600" />
-          <p className="text-sm font-medium">
-            {loading ? "পড়া হচ্ছে..." : "ফাইল সিলেক্ট করতে ক্লিক করুন বা টেনে ছাড়ুন"}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            সাপোর্টেড: .docx — প্রশ্ন, অপশন, উত্তর, ব্যাখ্যা অংশ অটো ডিটেক্ট হবে
-          </p>
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".docx"
-            multiple
-            className="hidden"
-            onChange={(e) => {
-              pick(e.target.files);
-              e.target.value = "";
-            }}
-          />
-        </div>
+        <FileDropzone
+          variant="compact"
+          accept=".docx"
+          multiple
+          busy={loading}
+          disabled={loading}
+          busyText="পড়া হচ্ছে..."
+          promptText="ফাইল সিলেক্ট করতে ক্লিক করুন বা টেনে ছাড়ুন"
+          hintText="সাপোর্টেড: .docx — প্রশ্ন, অপশন, উত্তর, ব্যাখ্যা অংশ অটো ডিটেক্ট হবে"
+          ariaLabel="docx ফাইল সিলেক্ট করতে ক্লিক করুন বা টেনে ছাড়ুন"
+          icon={Upload}
+          maxSizeBytes={MAX_FILE_BYTES}
+          onFiles={pick}
+        />
 
         <MultiFileList items={items} onReorder={onReorder} onRemove={onRemove} disabled={loading} />
       </CardContent>

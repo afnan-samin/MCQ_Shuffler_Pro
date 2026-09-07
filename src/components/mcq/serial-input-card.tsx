@@ -1,12 +1,16 @@
 "use client";
 
-import { useRef, useState, type DragEvent } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ClipboardPaste, FileUp, ListOrdered, Loader2, Plus, Search } from "lucide-react";
+import { FileDropzone, type DropzoneRejection, type DropzoneTrigger } from "@/components/mcq/file-dropzone";
 import { MultiFileList, type MultiFileItem } from "@/components/mcq/multi-file-list";
+import { MAX_FILE_BYTES } from "@/lib/mcq/limits";
+import { FILE_TOO_BIG_MSG } from "@/lib/mcq/file-pipeline";
+import { toast } from "@/hooks/use-toast";
 
 interface SerialInputCardProps {
   /** নতুন ফাইল-বাছাই — আগের লিস্ট বদলে নতুন লিস্ট বসে */
@@ -39,26 +43,21 @@ export function SerialInputCard({
   onPasteDetect,
   pasteBusy,
 }: SerialInputCardProps) {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const addRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
-  const [dragOver, setDragOver] = useState(false);
+  const dzTrigger = useRef<DropzoneTrigger | null>(null);
 
-  /** .docx ফিল্টার করে সঠিক হ্যান্ডলারে পাঠায়; ভুল এক্সটেনশন হলে এরর দেখায় */
-  const acceptFiles = (list: FileList | null, add: boolean) => {
+  /** .docx-ফিল্টার-করা ফাইল + রিজেকশন — সঠিক হ্যান্ডলারে পাঠায়; ভুল এক্সটেনশন/সাইজে এরর/টোস্ট */
+  const acceptFiles = (files: File[], rej: DropzoneRejection, add: boolean) => {
     setError(null);
-    const all = list ? Array.from(list) : [];
-    if (!all.length) return;
-    const docx = all.filter((f) => /\.docx$/i.test(f.name));
-    if (!docx.length) {
-      setError("সিরিয়াল মোডে শুধু .docx ফাইল চলবে (রঙ ডিটেক্ট + XML প্রিজার্ভের জন্য)।");
+    if (!files.length && !rej.notAccepted.length && !rej.tooBig.length) return;
+    for (const f of rej.tooBig) toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
+    if (!files.length) {
+      if (rej.notAccepted.length) setError("সিরিয়াল মোডে শুধু .docx ফাইল চলবে (রঙ ডিটেক্ট + XML প্রিজার্ভের জন্য)।");
       return;
     }
-    if (docx.length < all.length) {
-      setError(`${all.length - docx.length} টি ফাইল .docx না — বাদ দেওয়া হলো।`);
-    }
-    if (add && onAddFiles) onAddFiles(docx);
-    else onFiles(docx);
+    if (rej.notAccepted.length) setError(`${rej.notAccepted.length} টি ফাইল .docx না — বাদ দেওয়া হলো।`);
+    if (add && onAddFiles) onAddFiles(files);
+    else onFiles(files);
   };
 
   return (
@@ -89,41 +88,19 @@ export function SerialInputCard({
           </TabsList>
 
           <TabsContent value="upload" className="mt-3 space-y-3">
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
+            <FileDropzone
+              accept=".docx"
+              multiple
+              busy={loading}
               disabled={loading}
-              onDragOver={(e: DragEvent<HTMLButtonElement>) => {
-                e.preventDefault();
-                if (!loading) setDragOver(true);
-              }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={(e: DragEvent<HTMLButtonElement>) => {
-                e.preventDefault();
-                setDragOver(false);
-                if (!loading) acceptFiles(e.dataTransfer?.files ?? null, false);
-              }}
-              className={
-                "flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-6 text-center transition disabled:opacity-60 sm:p-8 " +
-                (dragOver
-                  ? "border-emerald-500 bg-emerald-100 dark:border-emerald-500 dark:bg-emerald-900/40"
-                  : "border-emerald-300 bg-emerald-50/50 hover:border-emerald-500 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/20 dark:hover:border-emerald-600")
-              }
-            >
-              {loading ? (
-                <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
-              ) : (
-                <FileUp className="h-8 w-8 text-emerald-600" />
-              )}
-              <span className="text-sm font-medium">
-                {loading
-                  ? "ফাইল পড়া ও রঙ-বিশ্লেষণ হচ্ছে..."
-                  : ".docx ফাইল সিলেক্ট করতে ক্লিক করুন বা টেনে ছাড়ুন"}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                একসাথে একাধিক .docx সিলেক্ট করা যাবে — পরে মার্জ করে এক ফাইলে (পেজ ব্রেকসহ) বা ZIP-এ আলাদা আলাদা ডাউনলোড করুন।
-              </span>
-            </button>
+              busyText="ফাইল পড়া ও রঙ-বিশ্লেষণ হচ্ছে..."
+              promptText=".docx ফাইল সিলেক্ট করতে ক্লিক করুন বা টেনে ছাড়ুন"
+              hintText="একসাথে একাধিক .docx সিলেক্ট করা যাবে — পরে মার্জ করে এক ফাইলে (পেজ ব্রেকসহ) বা ZIP-এ আলাদা আলাদা ডাউনলোড করুন।"
+              variant="md"
+              inputTestId="serial-file-input"
+              maxSizeBytes={MAX_FILE_BYTES}
+              onFiles={(files, rej) => acceptFiles(files, rej, false)}
+            />
           </TabsContent>
 
           <TabsContent value="paste" className="mt-3 space-y-3">
@@ -157,31 +134,6 @@ a) Beijing  b) Tokyo  c) Seoul  d) Bangkok`}
           </TabsContent>
         </Tabs>
 
-        {/* লুকানো ফাইল-ইনপুট — ট্যাবের বাইরে (সবসময় DOM-এ থাকে: যে ট্যাবেই থাকুক আপলোড ও ‘আরও ফাইল যোগ করুন’ কাজ করে) */}
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".docx"
-          multiple
-          className="hidden"
-          data-testid="serial-file-input"
-          onChange={(e) => {
-            acceptFiles(e.target.files, false);
-            e.target.value = "";
-          }}
-        />
-        <input
-          ref={addRef}
-          type="file"
-          accept=".docx"
-          multiple
-          className="hidden"
-          onChange={(e) => {
-            acceptFiles(e.target.files, true);
-            e.target.value = "";
-          }}
-        />
-
         {/* লোড হওয়া ফাইলের ক্রম-লিস্ট — টেনে উপরে/নিচে সাজানো যায় */}
         {items.length > 0 && (
           <div className="space-y-2">
@@ -189,17 +141,26 @@ a) Beijing  b) Tokyo  c) Seoul  d) Bangkok`}
               ফাইলের ক্রম বদলাতে টেনে ধরুন বা তীর-বাটন চাপুন — মার্জ/ZIP-এ ঠিক এই ক্রমেই আসবে।
             </p>
             <MultiFileList items={items} onReorder={onReorder} onRemove={onRemove} disabled={loading} />
+            {/* “আরও ফাইল যোগ করুন” — শেয়ার্ড ড্রপজোনের লুকানো ইনপুট এই বাটন দিয়ে খোলে (ট্যাবের বাইরে — যে ট্যাবেই থাকুক কাজ করে) */}
             {onAddFiles && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                onClick={() => addRef.current?.click()}
-                disabled={loading}
+              <FileDropzone
+                accept=".docx"
+                multiple
+                maxSizeBytes={MAX_FILE_BYTES}
+                triggerRef={dzTrigger}
+                onFiles={(files, rej) => acceptFiles(files, rej, true)}
               >
-                <Plus className="h-4 w-4" /> আরও ফাইল যোগ করুন
-              </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => dzTrigger.current?.open()}
+                  disabled={loading}
+                >
+                  <Plus className="h-4 w-4" /> আরও ফাইল যোগ করুন
+                </Button>
+              </FileDropzone>
             )}
           </div>
         )}

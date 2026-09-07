@@ -1,32 +1,14 @@
 "use client";
 
-import { Dices, FileOutput, ListOrdered } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MODE_IDS, MODE_META, type McqMode } from "@/lib/mcq/mode-meta";
 
-export type McqMode = "shuffle" | "serial" | "redownload";
+export type { McqMode } from "@/lib/mcq/mode-meta";
 
 interface ModeTabsProps {
   mode: McqMode;
   onChange: (m: McqMode) => void;
 }
-
-const TABS: { id: McqMode; title: string; sub: string }[] = [
-  { id: "shuffle", title: "🔀 MCQ শাফল", sub: "প্রশ্ন শাফল + সেট তৈরি" },
-  { id: "serial", title: "🔢 MCQ সিরিয়াল", sub: "রঙ-অনুযায়ী নম্বর বসানো" },
-  { id: "redownload", title: "📥 MCQ রিডাউনলোড", sub: "অংশ বাছাই করে নতুন ফাইল" },
-];
-
-const ICONS: Record<McqMode, typeof Dices> = {
-  shuffle: Dices,
-  serial: ListOrdered,
-  redownload: FileOutput,
-};
-
-const ARIA_LABELS: Record<McqMode, string> = {
-  shuffle: "শাফল মোড",
-  serial: "সিরিয়াল মোড",
-  redownload: "রিডাউনলোড মোড",
-};
 
 /** উপরের তিনটা মোড-বাটন — শাফল, সিরিয়াল আর রিডাউনলোডের কাজ সম্পূর্ণ আলাদা */
 export function ModeTabs({ mode, onChange }: ModeTabsProps) {
@@ -36,17 +18,18 @@ export function ModeTabs({ mode, onChange }: ModeTabsProps) {
       aria-label="মোড বাছাই — শাফল, সিরিয়াল বা রিডাউনলোড"
       className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3"
     >
-      {TABS.map((t) => {
-        const active = mode === t.id;
-        const Icon = ICONS[t.id];
+      {MODE_IDS.map((id) => {
+        const meta = MODE_META[id];
+        const active = mode === id;
+        const Icon = meta.Icon;
         return (
           <button
-            key={t.id}
+            key={id}
             role="tab"
             aria-selected={active}
-            aria-label={ARIA_LABELS[t.id]}
+            aria-label={meta.ariaLabel}
             type="button"
-            onClick={() => onChange(t.id)}
+            onClick={() => onChange(id)}
             className={cn(
               "flex min-h-[44px] items-center gap-3 rounded-xl border-2 p-3 text-left transition-all",
               active
@@ -63,14 +46,14 @@ export function ModeTabs({ mode, onChange }: ModeTabsProps) {
               <Icon className="h-5 w-5" />
             </span>
             <span className="min-w-0">
-              <span className="block text-sm font-bold leading-tight sm:text-base">{t.title}</span>
+              <span className="block text-sm font-bold leading-tight sm:text-base">{meta.tabTitle}</span>
               <span
                 className={cn(
                   "mt-0.5 block text-xs",
                   active ? "text-white/85" : "text-muted-foreground"
                 )}
               >
-                {t.sub}
+                {meta.description}
               </span>
             </span>
           </button>

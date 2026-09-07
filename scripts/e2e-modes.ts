@@ -201,11 +201,7 @@ const [dlZip2] = await Promise.all([
 ]);
 ok(dlZip2.suggestedFilename() === "MCQ-serial-files.zip", "২-ফাইল ZIP আবারও চলে");
 
-// B6. সিরিয়াল পেস্ট-পাথ — ফাইল বাদ দিয়ে পেস্ট → ডিটেক্ট → ফিক্স → ডাউনলোড
-while (await page.locator('button[aria-label="তালিকা থেকে বাদ দিন"]').count() > 0) {
-  await page.locator('button[aria-label="তালিকা থেকে বাদ দিন"]').first().click();
-  await page.waitForTimeout(400);
-}
+// B6. সিরিয়াল পেস্ট-পাথ — পেস্ট-ট্যাব (ফাইল লোড থাকলেও ট্যাব ক্লিকযোগ্য) → ডিটেক্ট (docx-লিস্ট অটো-ক্লিয়ার) → ফিক্স → ডাউনলোড
 await page.click('button[role="tab"]:has-text("পেস্ট করুন")');
 await page.fill("textarea", "1. পানির সংকেত কী?\nক) H2O খ) CO2 গ) O2 ঘ) NaCl\n2. বাতাসে সবচেয়ে বেশি কী আছে?\nক) অক্সিজেন খ) নাইট্রোজেন গ) হিলিয়াম ঘ) হাইড্রোজেন\n5. লোহার প্রতীক?\nক) Fe খ) Au গ) Ag ঘ) Cu");
 await page.click('button:has-text("🔍 প্রশ্ন ডিটেক্ট করুন")');

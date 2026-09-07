@@ -30,8 +30,6 @@ import {
   type ExportOptions,
 } from "@/lib/mcq/exporter";
 import {
-  loadDocxXml,
-  parseDocxXml,
   type DocxParseResult,
 } from "@/lib/mcq/docx-xml";
 import {
@@ -39,8 +37,6 @@ import {
   applyColorSerialXml,
   downloadColorSerialDocx,
   planSerialByColor,
-  stripNonMcqLinesXml,
-  stripShadedParasXml,
   type BlockedLine,
   type ColorAnalysis,
   type SerialScheme,
@@ -85,6 +81,12 @@ import {
   type WatermarkInfo,
 } from "@/lib/mcq/redownload";
 import { renumberQuestionsByPosition } from "@/lib/mcq/serial-paste";
+import {
+  FILE_TOO_BIG_MSG,
+  prepareShuffleXml,
+  runFilePipeline,
+} from "@/lib/mcq/file-pipeline";
+import { MAX_FILE_BYTES, SHUFFLE_MAX_FILES } from "@/lib/mcq/limits";
 import { toast } from "@/hooks/use-toast";
 import { Dices, ShieldCheck, Zap } from "lucide-react";
 
@@ -92,13 +94,8 @@ const STORAGE_KEY = "mcq-shuffler-text";
 const MODE_KEY = "mcq-shuffler-mode";
 /** বাংলা ডিজিটে রূপান্তর — টোস্ট/চিপের নাম্বারগুলোর জন্য */
 const bnNum = (n: number) => String(n).replace(/\d/g, (d) => "০১২৩৪৫৬৭৮৯"[Number(d)]);
-/** শাফল মোডে একসাথে সর্বোচ্চ কতটা ফাইল নেওয়া যায় (min ১, max ৫০) — ব্রাউজার-মেমোরির সীম রাখতে ক্যাপ, দরকারে বাড়ানো যাবে */
-const SHUFFLE_MAX_FILES = 50;
+/** শাফল মোডের ফাইল-ক্যাপ (limits.ts) — টোস্টে বাংলা ডিজিটে */
 const SHUFFLE_MAX_FILES_BN = bnNum(SHUFFLE_MAX_FILES);
-
-/** একটা .docx-এর সর্বোচ্চ সাইজ — এর চেয়ে বড় হলে ব্রাউজার ফ্রিজ/ক্র্যাশ, তাই লোডই করা হয় না */
-const MAX_FILE_BYTES = 50_000_000;
-const FILE_TOO_BIG_MSG = "ফাইলটি খুব বড় (৫০MB+ সাপোর্টেড না)";
 
 // মাল্টি-ফাইল লিস্টের আইটেম-id (reorder/remove-এর জন্য স্টেবল কী দরকার)
 let multiIdCounter = 0;
@@ -529,54 +526,42 @@ export default function Home() {
     setShuffleItems(null);
     setShuffleMultiSets(null);
     try {
-      const originalXml = await loadDocxXml(f);
-      // রঙ-বিশ্লেষণ (string-level, হালকা)
-      let colorAn: ColorAnalysis | null = null;
-      try {
-        colorAn = analyzeColorDocx(originalXml);
-      } catch {}
-      const hasColors = !!colorAn && colorAn.colors.length > 0;
-
-      // ইউজারের নিয়ম: শাফল মোডে হেডার থাকলে হেডার বাদ দিয়ে সবগুলো প্রশ্ন
-      // এক সিরিয়ালে নিয়ে শাফল — তাই রঙ-হেডারগুলো আগে সরিয়ে নিই,
-      // যাতে হেডার কোনো প্রশ্ন-ব্লকের সাথে জড়িয়ে শাফলে এলোমেলো না যায়
-      // + রঙ-নেই হেডার/শিরোনাম লাইনও (যেমন "Aa¨vq-8") টেক্সট-প্যাটার্নে বাদ
-      let xml = originalXml;
-      let headersStripped = 0;
-      const blocked: BlockedLine[] = [];
-      if (hasColors && colorAn) {
-        const st = stripShadedParasXml(originalXml);
-        xml = st.xml;
-        headersStripped = st.removed;
-        for (const t of st.texts) blocked.push({ text: t, reason: "color" });
+      // শেয়ার্ড পাইপলাইন: পড়া (loadDocxXml) → রঙ-বিশ্লেষণ + হেডার/নন-MCQ স্ট্রিপ + পার্স
+      // (ইউজারের নিয়ম: শাফল মোডে হেডার থাকলে হেডার বাদ দিয়ে সবগুলো প্রশ্ন এক সিরিয়ালে শাফল)
+      const run = await runFilePipeline([f], { parse: (xml) => prepareShuffleXml(xml) });
+      const item = run.items[0];
+      if (!item) {
+        toast({
+          title: "ফাইল পড়া যায়নি",
+          description: String(run.failures[0]?.message ?? ""),
+          variant: "destructive",
+        });
+        return;
       }
-      const st2 = stripNonMcqLinesXml(xml);
-      xml = st2.xml;
-      blocked.push(...st2.removed);
-      const patternStripped = blocked.length - headersStripped;
+      const v = item.value;
+      const patternStripped = v.blocked.length - v.headersStripped;
 
-      const parse = parseDocxXml(xml);
       setDocx({
         file: f,
-        baseName: f.name.replace(/\.docx$/i, ""),
-        xml,
-        originalXml,
-        parse,
-        colorAn: hasColors ? colorAn : null,
-        headersStripped,
-        blocked,
+        baseName: item.baseName,
+        xml: v.xml,
+        originalXml: item.xml,
+        parse: v.parse,
+        colorAn: v.colorAn,
+        headersStripped: v.headersStripped,
+        blocked: v.blocked,
       });
       setParsed(null);
       resetResults();
-      setSelected(new Set(parse.questions.map((q) => q.id)));
+      setSelected(new Set(v.parse.questions.map((q) => q.id)));
       setAllowBroken(false);
 
-      if (hasColors && colorAn) {
+      if (v.colorAn) {
         toast({
-          title: `🎨 রঙ-হেডার ${headersStripped} টি${patternStripped ? ` + নন-MCQ লাইন ${patternStripped} টি` : ""} বাদ দিয়ে ${parse.questions.length} টি প্রশ্ন এক সিরিয়ালে ডিটেক্ট হয়েছে`,
+          title: `🎨 রঙ-হেডার ${v.headersStripped} টি${patternStripped ? ` + নন-MCQ লাইন ${patternStripped} টি` : ""} বাদ দিয়ে ${v.parse.questions.length} টি প্রশ্ন এক সিরিয়ালে ডিটেক্ট হয়েছে`,
           description: "শাফলে হেডার/নন-MCQ লাইনগুলো যাবে না — নিচে বাদ-পড়া লাইনের পুরো লিস্ট দেখা যায়।",
         });
-      } else if (parse.questions.length === 0) {
+      } else if (v.parse.questions.length === 0) {
         toast({
           title: "কোনো প্রশ্ন পাওয়া যায়নি",
           description: "প্রশ্নগুলো সিরিয়াল দিয়ে শুরু আছে কিনা দেখুন (যেমন: 32. / ১. / 1.)",
@@ -585,19 +570,19 @@ export default function Home() {
         return;
       } else {
         const serialMsg =
-          parse.serial?.status === "ok"
+          v.parse.serial?.status === "ok"
             ? "সিরিয়াল ঠিক আছে — শাফল রেডি!"
-            : `সিরিয়ালে ${parse.serial?.issues.length ?? 0} টি জায়গায় সমস্যা — শাফলের সময় serial replace ON রাখলে ঠিক হয়ে যাবে।`;
+            : `সিরিয়ালে ${v.parse.serial?.issues.length ?? 0} টি জায়গায় সমস্যা — শাফলের সময় serial replace ON রাখলে ঠিক হয়ে যাবে।`;
 
         toast({
-          title: `✅ ${parse.questions.length} টি প্রশ্ন ডিটেক্ট হয়েছে${patternStripped ? ` (নন-MCQ লাইন ${patternStripped} টি বাদ)` : ""}`,
+          title: `✅ ${v.parse.questions.length} টি প্রশ্ন ডিটেক্ট হয়েছে${patternStripped ? ` (নন-MCQ লাইন ${patternStripped} টি বাদ)` : ""}`,
           description: patternStripped
             ? `${patternStripped} টি হেডার/শিরোনাম লাইন MCQ না — শাফলে যাবে না (নিচে লিস্ট)। ${serialMsg}`
-            : `${serialMsg}${parse.unicodeQuestionIds.length ? ` ⚠️ ${parse.unicodeQuestionIds.length} টি প্রশ্নে Unicode আছে (ডাউনলোডে অরিজিনালই থাকবে)।` : ""}`,
+            : `${serialMsg}${v.parse.unicodeQuestionIds.length ? ` ⚠️ ${v.parse.unicodeQuestionIds.length} টি প্রশ্নে Unicode আছে (ডাউনলোডে অরিজিনালই থাকবে)।` : ""}`,
         });
       }
 
-      if (originalXml.length > 8_000_000) {
+      if (item.xml.length > 8_000_000) {
         toast({
           title: "⚠️ বিশাল ফাইল",
           description: "ফাইলটা বড় — শাফল ও ডাউনলোডে কিছু সময় লাগতে পারে, ট্যাব বন্ধ করবেন না।",
@@ -625,43 +610,41 @@ export default function Home() {
     loadersBusyRef.current = true;
     setSerialLoading(true);
     try {
-    const added: SerialState[] = [];
-    const errors: string[] = [];
-    let colors = 0;
-    let questions = 0;
-    for (const f of files) {
-      if (f.size > MAX_FILE_BYTES) {
-        toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
-        continue;
+      const run = await runFilePipeline(files, { parse: (xml) => analyzeColorDocx(xml) });
+      // সাইজ-গার্ড — পাইপলাইন রিপোর্ট করে, টোস্ট এখানেই (আগের হুবহু মেসেজ)
+      for (const f of run.tooBig) toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
+      const added: SerialState[] = run.items.map((it) => ({
+        id: nextMultiId(),
+        file: it.file,
+        baseName: it.baseName,
+        xml: it.xml,
+        analysis: it.value,
+      }));
+      const errors = run.failures.map((x) => `${x.name}: ${x.message}`);
+      let colors = 0;
+      let questions = 0;
+      for (const d of added) {
+        colors += d.analysis.colors.length;
+        questions += d.analysis.questionCount;
       }
-      try {
-        const xml = await loadDocxXml(f);
-        const analysis = analyzeColorDocx(xml);
-        added.push({ id: nextMultiId(), file: f, baseName: f.name.replace(/\.docx$/i, ""), xml, analysis });
-        colors += analysis.colors.length;
-        questions += analysis.questionCount;
-      } catch (e) {
-        errors.push(`${f.name}: ${e instanceof Error ? e.message : String(e)}`);
+      setSerialDocs((prev) => (append ? [...prev, ...added] : added));
+      setSerialLoading(false);
+      if (added.length) {
+        // ফাইল আপলোড হলে পেস্ট-রেজাল্ট ক্লিয়ার — দুটো একসাথে অ্যাক্টিভ থাকবে না
+        setSerialPaste(null);
+        setSerialSchemes((prev) => {
+          const next = append ? { ...prev } : {};
+          for (const d of added) next[d.id] = { kind: "continuous" };
+          return next;
+        });
+        toast({
+          title: `✅ ${added.length} টি ফাইল ${append ? "যোগ" : "লোড"} হয়েছে`,
+          description: `মোট ${questions} টি প্রশ্ন${colors ? `, ${colors} টি রঙ-হেডার` : ""}।${added.length > 1 ? " লিস্ট থেকে ক্রম বদলাতে পারবেন — নিচে মার্জ/ZIP ডাউনলোড।" : ""}`,
+        });
       }
-    }
-    setSerialDocs((prev) => (append ? [...prev, ...added] : added));
-    setSerialLoading(false);
-    if (added.length) {
-      // ফাইল আপলোড হলে পেস্ট-রেজাল্ট ক্লিয়ার — দুটো একসাথে অ্যাক্টিভ থাকবে না
-      setSerialPaste(null);
-      setSerialSchemes((prev) => {
-        const next = append ? { ...prev } : {};
-        for (const d of added) next[d.id] = { kind: "continuous" };
-        return next;
-      });
-      toast({
-        title: `✅ ${added.length} টি ফাইল ${append ? "যোগ" : "লোড"} হয়েছে`,
-        description: `মোট ${questions} টি প্রশ্ন${colors ? `, ${colors} টি রঙ-হেডার` : ""}।${added.length > 1 ? " লিস্ট থেকে ক্রম বদলাতে পারবেন — নিচে মার্জ/ZIP ডাউনলোড।" : ""}`,
-      });
-    }
-    if (errors.length) {
-      toast({ title: "কিছু ফাইল পড়া যায়নি", description: errors.join("\n"), variant: "destructive" });
-    }
+      if (errors.length) {
+        toast({ title: "কিছু ফাইল পড়া যায়নি", description: errors.join("\n"), variant: "destructive" });
+      }
     } finally {
       loadersBusyRef.current = false;
     }
@@ -1049,39 +1032,37 @@ export default function Home() {
     loadersBusyRef.current = true;
     setRdLoading(true);
     try {
-    const added: RdDocState[] = [];
-    const errors: string[] = [];
-    for (const f of files) {
-      if (f.size > MAX_FILE_BYTES) {
-        toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
-        continue;
-      }
-      try {
-        const xml = await loadDocxXml(f);
-        const parse = parseRedownloadXml(xml);
-        const watermark = await extractWatermark(f);
-        added.push({ id: nextMultiId(), file: f, baseName: f.name.replace(/\.docx$/i, ""), xml, parse, watermark });
-      } catch (e) {
-        errors.push(`${f.name}: ${e instanceof Error ? e.message : String(e)}`);
-      }
-    }
-    setRdDocs((prev) => (append ? [...prev, ...added] : added));
-    if (added.length) {
-      // নতুন ফাইলের সব প্রশ্ন ডিফল্ট সিলেক্টেড
-      setRdSel((prev) => {
-        const next = append ? { ...prev } : {};
-        for (const d of added) next[d.id] = new Set(d.parse.questions.map((q) => q.id));
-        return next;
+      const run = await runFilePipeline(files, {
+        parse: async (xml, file) => ({ parse: parseRedownloadXml(xml), watermark: await extractWatermark(file) }),
       });
-      const totalQ = added.reduce((a, d) => a + d.parse.questions.length, 0);
-      toast({
-        title: `✅ ${added.length} টি ফাইল ${append ? "যোগ" : "লোড"} হয়েছে`,
-        description: `মোট ${totalQ} টি প্রশ্ন। এখন অংশ বাছাই করে ডাউনলোড করুন।`,
-      });
-    }
-    if (errors.length) {
-      toast({ title: "কিছু ফাইল পড়া যায়নি", description: errors.join("\n"), variant: "destructive" });
-    }
+      // সাইজ-গার্ড — পাইপলাইন রিপোর্ট করে, টোস্ট এখানেই (আগের হুবহু মেসেজ)
+      for (const f of run.tooBig) toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
+      const added: RdDocState[] = run.items.map((it) => ({
+        id: nextMultiId(),
+        file: it.file,
+        baseName: it.baseName,
+        xml: it.xml,
+        parse: it.value.parse,
+        watermark: it.value.watermark,
+      }));
+      const errors = run.failures.map((x) => `${x.name}: ${x.message}`);
+      setRdDocs((prev) => (append ? [...prev, ...added] : added));
+      if (added.length) {
+        // নতুন ফাইলের সব প্রশ্ন ডিফল্ট সিলেক্টেড
+        setRdSel((prev) => {
+          const next = append ? { ...prev } : {};
+          for (const d of added) next[d.id] = new Set(d.parse.questions.map((q) => q.id));
+          return next;
+        });
+        const totalQ = added.reduce((a, d) => a + d.parse.questions.length, 0);
+        toast({
+          title: `✅ ${added.length} টি ফাইল ${append ? "যোগ" : "লোড"} হয়েছে`,
+          description: `মোট ${totalQ} টি প্রশ্ন। এখন অংশ বাছাই করে ডাউনলোড করুন।`,
+        });
+      }
+      if (errors.length) {
+        toast({ title: "কিছু ফাইল পড়া যায়নি", description: errors.join("\n"), variant: "destructive" });
+      }
     } finally {
       loadersBusyRef.current = false;
     }
@@ -1241,35 +1222,10 @@ export default function Home() {
 
   // ================== SHUFFLE MODE — মাল্টি-ফাইল ==================
 
-  /** একটা .docx পড়ে শাফল-আইটেম বানায় (হেডার/নন-MCQ স্ট্রিপ + পার্স) — রিপ্লেস/অ্যাপেন্ড দুই পথেই ব্যবহৃত */
-  const parseShuffleFile = async (f: File): Promise<ShuffleItemState> => {
-    // বিশাল ফাইল আগেই ফেলে দিই — টোস্ট দেখিয়ে থ্রো; handleShuffleFiles-এর ক্যাচ এটা দেখে নীরবে স্কিপ করে
-    if (f.size > MAX_FILE_BYTES) {
-      toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
-      throw new Error(FILE_TOO_BIG_MSG);
-    }
-    const originalXml = await loadDocxXml(f);
-    let colorAn: ColorAnalysis | null = null;
-    try {
-      colorAn = analyzeColorDocx(originalXml);
-    } catch {}
-    let xml = originalXml;
-    const blocked: BlockedLine[] = [];
-    if (colorAn && colorAn.colors.length > 0) {
-      const st = stripShadedParasXml(originalXml);
-      xml = st.xml;
-      for (const t of st.texts) blocked.push({ text: t, reason: "color" });
-    }
-    const st2 = stripNonMcqLinesXml(xml);
-    xml = st2.xml;
-    blocked.push(...st2.removed);
-    const parse = parseDocxXml(xml);
-    return { id: nextMultiId(), file: f, baseName: f.name.replace(/\.docx$/i, ""), xml, parse, blocked };
-  };
-
   /**
    * শাফল মোডে ফাইল লোড — append=false: আগেরটা বদলে নতুনগুলো; append=true: আগের ফাইলের সাথে যোগ।
    * সীমা: একসাথে সর্বোচ্চ ৫০ টি ফাইল (min ১) — বেশি দিলে প্রথম ৫০ টি নেওয়া হয়।
+   * পড়া/ভ্যালিডেশন/স্ট্রিপ-পার্স শেয়ার্ড runFilePipeline + prepareShuffleXml-এ (সিঙ্গেল-ডক পথের হুবহু কোড)।
    */
   const handleShuffleFiles = async (files: File[], append = false) => {
     if (!files.length) return;
@@ -1277,42 +1233,54 @@ export default function Home() {
     if (loadersBusyRef.current) return;
     loadersBusyRef.current = true;
     try {
-    const existingCount = shuffleItems ? shuffleItems.length : docx ? 1 : 0;
-    let list = files;
-    if (existingCount + files.length > SHUFFLE_MAX_FILES) {
-      const take = Math.max(0, SHUFFLE_MAX_FILES - (append ? existingCount : 0));
-      list = files.slice(0, take);
-      toast({
-        title: `⚠️ শাফল মোডে সর্বোচ্চ ${SHUFFLE_MAX_FILES_BN} টি ফাইল`,
-        description: take > 0
-          ? `একসাথে ১ থেকে ${SHUFFLE_MAX_FILES_BN} টি ফাইল নেওয়া যায় — প্রথম ${bnNum(take)} টি নেওয়া হলো, বাকিগুলো বাদ।`
-          : `আগেই ${SHUFFLE_MAX_FILES_BN} টি ফাইল আছে — নতুন ফাইল যোগ করতে হলে লিস্ট থেকে কিছু বাদ দিন।`,
-        variant: "destructive",
-      });
-    }
-    if (!list.length) return;
-
-    // append — আগের একক docx থাকলে items-এ রূপ দিয়ে নতুনগুলো পিছে যোগ
-    const canAppend = !!(shuffleItems?.length || (docx && docx.parse));
-    if (append && canAppend) {
-      setShuffleLoading(true);
-      const base: ShuffleItemState[] = shuffleItems?.length
-        ? [...shuffleItems]
-        : docx && docx.parse
-          ? [{ id: nextMultiId(), file: docx.file, baseName: docx.baseName, xml: docx.xml, parse: docx.parse, blocked: docx.blocked }]
-          : [];
-      const newItems: ShuffleItemState[] = [];
-      const errors: string[] = [];
-      for (const f of list) {
-        try {
-          newItems.push(await parseShuffleFile(f));
-        } catch (e) {
-          // সাইজ-গার্ডের টোস্ট parseShuffleFile নিজেই দেখিয়েছে — ডাবল-টোস্ট এড়াতে সেটা এরর-লিস্টে নেই
-          const msg = e instanceof Error ? e.message : String(e);
-          if (msg !== FILE_TOO_BIG_MSG) errors.push(`${f.name}: ${msg}`);
-        }
+      const existingCount = shuffleItems ? shuffleItems.length : docx ? 1 : 0;
+      let list = files;
+      if (existingCount + files.length > SHUFFLE_MAX_FILES) {
+        const take = Math.max(0, SHUFFLE_MAX_FILES - (append ? existingCount : 0));
+        list = files.slice(0, take);
+        toast({
+          title: `⚠️ শাফল মোডে সর্বোচ্চ ${SHUFFLE_MAX_FILES_BN} টি ফাইল`,
+          description: take > 0
+            ? `একসাথে ১ থেকে ${SHUFFLE_MAX_FILES_BN} টি ফাইল নেওয়া যায় — প্রথম ${bnNum(take)} টি নেওয়া হলো, বাকিগুলো বাদ।`
+            : `আগেই ${SHUFFLE_MAX_FILES_BN} টি ফাইল আছে — নতুন ফাইল যোগ করতে হলে লিস্ট থেকে কিছু বাদ দিন।`,
+          variant: "destructive",
+        });
       }
-      const items = [...base, ...newItems];
+      if (!list.length) return;
+
+      // append — আগের একক docx থাকলে items-এ রূপ দিয়ে নতুনগুলো পিছে যোগ
+      const canAppend = !!(shuffleItems?.length || (docx && docx.parse));
+      const isAppend = append && canAppend;
+      if (!isAppend && list.length === 1) {
+        setShuffleItems(null);
+        setShuffleMultiSets(null);
+        handleDocxFile(list[0]);
+        return;
+      }
+      setShuffleLoading(true);
+      const run = await runFilePipeline(list, { parse: (xml) => prepareShuffleXml(xml) });
+      // সাইজ-গার্ডের টোস্ট পাইপলাইন-রিপোর্ট থেকে — ডাবল-টোস্ট এড়াতে এরর-লিস্টে নেই
+      for (const f of run.tooBig) toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
+      const loaded: ShuffleItemState[] = run.items.map((it) => ({
+        id: nextMultiId(),
+        file: it.file,
+        baseName: it.baseName,
+        xml: it.xml,
+        parse: it.value.parse,
+        blocked: it.value.blocked,
+      }));
+      const errors = run.failures.map((x) => `${x.name}: ${x.message}`);
+
+      const items = isAppend
+        ? [
+            ...(shuffleItems?.length
+              ? [...shuffleItems]
+              : docx && docx.parse
+                ? [{ id: nextMultiId(), file: docx.file, baseName: docx.baseName, xml: docx.xml, parse: docx.parse, blocked: docx.blocked }]
+                : []),
+            ...loaded,
+          ]
+        : loaded;
       setShuffleItems(items.length ? items : null);
       setShuffleMultiSets(null);
       setDocx(null);
@@ -1320,58 +1288,26 @@ export default function Home() {
       resetResults();
       setSelected(new Set());
       setShuffleLoading(false);
-      if (newItems.length) {
+      if (isAppend) {
+        if (loaded.length) {
+          toast({
+            title: `✅ ${loaded.length} টি ফাইল যোগ হয়েছে — এখন মোট ${items.length} টি`,
+            description: "লিস্ট থেকে ক্রম বদলাতে পারবেন — মার্জ/ZIP-এ ঠিক এই ক্রমেই আসবে।",
+          });
+        }
+      } else if (items.length) {
+        const totalQuestions = items.reduce((a, i) => a + i.parse.questions.length, 0);
+        const zeroQ = items.filter((i) => i.parse.questions.length === 0).length;
         toast({
-          title: `✅ ${newItems.length} টি ফাইল যোগ হয়েছে — এখন মোট ${items.length} টি`,
-          description: "লিস্ট থেকে ক্রম বদলাতে পারবেন — মার্জ/ZIP-এ ঠিক এই ক্রমেই আসবে।",
+          title: `✅ ${items.length} টি ফাইল লোড হয়েছে — মোট ${totalQuestions} টি প্রশ্ন`,
+          description: zeroQ
+            ? `${zeroQ} টি ফাইলে কোনো প্রশ্ন পাওয়া যায়নি — লিস্ট থেকে বাদ দিন। ক্রম বদলাতে টেনে ধরুন।`
+            : "লিস্ট থেকে ক্রম বদলাতে পারবেন — নিচের শাফল-কনফিগ দিয়ে সব ফাইল একসাথে শাফল হবে।",
         });
       }
       if (errors.length) {
         toast({ title: "কিছু ফাইল পড়া যায়নি", description: errors.join("\n"), variant: "destructive" });
       }
-      return;
-    }
-
-    if (list.length === 1) {
-      setShuffleItems(null);
-      setShuffleMultiSets(null);
-      handleDocxFile(list[0]);
-      return;
-    }
-    setShuffleLoading(true);
-    const items: ShuffleItemState[] = [];
-    const errors: string[] = [];
-    let totalQuestions = 0;
-    for (const f of list) {
-      try {
-        const it = await parseShuffleFile(f);
-        items.push(it);
-        totalQuestions += it.parse.questions.length;
-      } catch (e) {
-        // সাইজ-গার্ডের টোস্ট parseShuffleFile নিজেই দেখিয়েছে — ডাবল-টোস্ট এড়াতে সেটা এরর-লিস্টে নেই
-        const msg = e instanceof Error ? e.message : String(e);
-        if (msg !== FILE_TOO_BIG_MSG) errors.push(`${f.name}: ${msg}`);
-      }
-    }
-    setShuffleItems(items.length ? items : null);
-    setShuffleMultiSets(null);
-    setDocx(null);
-    setParsed(null);
-    resetResults();
-    setSelected(new Set());
-    setShuffleLoading(false);
-    if (items.length) {
-      const zeroQ = items.filter((i) => i.parse.questions.length === 0).length;
-      toast({
-        title: `✅ ${items.length} টি ফাইল লোড হয়েছে — মোট ${totalQuestions} টি প্রশ্ন`,
-        description: zeroQ
-          ? `${zeroQ} টি ফাইলে কোনো প্রশ্ন পাওয়া যায়নি — লিস্ট থেকে বাদ দিন। ক্রম বদলাতে টেনে ধরুন।`
-          : "লিস্ট থেকে ক্রম বদলাতে পারবেন — নিচের শাফল-কনফিগ দিয়ে সব ফাইল একসাথে শাফল হবে।",
-      });
-    }
-    if (errors.length) {
-      toast({ title: "কিছু ফাইল পড়া যায়নি", description: errors.join("\n"), variant: "destructive" });
-    }
     } finally {
       loadersBusyRef.current = false;
     }

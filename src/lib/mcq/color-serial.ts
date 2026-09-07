@@ -16,7 +16,6 @@
 //    বাকি বাইট হুবহু অরিজিনাল।
 // ============================================================
 
-import JSZip from "jszip";
 import {
   detectSerialPrefix,
   isQuestionStart,
@@ -25,6 +24,7 @@ import {
   numberToDigits,
   type DigitEnc,
 } from "./docx-xml";
+import { repackDocx } from "./repack-docx";
 
 // ---------- রঙের প্যালেট (ইউজারের "color shading palatte.docx" থেকে) ----------
 // Word-এর Paragraph → Shading গ্রিড: কলাম A–J, রো ১–৭ → ৭০টা রঙ
@@ -714,8 +714,6 @@ function collectWtSegs(sub: string): WtSegment[] {
   return segs;
 }
 
-const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-
 /** রঙ-সিরিয়াল করা .docx ডাউনলোড — অরিজিনাল zip-এর বাকি সব (ছবি/স্টাইল/সেটিংস) অক্ষত */
 export async function downloadColorSerialDocx(params: {
   originalFile: Blob;
@@ -725,17 +723,7 @@ export async function downloadColorSerialDocx(params: {
   schemeLabel: string;
 }): Promise<void> {
   const newXml = applyColorSerialXml(params.xml, params.plan);
-  const src = await JSZip.loadAsync(params.originalFile);
-  // নতুন zip-এ নন-ডিরেক্টরি এন্ট্রিগুলো হুবহু কপি, document.xml বদলে নতুন XML —
-  // (JSZip নিজে ফোল্ডার-এন্ট্রি বানায়, আর remove() রিকার্সিভ — তাই সরাসরি কপি-নির্মাণ)
-  const others: Array<{ path: string; data: Promise<Uint8Array> }> = [];
-  src.forEach((path, entry) => {
-    if (!entry.dir && path !== "word/document.xml") others.push({ path, data: entry.async("uint8array") });
-  });
-  const zip = new JSZip();
-  zip.file("word/document.xml", new TextEncoder().encode(newXml));
-  for (const o of others) zip.file(o.path, await o.data);
-  const blob = await zip.generateAsync({ type: "blob", mimeType: DOCX_MIME, compression: "DEFLATE" });
+  const blob = await repackDocx(params.originalFile, { "word/document.xml": newXml });
 
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

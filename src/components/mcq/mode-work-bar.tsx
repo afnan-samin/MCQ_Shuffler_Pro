@@ -3,13 +3,8 @@
 import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FolderPlus, Loader2 } from "lucide-react";
-import type { McqMode } from "@/components/mcq/mode-tabs";
-
-const MODE_META: Record<McqMode, { icon: string; title: string }> = {
-  shuffle: { icon: "🔀", title: "MCQ শাফল" },
-  serial: { icon: "🔢", title: "MCQ সিরিয়াল" },
-  redownload: { icon: "📥", title: "MCQ রিডাউনলোড" },
-};
+import { FileDropzone, type DropzoneTrigger } from "@/components/mcq/file-dropzone";
+import { MODE_META, type McqMode } from "@/lib/mcq/mode-meta";
 
 const bn = (n: number) => String(n).replace(/\d/g, (d) => "০১২৩৪৫৬৭৮৯"[Number(d)]);
 
@@ -31,9 +26,9 @@ interface ModeWorkBarProps {
  * বাঁয়ে অ্যারো-বাটন (হোমে ফেরা), ডানে "আরও ফাইল" — নতুন ফাইল এই মোডেই যুক্ত হয়।
  */
 export function ModeWorkBar({ mode, onBack, onAddFiles, busy, filesCount, maxFiles }: ModeWorkBarProps) {
-  const fileRef = useRef<HTMLInputElement>(null);
   const meta = MODE_META[mode];
   const capped = maxFiles !== undefined && filesCount !== undefined && filesCount >= maxFiles;
+  const dzTrigger = useRef<DropzoneTrigger | null>(null);
 
   return (
     <div data-testid="mode-work-bar" className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-2 shadow-sm">
@@ -51,7 +46,7 @@ export function ModeWorkBar({ mode, onBack, onAddFiles, busy, filesCount, maxFil
       </Button>
 
       <div className="min-w-0 flex-1 text-center">
-        <span className="text-sm font-bold sm:text-base">{meta.icon} {meta.title}</span>
+        <span className="text-sm font-bold sm:text-base">{meta.emoji} {meta.title}</span>
         <span className="ml-2 hidden text-xs text-muted-foreground sm:inline">— হোমে ফিরতে অ্যারো চাপুন</span>
       </div>
 
@@ -68,30 +63,26 @@ export function ModeWorkBar({ mode, onBack, onAddFiles, busy, filesCount, maxFil
         </span>
       )}
 
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="gap-1.5"
-        disabled={busy || capped}
-        title={capped ? `সর্বোচ্চ ${bn(maxFiles!)} টি ফাইল নেওয়া যায়` : undefined}
-        onClick={() => fileRef.current?.click()}
-      >
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderPlus className="h-4 w-4" />}
-        আরও ফাইল
-      </Button>
-      <input
-        ref={fileRef}
-        type="file"
+      {/* আরও ফাইল — শেয়ার্ড ড্রপজোনের লুকানো ইনপুট এই বাটন দিয়ে খোলে (শাফল/সিরিয়াল/রিডাউনলোড তিন মোডেই) */}
+      <FileDropzone
         accept=".docx"
-        multiple
-        className="hidden"
-        data-testid="mode-work-bar-input"
-        onChange={(e) => {
-          onAddFiles(Array.from(e.target.files ?? []).filter((f) => /\.docx$/i.test(f.name)));
-          e.target.value = "";
-        }}
-      />
+        inputTestId="mode-work-bar-input"
+        triggerRef={dzTrigger}
+        onFiles={(fs) => onAddFiles(fs)}
+      >
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="gap-1.5"
+          disabled={busy || capped}
+          title={capped ? `সর্বোচ্চ ${bn(maxFiles!)} টি ফাইল নেওয়া যায়` : undefined}
+          onClick={() => dzTrigger.current?.open()}
+        >
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderPlus className="h-4 w-4" />}
+          আরও ফাইল
+        </Button>
+      </FileDropzone>
     </div>
   );
 }

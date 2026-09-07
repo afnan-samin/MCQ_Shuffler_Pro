@@ -9,7 +9,6 @@
 // • সিরিয়াল-ফিক্স এক্সপোর্ট: অরিজিনাল অর্ডারে ১..N নম্বর
 // ============================================================
 
-import JSZip from "jszip";
 import {
   W_NS,
   renumberSerialPara,
@@ -20,6 +19,7 @@ import {
   type RefMode,
 } from "./reference";
 import { downloadBlob } from "./exporter";
+import { repackDocx } from "./repack-docx";
 
 export interface ShuffleExportOptions {
   renumber: boolean;
@@ -159,12 +159,9 @@ export function buildShuffledXml(
   return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n' + bodyXml;
 }
 
-const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-
+/** অরিজিনাল zip-এর বাকি সব এন্ট্রি অক্ষত রেখে document.xml বদলানো (শেয়ার্ড repack কোর) */
 async function zipWithXml(originalFile: Blob, newXml: string): Promise<Blob> {
-  const zip = await JSZip.loadAsync(originalFile);
-  zip.file("word/document.xml", newXml);
-  return zip.generateAsync({ type: "blob", mimeType: DOCX_MIME, compression: "DEFLATE" });
+  return repackDocx(originalFile, { "word/document.xml": newXml });
 }
 
 /** শাফল্ড সেটগুলো এক .docx-এ ডাউনলোড — প্রতি সেট আলাদা পেজে */

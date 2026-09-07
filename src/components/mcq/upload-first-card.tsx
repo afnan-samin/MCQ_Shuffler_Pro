@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { FileDropzone } from "@/components/mcq/file-dropzone";
 import { FileText, FileUp, Loader2, Search, ClipboardPaste, FolderOpen, X } from "lucide-react";
 
 interface UploadFirstCardProps {
@@ -31,10 +32,10 @@ export function UploadFirstCard({
   onDetect,
   busy,
 }: UploadFirstCardProps) {
-  const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [dragOver, setDragOver] = useState(false);
+
+  const busyTotal = busy || uploading;
 
   const handleFiles = async (list: File[]) => {
     setUploadError(null);
@@ -60,9 +61,17 @@ export function UploadFirstCard({
       } finally {
         setUploading(false);
       }
+    }
+  };
+
+  const onDropzoneFiles = (list: File[], rej: { notAccepted: File[] }) => {
+    setUploadError(null);
+    if (!list.length) {
+      // কোনো বৈধ ফাইলই না হলে (docx/txt কোনোটাই না) — আজকের মতোই এরর
+      if (rej.notAccepted.length) setUploadError("সাপোর্টেড ফাইল: .docx বা .txt");
       return;
     }
-    setUploadError("সাপোর্টেড ফাইল: .docx বা .txt");
+    void handleFiles(list);
   };
 
   const lineCount = rawText ? rawText.split("\n").filter((l) => l.trim()).length : 0;
@@ -91,49 +100,16 @@ export function UploadFirstCard({
           </TabsList>
 
           <TabsContent value="upload" className="mt-3 space-y-3">
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              disabled={busy || uploading}
-              onDragOver={(e) => {
-                e.preventDefault();
-                if (!busy && !uploading) setDragOver(true);
-              }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragOver(false);
-                if (!busy && !uploading) handleFiles(Array.from(e.dataTransfer?.files ?? []));
-              }}
-              className={
-                "flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-8 text-center transition disabled:opacity-60 sm:p-10 " +
-                (dragOver
-                  ? "border-emerald-500 bg-emerald-100 dark:border-emerald-500 dark:bg-emerald-900/40"
-                  : "border-emerald-300 bg-emerald-50/50 hover:border-emerald-500 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/20 dark:hover:border-emerald-600")
-              }
-            >
-              {busy || uploading ? (
-                <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
-              ) : (
-                <FileUp className="h-8 w-8 text-emerald-600" />
-              )}
-              <span className="text-sm font-medium">
-                {busy || uploading ? "ফাইল পড়া হচ্ছে..." : "ফাইল সিলেক্ট করতে ক্লিক করুন বা টেনে ছাড়ুন"}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                সাপোর্টেড: .docx (ফরম্যাট হুবহু থাকবে), .txt — একসাথে একাধিক .docx সিলেক্ট করা যাবে
-              </span>
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
+            <FileDropzone
               accept=".docx,.txt,.csv"
               multiple
-              className="hidden"
-              onChange={(e) => {
-                handleFiles(Array.from(e.target.files ?? []));
-                e.target.value = "";
-              }}
+              busy={busyTotal}
+              disabled={busyTotal}
+              busyText="ফাইল পড়া হচ্ছে..."
+              promptText="ফাইল সিলেক্ট করতে ক্লিক করুন বা টেনে ছাড়ুন"
+              hintText="সাপোর্টেড: .docx (ফরম্যাট হুবহু থাকবে), .txt — একসাথে একাধিক .docx সিলেক্ট করা যাবে"
+              variant="lg"
+              onFiles={onDropzoneFiles}
             />
             {uploadError && (
               <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-400">

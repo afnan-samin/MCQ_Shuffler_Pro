@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowRight, ListOrdered, Dices, FileOutput } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { McqMode } from "@/components/mcq/mode-tabs";
+import { MODE_IDS, MODE_META, type McqMode } from "@/lib/mcq/mode-meta";
 
 interface NextModesCardProps {
   /** যে মোডে এখন কাজ হয়েছে */
@@ -13,18 +13,12 @@ interface NextModesCardProps {
   onOpen: (m: McqMode) => void;
 }
 
-const MODE_META: Record<McqMode, { title: string; sub: string; Icon: typeof Dices }> = {
-  shuffle: { title: "🔀 MCQ শাফল", sub: "প্রশ্ন শাফল + সেট তৈরি", Icon: Dices },
-  serial: { title: "🔢 MCQ সিরিয়াল", sub: "রঙ-অনুযায়ী নম্বর বসানো", Icon: ListOrdered },
-  redownload: { title: "📥 MCQ রিডাউনলোড", sub: "অংশ বাছাই করে নতুন ফাইল", Icon: FileOutput },
-};
-
 /**
  * ডাউনলোড-কার্ডের ঠিক নিচে দেখা যায় — বাকি ২টা মোডের বাটন।
  * ক্লিক করলে বর্তমান মোডের ফাইলগুলো সরাসরি ওই মোডে চলে যায় (আবার আপলোড লাগে না)।
  */
 export function NextModesCard({ current, filesCount, onOpen }: NextModesCardProps) {
-  const others = (Object.keys(MODE_META) as McqMode[]).filter((m) => m !== current);
+  const others = MODE_IDS.filter((m) => m !== current);
   if (filesCount === 0) return null;
 
   return (
@@ -38,7 +32,7 @@ export function NextModesCard({ current, filesCount, onOpen }: NextModesCardProp
       <CardContent>
         <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
           {others.map((m) => {
-            const { title, sub, Icon } = MODE_META[m];
+            const { tabTitle, description, Icon } = MODE_META[m];
             return (
               <button
                 key={m}
@@ -50,8 +44,8 @@ export function NextModesCard({ current, filesCount, onOpen }: NextModesCardProp
                   <Icon className="h-5 w-5" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-bold leading-tight sm:text-base">{title}</span>
-                  <span className="mt-0.5 block text-xs text-muted-foreground">{sub}</span>
+                  <span className="block text-sm font-bold leading-tight sm:text-base">{tabTitle}</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">{description}</span>
                 </span>
                 <ArrowRight className="h-4 w-4 shrink-0 text-emerald-600" />
               </button>
