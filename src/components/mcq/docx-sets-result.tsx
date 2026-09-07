@@ -50,10 +50,10 @@ export function DocxSetsResult({
   const totalQ = sets.reduce((a, s) => a + s.length, 0);
 
   return (
-    <Card id="step-result" className="border-emerald-300 dark:border-emerald-700">
+    <Card id="step-result" className="border-brand-300 dark:border-brand-700">
       <CardHeader>
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">4</span>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white">4</span>
           <CardTitle className="text-lg md:text-xl">
             Shuffle complete — {sets.length} {sets.length === 1 ? "set" : "sets"} ({totalQ} questions)
           </CardTitle>
@@ -67,7 +67,7 @@ export function DocxSetsResult({
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/40 p-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2 font-medium">
-              <Hash className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
+              <Hash className="h-4 w-4 text-brand-700 dark:text-brand-400" />
               Serial replace {renumber ? "ON — 1, 2, 3…" : "OFF — original numbers"}
             </div>
             <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
@@ -80,7 +80,7 @@ export function DocxSetsResult({
 
         {/* এক্সপোর্ট বার */}
         <div className="sticky top-2 z-10 flex flex-wrap items-center justify-center gap-2 rounded-xl border bg-white/95 p-3 shadow-sm backdrop-blur dark:bg-background/95">
-          <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700" onClick={() => onDownload(true)} disabled={busy !== null}>
+          <Button className="gap-2 bg-brand-600 hover:bg-brand-700" onClick={() => onDownload(true)} disabled={busy !== null}>
             {busy === "docx-r" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
             ⬇️ Word (.docx) — renumbered serials (1,2,3…)
           </Button>
@@ -94,12 +94,12 @@ export function DocxSetsResult({
         <div className="grid gap-4 lg:grid-cols-2">
           {sets.map((ids, si) => (
             <div key={si} className="rounded-xl border bg-white dark:bg-background">
-              <div className="flex flex-wrap items-center gap-2 border-b bg-emerald-50/70 px-4 py-2.5 dark:bg-emerald-950/20">
-                <span className="font-bold text-emerald-800 dark:text-emerald-300">{englishSetName(si)}</span>
+              <div className="flex flex-wrap items-center gap-2 border-b bg-brand-50/70 px-4 py-2.5 dark:bg-brand-950/20">
+                <span className="font-bold text-brand-800 dark:text-brand-300">{englishSetName(si)}</span>
                 <Badge variant="secondary" className="gap-1">
                   {ids.length} questions
                 </Badge>
-                <Badge className={renumber ? "gap-1 bg-emerald-100 text-emerald-800 hover:bg-emerald-100" : "gap-1 bg-amber-100 text-amber-800 hover:bg-amber-100"}>
+                <Badge className={renumber ? "gap-1 bg-brand-100 text-brand-800 hover:bg-brand-100" : "gap-1 bg-amber-100 text-amber-800 hover:bg-amber-100"}>
                   {renumber ? "Serial: 1,2,3…" : "Serial: original"}
                 </Badge>
                 <div className="ml-auto">
@@ -110,7 +110,7 @@ export function DocxSetsResult({
                     onClick={() => onCopySet(si)}
                     disabled={busy !== null}
                   >
-                    {copiedSet === si ? <Check className="h-3 w-3 text-emerald-600" /> : <ClipboardCopy className="h-3 w-3" />}
+                    {copiedSet === si ? <Check className="h-3 w-3 text-brand-600" /> : <ClipboardCopy className="h-3 w-3" />}
                     {copiedSet === si ? "Copied" : "Copy"}
                   </Button>
                 </div>
@@ -126,7 +126,7 @@ export function DocxSetsResult({
                         type="button"
                         onClick={() => onRenumberChange(!renumber)}
                         title="Click to toggle serial replace"
-                        className="min-w-[2rem] shrink-0 cursor-pointer rounded px-0.5 text-right font-semibold text-emerald-700 hover:bg-emerald-100 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+                        className="min-w-[2rem] shrink-0 cursor-pointer rounded px-0.5 text-right font-semibold text-brand-700 hover:bg-brand-100 dark:text-brand-400 dark:hover:bg-brand-950/40"
                       >
                         <SerialSpan q={q} text={shownSerial} />
                       </button>

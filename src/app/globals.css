@@ -3,15 +3,50 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ---------- ফন্ট এমবেড ----------
-   Kalpurush ও SutonnyMJ এখন layout.tsx-এ next/font/local দিয়ে এমবেড করা —
-   CSS ভেরিয়েবল: --font-kalpurush / --font-sutonny (GitHub Pages সাবপাথেও কাজ করে)। */
+/* ============================================================================
+   THEME WIRING — do not tune values here!
+   ----------------------------------------------------------------------------
+   The whole site's look (fonts, colors, radius, popup style) is controlled
+   from ONE file:  src/config/theme.ts
+
+   Flow:  theme.ts  →  src/config/theme-css.ts  →  <style> injected in
+   src/app/layout.tsx  →  defines --st-* CSS variables (below they are read
+   by the shadcn tokens and Tailwind theme mappings).
+
+   What lives HERE is only plumbing: shadcn tokens (--background, --radius,
+   …) are re-pointed at the injected --st-* variables, and @theme inline
+   maps them to Tailwind utilities (bg-card, rounded-lg, bg-brand-600, …).
+
+   --------------------------------------------------------------------------
+   OLD COMMENT (font embed): Kalpurush & SutonnyMJ are embedded via
+   next/font/local in layout.tsx — CSS variables: --font-kalpurush /
+   --font-sutonny (works on GitHub Pages subpaths too). To change which font
+   the site uses, edit src/config/theme.ts (fonts section), not here.
+   -------------------------------------------------------------------------- */
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-kalpurush), var(--font-bengali), var(--font-geist-sans), "Noto Sans Bengali", sans-serif;
-  --font-mono: var(--font-geist-mono);
+  /* Fonts — driven by src/config/theme.ts → fonts */
+  --font-sans: var(--st-font-sans);
+  --font-serif: var(--st-font-serif);
+  --font-mono: var(--st-font-mono);
+  /* BRAND color scale — driven by src/config/theme.ts → colors.*.brand
+     (migrated from the old hard-coded emerald-* utilities). */
+  --color-brand-50: var(--st-brand-50);
+  --color-brand-100: var(--st-brand-100);
+  --color-brand-200: var(--st-brand-200);
+  --color-brand-300: var(--st-brand-300);
+  --color-brand-400: var(--st-brand-400);
+  --color-brand-500: var(--st-brand-500);
+  --color-brand-600: var(--st-brand-600);
+  --color-brand-700: var(--st-brand-700);
+  --color-brand-800: var(--st-brand-800);
+  --color-brand-900: var(--st-brand-900);
+  --color-brand-950: var(--st-brand-950);
+  /* New semantic tokens (driven by theme.ts → colors.*.success/warning) */
+  --color-success: var(--success);
+  --color-warning: var(--warning);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -47,26 +82,30 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* Shadcn tokens — every value is now just a pointer into src/config/theme.ts.
+   (chart and sidebar tokens are unused legacy values kept as literals.) */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --radius: var(--st-radius-base);
+  --background: var(--st-background);
+  --foreground: var(--st-foreground);
+  --card: var(--st-card);
+  --card-foreground: var(--st-card-foreground);
+  --popover: var(--st-popover);
+  --popover-foreground: var(--st-popover-foreground);
+  --primary: var(--st-primary);
+  --primary-foreground: var(--st-primary-foreground);
+  --secondary: var(--st-secondary);
+  --secondary-foreground: var(--st-secondary-foreground);
+  --muted: var(--st-muted);
+  --muted-foreground: var(--st-muted-foreground);
+  --accent: var(--st-accent);
+  --accent-foreground: var(--st-accent-foreground);
+  --destructive: var(--st-destructive);
+  --success: var(--st-success);
+  --warning: var(--st-warning);
+  --border: var(--st-border);
+  --input: var(--st-input);
+  --ring: var(--st-ring);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -82,25 +121,29 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
+/* Dark values come from theme.ts → colors.dark (active when <html class="dark">).
+   Same --st-* names resolve to the dark set automatically. */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --background: var(--st-background);
+  --foreground: var(--st-foreground);
+  --card: var(--st-card);
+  --card-foreground: var(--st-card-foreground);
+  --popover: var(--st-popover);
+  --popover-foreground: var(--st-popover-foreground);
+  --primary: var(--st-primary);
+  --primary-foreground: var(--st-primary-foreground);
+  --secondary: var(--st-secondary);
+  --secondary-foreground: var(--st-secondary-foreground);
+  --muted: var(--st-muted);
+  --muted-foreground: var(--st-muted-foreground);
+  --accent: var(--st-accent);
+  --accent-foreground: var(--st-accent-foreground);
+  --destructive: var(--st-destructive);
+  --success: var(--st-success);
+  --warning: var(--st-warning);
+  --border: var(--st-border);
+  --input: var(--st-input);
+  --ring: var(--st-ring);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
@@ -122,8 +165,41 @@
   }
   body {
     @apply bg-background text-foreground;
-    /* পুরো ওয়েবসাইটের ফন্ট = Kalpurush (next/font ভেরিয়েবল — ব্যবহারকারীর অনুরোধ) */
-    font-family: var(--font-kalpurush), var(--font-bengali), var(--font-geist-sans), "Noto Sans Bengali", sans-serif;
+    /* Whole-site font = theme.ts → fonts.sans (single source of truth). */
+    font-family: var(--st-font-sans);
+  }
+}
+
+/* ============================================================================
+   POPUP STYLE — driven by theme.ts → popup (radius / shadow / border / blur)
+   Toasts & select dropdowns get the tokens via utility classes inside their
+   components (rounded-(--st-popup-radius), shadow-(--st-popup-shadow)).
+   The rules below pre-wire future shadcn dialog/sheet/popover/tooltip
+   components so they follow theme.ts the moment they are added.
+   ============================================================================ */
+@layer components {
+  [data-slot="dialog-content"],
+  [data-slot="alert-dialog-content"],
+  [data-slot="sheet-content"] {
+    border-radius: var(--st-popup-radius);
+    border-width: var(--st-popup-border-width);
+    border-style: var(--st-popup-border-style);
+    box-shadow: var(--st-popup-shadow);
+  }
+  [data-slot="popover-content"],
+  [data-slot="tooltip-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="hover-card-content"] {
+    border-radius: var(--st-popup-radius);
+    border-width: var(--st-popup-border-width);
+    border-style: var(--st-popup-border-style);
+    box-shadow: var(--st-popup-shadow-sm);
+  }
+  [data-slot="dialog-overlay"],
+  [data-slot="alert-dialog-overlay"],
+  [data-slot="sheet-overlay"] {
+    backdrop-filter: blur(var(--st-popup-backdrop-blur));
+    -webkit-backdrop-filter: blur(var(--st-popup-backdrop-blur));
   }
 }
 
@@ -175,15 +251,15 @@ input[type="number"] {
   color: #fcd34d;
 }
 
-/* ইউনিকোড বাংলা শব্দ — সবুজ রঙ */
+/* ইউনিকোড বাংলা শব্দ — সবুজ রঙ (brand green = theme.ts → colors.*.brand) */
 .tok-unicode {
-  background: color-mix(in oklab, #10b981 14%, transparent);
-  color: #047857;
+  background: color-mix(in oklab, var(--st-brand-500) 14%, transparent);
+  color: var(--st-brand-700);
   border-radius: 3px;
   padding: 0 1.5px;
 }
 .dark .tok-unicode {
-  color: #6ee7b7;
+  color: var(--st-brand-300);
 }
 
 /* English শব্দ — নীল রঙ */

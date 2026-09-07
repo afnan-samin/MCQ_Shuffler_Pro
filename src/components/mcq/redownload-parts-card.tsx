@@ -46,7 +46,7 @@ export function RedownloadPartsCard({
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center gap-2">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-100 text-brand-700 dark:bg-brand-950/50 dark:text-brand-400">
             <FileCheck2 className="h-5 w-5" />
           </span>
           <div>
@@ -64,7 +64,7 @@ export function RedownloadPartsCard({
             <label
               key={k}
               className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${
-                sel[k] ? "border-emerald-400 bg-emerald-50/60 dark:border-emerald-700 dark:bg-emerald-950/20" : "border-border hover:bg-muted/50"
+                sel[k] ? "border-brand-400 bg-brand-50/60 dark:border-brand-700 dark:bg-brand-950/20" : "border-border hover:bg-muted/50"
               }`}
             >
               <Checkbox
@@ -92,7 +92,7 @@ export function RedownloadPartsCard({
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/40 p-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-sm font-semibold">
-              <Hash className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
+              <Hash className="h-4 w-4 text-brand-700 dark:text-brand-400" />
               Renumber serials 1, 2, 3…
             </div>
             <p className="mt-0.5 text-xs text-muted-foreground">

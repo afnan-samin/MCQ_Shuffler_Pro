@@ -111,7 +111,7 @@ export function ColorSerialCard({ analysis, fileName, busy, onSerial }: ColorSer
                   : "bg-background hover:bg-muted/60"
               )}
             >
-              <span className="inline-block h-5 w-5 shrink-0 rounded-md border border-border bg-gradient-to-r from-emerald-400 to-sky-500 shadow-sm" />
+              <span className="inline-block h-5 w-5 shrink-0 rounded-md border border-border bg-gradient-to-r from-brand-400 to-sky-500 shadow-sm" />
               Continuous across the file
               <Badge variant="secondary" className="px-1.5 py-0 text-[11px]">
                 {analysis.questionCount} questions

@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Noto_Sans_Bengali } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
+import { themeCss } from "@/config/theme-css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -52,14 +53,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    /* All next/font CSS variables live on <html> (=:root) so the injected
+       theme tokens (--st-font-*, from src/config/theme.ts) can reference
+       them. Do not move them back to <body>. */
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${kalpurush.variable} ${sutonny.variable}`}
+      className={`${kalpurush.variable} ${sutonny.variable} ${geistSans.variable} ${geistMono.variable} ${notoBengali.variable}`}
     >
-      <body
-        className={`${geistSans.variable} ${notoBengali.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
-      >
+      <body className="antialiased bg-background text-foreground">
+        {/* Site theme tokens (fonts/colors/radius/popups) — generated from
+            src/config/theme.ts, the ONE place that controls the whole look. */}
+        <style dangerouslySetInnerHTML={{ __html: themeCss }} />
         {children}
         <Toaster />
       </body>

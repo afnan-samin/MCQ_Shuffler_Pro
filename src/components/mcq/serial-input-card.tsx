@@ -122,7 +122,7 @@ a) Beijing  b) Tokyo  c) Seoul  d) Bangkok`}
                 type="button"
                 onClick={onPasteDetect}
                 disabled={pasteBusy || !pasteText.trim()}
-                className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+                className="gap-2 bg-brand-600 hover:bg-brand-700"
               >
                 {pasteBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                 {pasteBusy ? "Detecting..." : "🔍 Detect questions"}

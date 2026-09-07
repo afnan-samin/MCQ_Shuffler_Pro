@@ -71,10 +71,10 @@ export function SetsResult({
   const patch = (p: Partial<ExportOptions>) => onExportOptsChange({ ...exportOpts, ...p });
 
   return (
-    <Card id="step-result" className="border-emerald-300 dark:border-emerald-700">
+    <Card id="step-result" className="border-brand-300 dark:border-brand-700">
       <CardHeader>
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">4</span>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white">4</span>
           <CardTitle className="text-lg md:text-xl">
             Shuffle complete — {sets.length} {sets.length === 1 ? "set" : "sets"} ({totalQ} questions)
           </CardTitle>
@@ -212,7 +212,7 @@ export function SetsResult({
 
         {/* এক্সপোর্ট বার */}
         <div className="sticky top-2 z-10 flex flex-wrap items-center justify-center gap-2 rounded-xl border bg-white/95 p-3 shadow-sm backdrop-blur dark:bg-background/95">
-          <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700" onClick={onExportDocx} disabled={busy !== null}>
+          <Button className="gap-2 bg-brand-600 hover:bg-brand-700" onClick={onExportDocx} disabled={busy !== null}>
             {busy === "docx" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
             ⬇️ Word (.docx) — one set per page
           </Button>
@@ -233,13 +233,13 @@ export function SetsResult({
         <div className="grid gap-4 lg:grid-cols-2">
           {sets.map((qs, si) => (
             <div key={si} className="rounded-xl border bg-white dark:bg-background">
-              <div className="flex flex-wrap items-center gap-2 border-b bg-emerald-50/70 px-4 py-2.5 dark:bg-emerald-950/20">
-                <span className="font-bold text-emerald-800 dark:text-emerald-300">{getSetName(si, exportOpts.nameStyle)}</span>
+              <div className="flex flex-wrap items-center gap-2 border-b bg-brand-50/70 px-4 py-2.5 dark:bg-brand-950/20">
+                <span className="font-bold text-brand-800 dark:text-brand-300">{getSetName(si, exportOpts.nameStyle)}</span>
                 <Badge variant="secondary" className="gap-1">
                   {qs.length} questions
                 </Badge>
                 {sortedFlags[si] ? (
-                  <Badge className="gap-1 bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+                  <Badge className="gap-1 bg-brand-100 text-brand-800 hover:bg-brand-100">
                     <AlignLeft className="h-3 w-3" /> Serial
                   </Badge>
                 ) : (
@@ -265,7 +265,7 @@ export function SetsResult({
                     onClick={() => onCopySet(si)}
                     disabled={busy !== null}
                   >
-                    {copiedSet === si ? <Check className="h-3 w-3 text-emerald-600" /> : <ClipboardCopy className="h-3 w-3" />}
+                    {copiedSet === si ? <Check className="h-3 w-3 text-brand-600" /> : <ClipboardCopy className="h-3 w-3" />}
                     {copiedSet === si ? "Copied" : "Copy"}
                   </Button>
                 </div>
@@ -273,7 +273,7 @@ export function SetsResult({
               <div className="max-h-64 space-y-0.5 overflow-y-auto p-3 mcq-scroll">
                 {qs.map((q) => (
                   <div key={q.id} className="flex items-start gap-2 text-[13px] leading-snug">
-                    <span className="min-w-[2rem] shrink-0 text-right font-semibold text-emerald-700 dark:text-emerald-400">
+                    <span className="min-w-[2rem] shrink-0 text-right font-semibold text-brand-700 dark:text-brand-400">
                       {q.originalNumber}.
                     </span>
                     <span className="text-foreground/90">

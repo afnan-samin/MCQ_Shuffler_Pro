@@ -94,7 +94,7 @@ export function DetectCard({
     <Card id="step-detect">
       <CardHeader>
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">2</span>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white">2</span>
           <CardTitle className="text-lg md:text-xl">Detection result & question selection</CardTitle>
         </div>
         <CardDescription>Tick the questions you want to shuffle.</CardDescription>
@@ -103,11 +103,11 @@ export function DetectCard({
         {/* স্ট্যাটস */}
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
-            <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{stats.total}</div>
+            <div className="text-2xl font-bold text-brand-700 dark:text-brand-400">{stats.total}</div>
             <div className="text-xs text-muted-foreground">Questions detected</div>
           </div>
           <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
-            <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{stats.withOptions}</div>
+            <div className="text-2xl font-bold text-brand-700 dark:text-brand-400">{stats.withOptions}</div>
             <div className="text-xs text-muted-foreground">With options</div>
           </div>
           <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
@@ -115,7 +115,7 @@ export function DetectCard({
             <div className="text-xs text-muted-foreground">Number style</div>
           </div>
           <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
-            <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">
+            <div className="text-2xl font-bold text-brand-700 dark:text-brand-400">
               {selected.size}
             </div>
             <div className="text-xs text-muted-foreground">Selected</div>
@@ -144,11 +144,11 @@ export function DetectCard({
                 </div>
                 <div className="text-[11px] text-amber-700 dark:text-amber-400">Bijoy (SutonnyMJ)</div>
               </div>
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-center dark:border-emerald-900 dark:bg-emerald-950/30">
-                <div className="text-lg font-bold text-emerald-800 dark:text-emerald-300">
+              <div className="rounded-lg border border-brand-200 bg-brand-50 p-2 text-center dark:border-brand-900 dark:bg-brand-950/30">
+                <div className="text-lg font-bold text-brand-800 dark:text-brand-300">
                   {encStats.unicode} <span className="text-xs font-medium">({Math.round((encStats.unicode / encStats.total) * 100)}%)</span>
                 </div>
-                <div className="text-[11px] text-emerald-700 dark:text-emerald-400">Unicode Bengali (Avro)</div>
+                <div className="text-[11px] text-brand-700 dark:text-brand-400">Unicode Bengali (Avro)</div>
               </div>
               <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-2 text-center dark:border-indigo-900 dark:bg-indigo-950/30">
                 <div className="text-lg font-bold text-indigo-800 dark:text-indigo-300">
@@ -186,23 +186,23 @@ export function DetectCard({
           <div
             className={`rounded-xl border p-4 ${
               serial.status === "ok"
-                ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30"
+                ? "border-brand-300 bg-brand-50 dark:border-brand-800 dark:bg-brand-950/30"
                 : "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30"
             }`}
           >
             <div className="flex flex-wrap items-center gap-3">
               {serial.status === "ok" ? (
-                <CheckCircle2 className="h-6 w-6 shrink-0 text-emerald-600" />
+                <CheckCircle2 className="h-6 w-6 shrink-0 text-brand-600" />
               ) : (
                 <AlertTriangle className="h-6 w-6 shrink-0 text-amber-600" />
               )}
               <div className="min-w-0 flex-1">
                 {serial.status === "ok" ? (
                   <>
-                    <div className="font-semibold text-emerald-800 dark:text-emerald-300">
+                    <div className="font-semibold text-brand-800 dark:text-brand-300">
                       ✅ Serial is correct — ready to shuffle!
                     </div>
-                    <div className="mt-0.5 text-sm text-emerald-700/80 dark:text-emerald-400/80">
+                    <div className="mt-0.5 text-sm text-brand-700/80 dark:text-brand-400/80">
                       Question numbers run consecutively from {serial.startAt} to {questions[questions.length - 1].originalNumber}.
                       {!serial.startsAtOne && " (Note: doesn't start at 1, but the order is correct)"}
                     </div>
@@ -244,7 +244,7 @@ export function DetectCard({
 
         {/* সিলেকশন টুলবার */}
         <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-muted/40 p-3">
-          <ListChecks className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
+          <ListChecks className="h-4 w-4 text-brand-700 dark:text-brand-400" />
           <Button size="sm" variant="outline" onClick={onSelectAll}>
             Select all
           </Button>
@@ -279,7 +279,7 @@ export function DetectCard({
           {shown.map((q, pos) => (
             <label
               key={q.id}
-              className="flex cursor-pointer items-start gap-2.5 rounded-lg px-2 py-1.5 transition hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+              className="flex cursor-pointer items-start gap-2.5 rounded-lg px-2 py-1.5 transition hover:bg-brand-50 dark:hover:bg-brand-950/30"
             >
               <Checkbox
                 checked={selected.has(q.id)}
@@ -287,7 +287,7 @@ export function DetectCard({
                 className="mt-0.5"
               />
               <span className="min-w-0 flex-1 text-sm leading-snug">
-                <span className="mr-1.5 inline-block min-w-[2.2rem] text-right font-semibold text-emerald-700 dark:text-emerald-400">
+                <span className="mr-1.5 inline-block min-w-[2.2rem] text-right font-semibold text-brand-700 dark:text-brand-400">
                   {q.originalNumber}.
                 </span>
                 <span className="text-foreground/90">
@@ -313,7 +313,7 @@ export function DetectCard({
             <Button
               variant="ghost"
               size="sm"
-              className="w-full gap-1 text-emerald-700 dark:text-emerald-400"
+              className="w-full gap-1 text-brand-700 dark:text-brand-400"
               onClick={() => setVisible((v) => v + PAGE)}
             >
               <ChevronDown className="h-4 w-4" />

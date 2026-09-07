@@ -22,7 +22,7 @@ export function NextModesCard({ current, filesCount, onOpen }: NextModesCardProp
   if (filesCount === 0) return null;
 
   return (
-    <Card className="border-dashed border-emerald-300 bg-emerald-50/40 dark:border-emerald-800 dark:bg-emerald-950/10">
+    <Card className="border-dashed border-brand-300 bg-brand-50/40 dark:border-brand-800 dark:bg-brand-950/10">
       <CardHeader className="pb-2">
         <CardTitle className="text-base md:text-lg">✅ Keep working with these files</CardTitle>
         <CardDescription>
@@ -38,16 +38,16 @@ export function NextModesCard({ current, filesCount, onOpen }: NextModesCardProp
                 key={m}
                 type="button"
                 onClick={() => onOpen(m)}
-                className="flex min-h-[44px] items-center gap-3 rounded-xl border-2 border-border bg-card p-3 text-left transition-all hover:border-emerald-500 hover:bg-emerald-50 dark:hover:border-emerald-600 dark:hover:bg-emerald-950/20"
+                className="flex min-h-[44px] items-center gap-3 rounded-xl border-2 border-border bg-card p-3 text-left transition-all hover:border-brand-500 hover:bg-brand-50 dark:hover:border-brand-600 dark:hover:bg-brand-950/20"
               >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-600/10 text-emerald-600 dark:text-emerald-400">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-600/10 text-brand-600 dark:text-brand-400">
                   <Icon className="h-5 w-5" />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-bold leading-tight sm:text-base">{tabTitle}</span>
                   <span className="mt-0.5 block text-xs text-muted-foreground">{description}</span>
                 </span>
-                <ArrowRight className="h-4 w-4 shrink-0 text-emerald-600" />
+                <ArrowRight className="h-4 w-4 shrink-0 text-brand-600" />
               </button>
             );
           })}

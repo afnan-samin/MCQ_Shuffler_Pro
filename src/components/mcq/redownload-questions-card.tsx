@@ -82,7 +82,7 @@ export function RedownloadQuestionsCard({
       <CardContent className="space-y-4">
         {/* সিলেকশন টুলবার */}
         <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-muted/40 p-3">
-          <ListChecks className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
+          <ListChecks className="h-4 w-4 text-brand-700 dark:text-brand-400" />
           <Button size="sm" variant="outline" onClick={onSelectAll}>
             Select all
           </Button>
@@ -140,8 +140,8 @@ export function RedownloadQuestionsCard({
               return (
                 <label
                   key={q.id}
-                  className={`flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 transition hover:border-emerald-300 hover:bg-emerald-50/40 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/20 ${
-                    selected.has(q.id) ? "border-emerald-300 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/20" : "border-transparent"
+                  className={`flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 transition hover:border-brand-300 hover:bg-brand-50/40 dark:hover:border-brand-800 dark:hover:bg-brand-950/20 ${
+                    selected.has(q.id) ? "border-brand-300 bg-brand-50/50 dark:border-brand-800 dark:bg-brand-950/20" : "border-transparent"
                   }`}
                 >
                   <Checkbox
@@ -149,7 +149,7 @@ export function RedownloadQuestionsCard({
                     onCheckedChange={() => onToggle(q.id)}
                     className="mt-1"
                   />
-                  <span className="mt-0.5 w-7 shrink-0 text-right text-xs font-bold text-emerald-700/80 dark:text-emerald-400/80" title={`Position ${q.pos}`}>
+                  <span className="mt-0.5 w-7 shrink-0 text-right text-xs font-bold text-brand-700/80 dark:text-brand-400/80" title={`Position ${q.pos}`}>
                     {pos}
                   </span>
                   <span className="min-w-0 flex-1 text-sm leading-relaxed">
@@ -179,8 +179,8 @@ export function RedownloadQuestionsCard({
                     {/* উত্তর — তার নিচে */}
                     {q.answer && (
                       <span className="mt-1 block pl-1 text-[13px]">
-                        <span className="font-medium text-emerald-800 dark:text-emerald-300">Answer: </span>
-                        <span className={`font-semibold text-emerald-700 dark:text-emerald-400 ${q.serialFontBijoy && /[KLMN]/.test(q.answer) ? "tokfont-bijoy" : ""}`}>
+                        <span className="font-medium text-brand-800 dark:text-brand-300">Answer: </span>
+                        <span className={`font-semibold text-brand-700 dark:text-brand-400 ${q.serialFontBijoy && /[KLMN]/.test(q.answer) ? "tokfont-bijoy" : ""}`}>
                           {q.answer}
                         </span>
                       </span>
@@ -205,7 +205,7 @@ export function RedownloadQuestionsCard({
               <Button
                 variant="ghost"
                 size="sm"
-                className="w-full gap-1 text-emerald-700 dark:text-emerald-400"
+                className="w-full gap-1 text-brand-700 dark:text-brand-400"
                 onClick={() => setVisible((v) => v + PAGE)}
               >
                 Show more ({questions.length - visible} remaining)

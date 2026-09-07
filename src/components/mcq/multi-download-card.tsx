@@ -48,7 +48,7 @@ export function MultiDownloadCard({
       <CardHeader className="pb-2">
         <div className="flex min-w-0 items-center gap-2">
           {/* সবুজ আইকন-টাইল (serial-input-card-এর মতোই স্টাইল) */}
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-100 text-brand-700 dark:bg-brand-950/50 dark:text-brand-400">
             <FileDown className="h-5 w-5" />
           </span>
           <div className="min-w-0">
@@ -98,7 +98,7 @@ export function MultiDownloadCard({
             type="button"
             onClick={onDownloadMerged}
             disabled={disabled || mergedBusy}
-            className="h-auto flex-col items-center gap-1 rounded-xl bg-emerald-600 p-4 text-white hover:bg-emerald-700"
+            className="h-auto flex-col items-center gap-1 rounded-xl bg-brand-600 p-4 text-white hover:bg-brand-700"
           >
             {mergedBusy ? (
               <span className="flex items-center gap-2 text-sm font-semibold">

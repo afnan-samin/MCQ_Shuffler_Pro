@@ -74,14 +74,14 @@ export function MultiFileList({ items, onReorder, onRemove, disabled = false }: 
             "flex min-w-0 items-center gap-2 rounded-lg border bg-card px-3 py-2 transition-shadow " +
             (item.status === "error" ? "border-red-300 dark:border-red-900 " : "") +
             (dragFrom === i ? "opacity-50 " : "") +
-            (hoverIndex === i && dragFrom !== null && dragFrom !== i ? "ring-2 ring-emerald-500 " : "")
+            (hoverIndex === i && dragFrom !== null && dragFrom !== i ? "ring-2 ring-brand-500 " : "")
           }
         >
           {/* ড্র্যাগ হ্যান্ডেল (শুধু দেখার জন্য — পুরো রো-ই draggable) */}
           <GripVertical aria-hidden="true" className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground" />
 
           {/* বাংলা সিরিয়াল নম্বর */}
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-emerald-100 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-brand-100 text-xs font-semibold text-brand-800 dark:bg-brand-950/60 dark:text-brand-300">
             {i + 1}
           </span>
 
@@ -96,7 +96,7 @@ export function MultiFileList({ items, onReorder, onRemove, disabled = false }: 
             (typeof item.questionCount === "number" ? (
               <Badge
                 variant="secondary"
-                className="shrink-0 border-transparent bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                className="shrink-0 border-transparent bg-brand-100 text-brand-800 dark:bg-brand-950/60 dark:text-brand-300"
               >
                 {item.questionCount} questions
               </Badge>

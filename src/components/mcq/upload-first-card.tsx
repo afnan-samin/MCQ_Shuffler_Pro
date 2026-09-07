@@ -77,10 +77,10 @@ export function UploadFirstCard({
   const lineCount = rawText ? rawText.split("\n").filter((l) => l.trim()).length : 0;
 
   return (
-    <Card id="step-upload" className="border-emerald-200 dark:border-emerald-900">
+    <Card id="step-upload" className="border-brand-200 dark:border-brand-900">
       <CardHeader>
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">1</span>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white">1</span>
           <CardTitle className="text-lg md:text-xl">Upload a file first</CardTitle>
         </div>
         <CardDescription>
@@ -140,7 +140,7 @@ a) Beijing  b) Tokyo  c) Seoul  d) Bangkok`}
             onClick={onDetect}
             disabled={busy || !rawText.trim()}
             size="lg"
-            className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+            className="gap-2 bg-brand-600 hover:bg-brand-700"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
             {busy ? "Detecting..." : "🔍 Detect questions (paste mode)"}
@@ -167,10 +167,10 @@ interface StagedFilesCardProps {
  */
 export function StagedFilesCard({ files, onClear }: StagedFilesCardProps) {
   return (
-    <Card className="border-emerald-300 bg-emerald-50/60 dark:border-emerald-800 dark:bg-emerald-950/20">
+    <Card className="border-brand-300 bg-brand-50/60 dark:border-brand-800 dark:bg-brand-950/20">
       <CardHeader className="pb-2">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-100 text-brand-700 dark:bg-brand-950/50 dark:text-brand-400">
             <FolderOpen className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1">
@@ -200,7 +200,7 @@ export function StagedFilesCard({ files, onClear }: StagedFilesCardProps) {
               key={`${f.name}-${i}`}
               className="flex max-w-full items-center gap-1.5 rounded-lg border bg-white px-2.5 py-1.5 text-xs dark:bg-background"
             >
-              <FileText className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+              <FileText className="h-3.5 w-3.5 shrink-0 text-brand-600" />
               <span className="truncate">{f.name}</span>
             </li>
           ))}

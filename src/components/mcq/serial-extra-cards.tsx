@@ -273,7 +273,7 @@ export function MultiSerialSchemeCard({ docs, schemes, onSchemeChange }: MultiSe
                         : "bg-background hover:bg-muted/60"
                     )}
                   >
-                    <span className="inline-block h-4 w-4 shrink-0 rounded-md border border-border bg-gradient-to-r from-emerald-400 to-sky-500 shadow-sm" />
+                    <span className="inline-block h-4 w-4 shrink-0 rounded-md border border-border bg-gradient-to-r from-brand-400 to-sky-500 shadow-sm" />
                     Continuous
                     {scheme.kind === "continuous" && <CheckCircle2 className="h-4 w-4 text-primary" />}
                   </button>

@@ -53,10 +53,10 @@ export function ShuffleCard({
     setCount < 1 || setCount > 10 || (isOriginal ? false : setCount > selectedCount);
 
   return (
-    <Card id="step-shuffle" className={enabled ? "border-emerald-300 dark:border-emerald-700" : ""}>
+    <Card id="step-shuffle" className={enabled ? "border-brand-300 dark:border-brand-700" : ""}>
       <CardHeader>
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">3</span>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white">3</span>
           <CardTitle className="text-lg md:text-xl">Shuffle settings & start</CardTitle>
         </div>
         <CardDescription>
@@ -88,7 +88,7 @@ export function ShuffleCard({
                     key={n}
                     size="sm"
                     variant={setCount === n ? "default" : "outline"}
-                    className={`h-8 w-12 px-0 ${setCount === n ? "bg-emerald-600 hover:bg-emerald-700" : ""}`}
+                    className={`h-8 w-12 px-0 ${setCount === n ? "bg-brand-600 hover:bg-brand-700" : ""}`}
                     onClick={() => onSetCountChange(n)}
                   >
                     {n}
@@ -103,12 +103,12 @@ export function ShuffleCard({
             )}
             {enabled && !countInvalid && isOriginal && (
               <p className="text-xs text-muted-foreground">
-                Every set gets <span className="font-semibold text-emerald-700 dark:text-emerald-400">all {selectedCount}</span> questions — but each set's serial order differs (e.g. A: 1,2,3,4… / B: 4,1,2,5,3…)
+                Every set gets <span className="font-semibold text-brand-700 dark:text-brand-400">all {selectedCount}</span> questions — but each set's serial order differs (e.g. A: 1,2,3,4… / B: 4,1,2,5,3…)
               </p>
             )}
             {enabled && !countInvalid && !isOriginal && (
               <p className="text-xs text-muted-foreground">
-                ≈ <span className="font-semibold text-emerald-700 dark:text-emerald-400">{perSet}</span> questions per set
+                ≈ <span className="font-semibold text-brand-700 dark:text-brand-400">{perSet}</span> questions per set
                 {remainder > 0 && ` (first ${remainder} set(s) get one extra)`}
               </p>
             )}
@@ -217,7 +217,7 @@ export function ShuffleCard({
             size="lg"
             disabled={!enabled || countInvalid || shuffling}
             onClick={onShuffle}
-            className={`h-14 gap-3 text-base font-bold ${enabled ? "bg-emerald-600 hover:bg-emerald-700" : ""}`}
+            className={`h-14 gap-3 text-base font-bold ${enabled ? "bg-brand-600 hover:bg-brand-700" : ""}`}
           >
             {enabled ? <Shuffle className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
             {shuffling ? "Shuffling..." : "🔀 Shuffle & build sets"}
@@ -227,11 +227,11 @@ export function ShuffleCard({
               <Lock className="h-3.5 w-3.5" /> {lockReason}
             </p>
           ) : isOriginal ? (
-            <p className="text-center text-sm text-emerald-700 dark:text-emerald-400">
+            <p className="text-center text-sm text-brand-700 dark:text-brand-400">
               Ready! One click builds {setCount} set(s) — each with all {selectedCount} questions, a distinct serial order, one set per page.
             </p>
           ) : (
-            <p className="text-center text-sm text-emerald-700 dark:text-emerald-400">
+            <p className="text-center text-sm text-brand-700 dark:text-brand-400">
               Ready! One click builds {setCount} set(s) — each on its own page.
             </p>
           )}

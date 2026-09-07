@@ -42,7 +42,7 @@ export function SerialPasteCard({ result, fixing, downloading, onFix, onDownload
     <Card id="serial-paste-result">
       <CardHeader>
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">2</span>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white">2</span>
           <CardTitle className="text-lg md:text-xl">Detection result (paste)</CardTitle>
         </div>
         <CardDescription>
@@ -53,11 +53,11 @@ export function SerialPasteCard({ result, fixing, downloading, onFix, onDownload
         {/* স্ট্যাট — ডিটেকশন রেজাল্টের ৩টা মূল সংখ্যা */}
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
           <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
-            <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{questions.length}</div>
+            <div className="text-2xl font-bold text-brand-700 dark:text-brand-400">{questions.length}</div>
             <div className="text-xs text-muted-foreground">Total questions</div>
           </div>
           <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
-            <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{withOptions}</div>
+            <div className="text-2xl font-bold text-brand-700 dark:text-brand-400">{withOptions}</div>
             <div className="text-xs text-muted-foreground">With options</div>
           </div>
           <div className="rounded-xl border bg-white p-3 text-center dark:bg-background">
@@ -71,23 +71,23 @@ export function SerialPasteCard({ result, fixing, downloading, onFix, onDownload
           <div
             className={`rounded-xl border p-4 ${
               serialOk
-                ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30"
+                ? "border-brand-300 bg-brand-50 dark:border-brand-800 dark:bg-brand-950/30"
                 : "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30"
             }`}
           >
             <div className="flex flex-wrap items-center gap-3">
               {serialOk ? (
-                <CheckCircle2 className="h-6 w-6 shrink-0 text-emerald-600" />
+                <CheckCircle2 className="h-6 w-6 shrink-0 text-brand-600" />
               ) : (
                 <AlertTriangle className="h-6 w-6 shrink-0 text-amber-600" />
               )}
               <div className="min-w-0 flex-1">
                 {serialOk ? (
                   <>
-                    <div className="font-semibold text-emerald-800 dark:text-emerald-300">
+                    <div className="font-semibold text-brand-800 dark:text-brand-300">
                       ✅ Serial is correct — download enabled!
                     </div>
-                    <div className="mt-0.5 text-sm text-emerald-700/80 dark:text-emerald-400/80">
+                    <div className="mt-0.5 text-sm text-brand-700/80 dark:text-brand-400/80">
                       Question numbers run consecutively from {serial.startAt} to {lastNumber}.
                       {!serial.startsAtOne && " (Note: doesn't start at 1, but the order is correct — 1..N will be applied on download)"}
                     </div>
@@ -134,7 +134,7 @@ export function SerialPasteCard({ result, fixing, downloading, onFix, onDownload
           type="button"
           onClick={onDownload}
           disabled={questions.length === 0 || downloading}
-          className="h-auto w-full flex-col items-center gap-1 rounded-xl bg-emerald-600 p-4 text-white hover:bg-emerald-700 sm:w-auto"
+          className="h-auto w-full flex-col items-center gap-1 rounded-xl bg-brand-600 p-4 text-white hover:bg-brand-700 sm:w-auto"
         >
           {downloading ? (
             <span className="flex items-center gap-2 text-sm font-semibold">Generating...</span>

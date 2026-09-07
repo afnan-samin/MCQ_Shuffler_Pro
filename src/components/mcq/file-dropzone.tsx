@@ -162,11 +162,11 @@ export function FileDropzone({
           onDrop={onDrop}
           className={`flex min-h-[110px] cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-5 text-center transition-colors ${
             dragOver
-              ? "border-emerald-600 bg-emerald-50"
-              : "border-border hover:border-emerald-400 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20"
+              ? "border-brand-600 bg-brand-50"
+              : "border-border hover:border-brand-400 hover:bg-brand-50/50 dark:hover:bg-brand-950/20"
           } ${busy ? "pointer-events-none opacity-60" : ""}`}
         >
-          <Icon className="h-7 w-7 text-emerald-600" />
+          <Icon className="h-7 w-7 text-brand-600" />
           <p className="text-sm font-medium">{busy ? busyText : promptText}</p>
           <p className="text-xs text-muted-foreground">{hintText}</p>
         </div>
@@ -192,11 +192,11 @@ export function FileDropzone({
           pad +
           " " +
           (dragOver
-            ? "border-emerald-500 bg-emerald-100 dark:border-emerald-500 dark:bg-emerald-900/40"
-            : "border-emerald-300 bg-emerald-50/50 hover:border-emerald-500 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/20 dark:hover:border-emerald-600")
+            ? "border-brand-500 bg-brand-100 dark:border-brand-500 dark:bg-brand-900/40"
+            : "border-brand-300 bg-brand-50/50 hover:border-brand-500 hover:bg-brand-50 dark:border-brand-800 dark:bg-brand-950/20 dark:hover:border-brand-600")
         }
       >
-        {busy ? <Loader2 className="h-8 w-8 animate-spin text-emerald-600" /> : <Icon className="h-8 w-8 text-emerald-600" />}
+        {busy ? <Loader2 className="h-8 w-8 animate-spin text-brand-600" /> : <Icon className="h-8 w-8 text-brand-600" />}
         <span className="text-sm font-medium">{busy ? busyText : promptText}</span>
         <span className="text-xs text-muted-foreground">{hintText}</span>
       </button>

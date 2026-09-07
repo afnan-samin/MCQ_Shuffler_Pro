@@ -94,7 +94,7 @@ export function InputCard({
     <Card id="step-input">
       <CardHeader>
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">1</span>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white">1</span>
           <CardTitle className="text-lg md:text-xl">Add questions — upload a file or paste</CardTitle>
         </div>
         <CardDescription>
@@ -126,7 +126,7 @@ export function InputCard({
               chips={
                 /* .docx হলে মূল পেজে ফাইল-লিস্ট দেখায় — এখানে শুধু .txt-এর নাম */
                 uploadName && !uploadError ? (
-                  <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
+                  <div className="flex items-center gap-2 text-sm text-brand-700 dark:text-brand-400">
                     <FileText className="h-4 w-4" /> {uploadName} loaded
                   </div>
                 ) : null
@@ -161,7 +161,7 @@ a) Beijing  b) Tokyo  c) Seoul  d) Bangkok`}
             onClick={onDetect}
             disabled={detecting || !rawText.trim()}
             size="lg"
-            className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+            className="gap-2 bg-brand-600 hover:bg-brand-700"
           >
             {detecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
             {detecting ? "Detecting..." : "🔍 Detect questions (paste mode)"}
@@ -171,7 +171,7 @@ a) Beijing  b) Tokyo  c) Seoul  d) Bangkok`}
               {lineCount} lines
             </Badge>
           )}
-          {detected && <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Detected ✓</Badge>}
+          {detected && <Badge className="bg-brand-100 text-brand-800 hover:bg-brand-100">Detected ✓</Badge>}
         </div>
       </CardContent>
     </Card>

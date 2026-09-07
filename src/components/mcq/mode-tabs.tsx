@@ -33,14 +33,14 @@ export function ModeTabs({ mode, onChange }: ModeTabsProps) {
             className={cn(
               "flex min-h-[44px] items-center gap-3 rounded-xl border-2 p-3 text-left transition-all",
               active
-                ? "border-emerald-600 bg-emerald-600 text-white shadow-md"
-                : "border-border bg-card hover:border-emerald-400 hover:bg-emerald-50/60 dark:hover:border-emerald-600 dark:hover:bg-emerald-950/20"
+                ? "border-brand-600 bg-brand-600 text-white shadow-md"
+                : "border-border bg-card hover:border-brand-400 hover:bg-brand-50/60 dark:hover:border-brand-600 dark:hover:bg-brand-950/20"
             )}
           >
             <span
               className={cn(
                 "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
-                active ? "bg-white/20 text-white" : "bg-emerald-600/10 text-emerald-600 dark:text-emerald-400"
+                active ? "bg-white/20 text-white" : "bg-brand-600/10 text-brand-600 dark:text-brand-400"
               )}
             >
               <Icon className="h-5 w-5" />

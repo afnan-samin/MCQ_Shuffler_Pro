@@ -29,7 +29,7 @@ export function RedownloadInputCard({ onFiles, loading, items, onReorder, onRemo
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-100 text-brand-700 dark:bg-brand-950/50 dark:text-brand-400">
             <FileOutput className="h-5 w-5" />
           </span>
           <div>
