@@ -194,7 +194,8 @@ export function detectSerialPrefix(text: string): SerialPrefix | null {
 
 export function looksOptionLed(t: string): boolean {
   if (/^\t/.test(t)) return true;
-  return /^\s*(?:[KLMNklmn]\s*[.।):]|[কখগঘ]\s*[.।):]|[a-dA-D]\s*[.):]|[([]\s*[কখগঘa-dA-D]\s*[)\]]|Dt\b|উঃ|উত্তর)/.test(t);
+  // `*`-প্রিফিক্স = B-টাইমার ফরম্যাটের উত্তর-মার্কড অপশন-লাইন ("*A. টেক্সট")
+  return /^\s*\*?\s*(?:[KLMNklmn]\s*[.।):]|[কখগঘ]\s*[.।):]|[a-dA-D]\s*[.):]|[([]\s*[কখগঘa-dA-D]\s*[)\]]|Dt\b|উঃ|উত্তর)/.test(t);
 }
 
 /**
@@ -260,8 +261,10 @@ export interface OptionPreview {
  * — বেয়ার "D" = Bijoy (SutonnyMJ)-এ "উ" — শুধু কোলন/ডট-সহ গৃহীত (D: K)
  * — একাধিক উত্তরও ধরা পড়ে: "D: L + N", "উত্তর: ক, খ"
  */
-const ANSWER_TAIL_RE =
-  /(?:Dt|Cvw|wU|উঃ|উত্তর|উওর|Ans?\.?|Answer|D(?=\s*[:.]))\s*[:.]?\s*([KLMNklmnকখগঘa-dA-D1-4](?:\s*[+&,/]\s*[KLMNklmnকখগঘa-dA-D1-4])*)\s*$/;
+/** অপশন-লাইনের শেষে গ্লুড উত্তর — redownload-এর টেইল-স্প্লিটও একই রেজেক্স;
+ * `DËi?t?` = Bijoy "উত্তর(ঃ)" (Chemistry Set-C ফরম্যাট: "…DËit K") */
+export const ANSWER_TAIL_RE =
+  /(?:Dt|DËi?t?|Cvw|wU|উঃ|উত্তর|উওর|Ans?\.?|Answer|D(?=\s*[:.]))\s*[:.]?\s*([KLMNklmnকখগঘa-dA-D1-4](?:\s*[+&,/]\s*[KLMNklmnকখগঘa-dA-D1-4])*)\s*$/;
 
 /**
  * অক্ষর-হীন ঝুলন্ত উত্তর-মার্কার (ফাইলের টাইপো): "…\tDt" / "…\tD: -"।
@@ -269,7 +272,7 @@ const ANSWER_TAIL_RE =
  * লাইন-শুরু বা ট্যাবের পরে হতে হবে — "No Answer"-জাতীয় অপশন রক্ষা পায়।
  */
 const ANSWER_DANGLING_RE =
-  /(?:^|\t)(?:Dt|Cvw|wU|উঃ|উত্তর|উওর|Ans?\.?|Answer|D(?=\s*[:.]))\s*[:.]?\s*[-–—]?\s*$/;
+  /(?:^|\t)(?:Dt|DËi?t?|Cvw|wU|উঃ|উত্তর|উওর|Ans?\.?|Answer|D(?=\s*[:.]))\s*[:.]?\s*[-–—]?\s*$/;
 
 /** লাইন-শুরুর ব্যাখ্যা-মার্কার: Bijoy "e¨vL¨v:" / Unicode "ব্যাখ্যা:" / "সমাধান:" */
 export const BEKKHA_LINE_RE =

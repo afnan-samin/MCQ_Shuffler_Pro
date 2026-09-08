@@ -18,7 +18,9 @@ import JSZip from "jszip";
 
 import { MAX_SERIAL_NUMBER } from "./limits";
 import { relabelOptionPara, type OptionLabelSettings } from "./option-labels";
+import { findRefTokens } from "./reference";
 import {
+  ANSWER_TAIL_RE,
   W_NS,
   countRunTabs,
   detectSerialPrefix,
@@ -70,7 +72,7 @@ export const DEFAULT_PART_SELECTION: PartSel = {
 
 /** উত্তর-টোকেন (docx-xml-এর ANSWER_TAIL_RE-এর সাথে সামঞ্জস্যপূর্ণ)।
  * বেয়ার "D" = Bijoy "উ" — শুধু কোলন/ডট-সহ ("D: K") */
-const ANSWER_TOK = "(?:Dt|Cvw|wU|উঃ|উত্তরমালা|উত্তর|Ans?\\.?|Answer|D(?=\\s*[:.]))";
+const ANSWER_TOK = "(?:Dt|DËi?t?|Cvw|wU|উঃ|উত্তরমালা|উত্তর|Ans?\\.?|Answer|D(?=\\s*[:.]))";
 /** অক্ষর-গ্রুপ: একাধিক উত্তরও ("D: L + N", "উত্তর: ক, খ") */
 const LETTER_GROUP = "([KLMNklmnকখগঘa-dA-D1-4](?:\\s*[+&,/]\\s*[KLMNklmnকখগঘa-dA-D1-4])*)";
 /** লাইন-শুরুতে উত্তর-টোকেন ("উত্তর: ক", "উঃ খ", "Dt. K", "D: L + N") */
@@ -94,9 +96,10 @@ const SERIAL_LETTER_PAIR_RE = new RegExp(
   "g"
 );
 
-/** অপশন-লেড (উত্তর নয়): "ক)" "K." "a)" "(গ)" বা ট্যাব-লেড */
+/** অপশন-লেড (উত্তর নয়): "ক)" "K." "a)" "(গ)" বা ট্যাব-লেড;
+ * `*`-প্রিফিক্স = B-টাইমার ফরম্যাটের উত্তর-মার্কড অপশন-লাইন ("*A. টেক্সট") */
 const OPTION_LEAD_RE =
-  /^\s*(?:[KLMNklmn]\s*[.।):]|[কখগঘ]\s*[.।):]|[a-dA-D]\s*[.):]|[([]\s*[কখগঘa-dA-D]\s*[)\]])/;
+  /^\s*\*?\s*(?:[KLMNklmn]\s*[.।):]|[কখগঘ]\s*[.।):]|[a-dA-D]\s*[.):]|[([]\s*[কখগঘa-dA-D]\s*[)\]])/;
 /** ব্যাখ্যা/রেফারেন্স প্রিফিক্স — Bijoy "e¨vL¨v" সহ (docx-xml BEKKHA_LINE_RE-এর সাথে একই তালিকা) */
 const BEKKHA_PREFIX_RE = /^\s*(?:e¨vL¨v|ব্যাখ্যা|সমাধান|explanation)\s*[:.\-—]?/i;
 const REFERENCE_PREFIX_RE =
@@ -190,9 +193,23 @@ export interface RdQuestion {
   qText: string;
   options: OptionPreview[];
   answer: string | null;
+  /** উত্তর `*`-মার্কার থেকে এসেছে (B-টাইমার ফরম্যাট — সোর্সে আলাদা উত্তর-লাইন নেই) */
+  answerFromStar: boolean;
   /** ব্লকের ব্যাখ্যা-অংশের টেক্সট (মার্কার বাদে) — না থাকলে null */
   bekkha: string | null;
   hasUnicode: boolean;
+}
+
+/**
+ * প্যারা-স্প্লিট প্ল্যান — w:t-জয়েন্ট টেক্সটের `start`-অফসেটে প্যারা দু-ভাগ হয়;
+ * টেইল-অংশটি নিজের কাইন্ডের অংশ-টিক মেনে ডাউনলোডে যায়/বাদ যায়।
+ * (অপশন-লাইনের শেষে গ্লুড "Dt K" → answer; প্রশ্ন-লাইনের শেষে "(JU: 21-22)" → reference)
+ */
+export interface RdSplit {
+  /** body-child ইনডেক্স */
+  para: number;
+  kind: "answer" | "reference";
+  start: number;
 }
 
 export interface RdParseResult {
@@ -204,6 +221,10 @@ export interface RdParseResult {
   kindCounts: Record<PartKind, number>;
   separators: string[];
   hasUnicode: boolean;
+  /** টেইল-স্প্লিট প্ল্যান (গ্লুড উত্তর / টেইল-রেফারেন্স) */
+  splits: RdSplit[];
+  /** অপশন-প্যারা থেকে `*`-উত্তর-মার্কার সরানোর স্প্যান */
+  starStrips: Array<{ para: number; start: number; end: number }>;
 }
 
 interface CurBlock {
@@ -306,6 +327,13 @@ export function parseRedownloadXml(xml: string): RdParseResult {
       continue;
     }
 
+    // পুরো প্যারাই রেফারেন্স-ব্র্যাকেট ("(JU: 21-22)" / "(নমুনা - 93)" / "[X] [Y]")
+    // — নম্বর-বাছাইয়ে আলাদা অংশ; ধারাবাহিকতা বদলায় না বলে lastKind অস্পৃশ্য
+    if (isRefOnlyPara(t)) {
+      kinds[i] = "reference";
+      continue;
+    }
+
     if (isAnswerLine(t)) {
       kinds[i] = "answer";
       lastKind = "answer";
@@ -372,6 +400,35 @@ export function parseRedownloadXml(xml: string): RdParseResult {
     kinds[i] = lastKind ?? section ?? "other";
   }
 
+  // ---- পাস ১.৫: স্প্লিট-প্ল্যান + `*`-মার্কার (w:t-জয়েন্ট টেক্সটে ডিটেকশন) ----
+  // ① অপশন-প্যারার শেষে গ্লুড উত্তর ("…Dt K" / "…DËit M" / "…Ans: C" / "…D: L + N")
+  // ② প্রশ্ন-প্যারার শেষ-প্রান্তের রেফারেন্স-টোকেন ("…(Ju: 21-22)" / "…[CU-A: 22-23]")
+  // ③ অপশন-প্যারার `*`-উত্তর-মার্কার (B-টাইমার: "*A. টেক্সট" / "টেক্সট*")
+  const splits: RdSplit[] = [];
+  const starStrips: Array<{ para: number; start: number; end: number }> = [];
+  const starLetters = new Map<number, string>();
+  for (let i = 0; i < kids.length; i++) {
+    if (kids[i].localName === "sectPr") continue;
+    const text = paraStreamText(kids[i]);
+    if (!text.trim()) continue;
+    const kind = kinds[i];
+    if (kind === "options") {
+      const ta = findTailAnswer(text);
+      if (ta !== null) {
+        splits.push({ para: i, kind: "answer", start: ta });
+        continue;
+      }
+      const star = findStarAnswer(text);
+      if (star) {
+        starLetters.set(i, star.letter);
+        starStrips.push(...star.spans.map((s) => ({ para: i, ...s })));
+      }
+    } else if (kind === "question") {
+      const rs = findTailRefStart(text);
+      if (rs !== null) splits.push({ para: i, kind: "reference", start: rs });
+    }
+  }
+
   // ---- পাস ২: প্রশ্ন-ব্লক গঠন ----
   const questions: RdQuestion[] = [];
   const separators: string[] = [];
@@ -381,6 +438,19 @@ export function parseRedownloadXml(xml: string): RdParseResult {
     const id = questions.length;
     const blockText = c.texts.join("\n");
     const { options, answer, qText, bekkha } = scanOptions(blockText, c.si.raw);
+    // `*`-উত্তর (B-টাইমার) — scanOptions ধরে না; প্যারা-স্টার-ম্যাপ থেকে
+    let answerFromStar = false;
+    let effAnswer = answer;
+    if (!effAnswer) {
+      for (let j = c.start; j <= c.end; j++) {
+        const st = starLetters.get(j);
+        if (st) {
+          effAnswer = st;
+          answerFromStar = true;
+          break;
+        }
+      }
+    }
     const slicedKinds = kinds.slice(c.start, c.end + 1);
     const q: RdQuestion = {
       id,
@@ -395,8 +465,9 @@ export function parseRedownloadXml(xml: string): RdParseResult {
       texts: c.texts,
       kinds: slicedKinds,
       qText,
-      options,
-      answer,
+      options: options.map((o) => ({ ...o, text: o.text.replace(/\*/g, "") })), // প্রিভিউ থেকে * সরানো
+      answer: effAnswer,
+      answerFromStar,
       bekkha,
       hasUnicode: /[\u0980-\u09FF]/.test(blockText),
     };
@@ -461,6 +532,8 @@ export function parseRedownloadXml(xml: string): RdParseResult {
     kindCounts,
     separators,
     hasUnicode: questions.some((q) => q.hasUnicode),
+    splits,
+    starStrips,
   };
 }
 
@@ -535,6 +608,21 @@ export function buildRedownloadXml(
 
   const expandActive = opts.expandAnswer && !opts.partSel.options && opts.partSel.answer;
 
+  // স্প্লিট/স্টার-প্ল্যান + প্রতি প্রশ্নের শেষ অপশন-প্যারা (`*`-উত্তর লাইন এখানেই বসবে)
+  const splitByPara = new Map(parse.splits.map((s) => [s.para, s]));
+  const starStripByPara = new Map<number, Array<{ start: number; end: number }>>();
+  for (const s of parse.starStrips) {
+    const arr = starStripByPara.get(s.para) ?? [];
+    arr.push({ start: s.start, end: s.end });
+    starStripByPara.set(s.para, arr);
+  }
+  const lastOptPara = new Map<number, number>();
+  for (const q of parse.questions) {
+    for (let j = q.blockStart; j <= q.blockEnd; j++) {
+      if (parse.kinds[j] === "options") lastOptPara.set(q.id, j);
+    }
+  }
+
   while (body.firstChild) body.removeChild(body.firstChild);
 
   for (let i = 0; i < kids.length; i++) {
@@ -550,26 +638,32 @@ export function buildRedownloadXml(
         body.appendChild(src.cloneNode(true));
         continue;
       }
-      if (!opts.partSel[kind]) continue;
+      const sp = splitByPara.get(i) ?? null;
+      if (!opts.partSel[kind] && !(sp && opts.partSel[sp.kind])) continue;
       const clone = src.cloneNode(true) as Element;
+      const tail = sp ? splitParaAtOffset(clone, sp.start) : null;
       // উত্তরমালা-স্টাইল লাইন ("১২. ক") — সিরিয়াল নম্বর দিয়ে প্রশ্ন খুঁজে বিস্তার
       if (kind === "answer" && expandActive) {
         expandAnswerBySerial(clone, parse, kids);
       }
-      if (kind === "options" && opts.optionLabels?.enabled) {
+      if (!sp && kind === "options" && opts.optionLabels?.enabled) {
         relabelOptionPara(clone, opts.optionLabels);
       }
-      body.appendChild(clone);
+      if (opts.partSel[kind]) body.appendChild(clone);
+      if (tail && sp && opts.partSel[sp.kind]) body.appendChild(tail);
       continue;
     }
 
     // ---- প্রশ্ন-ব্লকের ভিতর ----
     const q = byId.get(bid)!;
     if (!selSet.has(bid)) continue;
+    const split = splitByPara.get(i);
     const keep = kind === "other" ? opts.partSel.question : opts.partSel[kind];
-    if (!keep) continue;
 
     const clone = src.cloneNode(true) as Element;
+
+    // স্প্লিট আগে — renumber/strip হেডের লেখা বদলায়, অফসেট সরে যেত
+    const tail = split ? splitParaAtOffset(clone, split.start) : null;
 
     if (i === q.blockStart) {
       if (opts.partSel.serial && opts.renumber) {
@@ -577,6 +671,14 @@ export function buildRedownloadXml(
       } else if (!opts.partSel.serial) {
         stripSerialPrefix(clone);
       }
+    }
+
+    // `*`-উত্তর-মার্কার সরানো (অপশন-প্যারা — মার্কারটা কনটেন্ট নয়)
+    const stars = starStripByPara.get(i);
+    if (stars?.length) {
+      const stream: Element[] = [];
+      collectTsLocal(clone, stream);
+      replaceSpansLocal(stream, stars.map((s) => ({ ...s, text: "" })));
     }
 
     // উত্তর-বিস্তার: অপশন বাদ + উত্তর আছে + অক্ষর-উত্তর ("উঃ ক")
@@ -588,7 +690,20 @@ export function buildRedownloadXml(
       relabelOptionPara(clone, opts.optionLabels);
     }
 
-    body.appendChild(clone);
+    if (keep) body.appendChild(clone);
+
+    // টেইল-অংশ (গ্লুড উত্তর / টেইল-রেফারেন্স) — নিজের অংশ-টিক অনুযায়ী
+    if (tail && split && opts.partSel[split.kind]) {
+      if (split.kind === "answer" && expandActive) {
+        expandAnswerPara(tail, q, kids, parse, opts.optionLabels ?? null);
+      }
+      body.appendChild(tail);
+    }
+
+    // `*`-উত্তর-লাইন জেনারেট (অপশন A) — শেষ অপশন-প্যারার ঠিক পরে "Dt X"
+    if (q.answerFromStar && opts.partSel.answer && lastOptPara.get(bid) === i) {
+      body.appendChild(makeStarAnswerPara(doc, src, q.answer ?? ""));
+    }
   }
 
   if (sectPr) body.appendChild(sectPr);
@@ -749,6 +864,239 @@ function replaceSpansLocal(
       if (/^\s|\s$/.test(out)) t.setAttribute("xml:space", "preserve");
     }
   }
+}
+
+// ---------- টেইল-স্প্লিট + `*`-মার্কার ডিটেকশন (w:t-জয়েন্ট টেক্সট-স্পেস) ----------
+
+/** প্যারার w:t-জয়েন্ট টেক্সট (oMath বাদ — splitParaAtOffset-এর স্পেসের সাথে সামঞ্জস্যপূর্ণ) */
+function paraStreamText(p: Element): string {
+  const els: Element[] = [];
+  collectTsLocal(p, els);
+  return els.map((t) => t.textContent ?? "").join("");
+}
+
+/** গ্লুড (স্পেস-ছাড়া) অবস্থায় শুধু নির্দিষ্ট উত্তর-টোকেনই বিশ্বস্ত — "wU"-জাতীয়
+ * বিজয়-শব্দ-প্রত্যয় ভুল করে উত্তর হয়ে যাওয়া আটকায় ("…wbDwU K" রক্ষা) */
+const TAIL_GLUE_OK_RE = /^(?:Dt|DË|D:|Cvw|উঃ|উত্তর|উওর|Ans|Answer)/;
+
+/**
+ * অপশন-প্যারার শেষে গ্লুড উত্তর — "…Dt K" / "…DËit M" / "…উঃ খ" / "…Ans: C" /
+ * "…D: L + N" (docx-xml-এর ANSWER_TAIL_RE reuse — $-অ্যাঙ্করড, লেটার-গ্রুপসহ)।
+ * রিটার্ন: টেইল-শুরুর অফসেট (টোকেনের শুরু)।
+ */
+function findTailAnswer(text: string): number | null {
+  const m = ANSWER_TAIL_RE.exec(text);
+  if (!m) return null;
+  const prev = m.index > 0 ? text[m.index - 1] : "";
+  if (prev && !/\s/.test(prev) && !TAIL_GLUE_OK_RE.test(m[0])) return null;
+  return m.index;
+}
+
+/**
+ * অপশন-প্যারার `*`-উত্তর-মার্কার (B-টাইমার ফরম্যাট) — লেবেলের আগে ("*C. টেক্সট",
+ * "*A.B.") বা সঠিক অপশনের টেক্সটের পরে ("টেক্সট*", "টেক্সট*D.")।
+ * রিটার্ন: উত্তর-অক্ষর (যেমন টাইপ করা, "A"/"c") + সরানোর স্প্যান (প্যারার সব `*`)।
+ */
+function findStarAnswer(text: string): {
+  letter: string;
+  spans: Array<{ start: number; end: number }>;
+} | null {
+  const at: number[] = [];
+  for (let i = 0; i < text.length; i++) if (text[i] === "*") at.push(i);
+  if (!at.length) return null;
+  const labelAfter = /^([KLMNklmnকখগঘa-dA-D])\s*[.।):]/;
+  const labelScan = /([KLMNklmnকখগঘa-dA-D])\s*[.।):]/g;
+  let letter: string | null = null;
+  for (const s of at) {
+    // ① স্টারের ঠিক পরেই লেবেল ("*C. টেক্সট" / "*A.B.")
+    const after = labelAfter.exec(text.slice(s + 1));
+    if (after) {
+      letter = after[1];
+      break;
+    }
+    // ② স্টারের আগের নিকটতম লেবেল — ওই অপশনের টেক্সটের শেষেই স্টার
+    const before = text.slice(0, s);
+    labelScan.lastIndex = 0;
+    let last: RegExpExecArray | null = null;
+    let mm: RegExpExecArray | null;
+    while ((mm = labelScan.exec(before))) last = mm;
+    if (last) {
+      letter = last[1];
+      break;
+    }
+  }
+  if (!letter) return null;
+  return { letter, spans: at.map((s) => ({ start: s, end: s + 1 })) };
+}
+
+/**
+ * প্রশ্ন-প্যারার শেষ-প্রান্তের রেফারেন্স-টোকেন — "(JU: 21-22)" / "[CU-A: 22-23]" /
+ * চেইন "[X] [Y]"। reference.ts-এর findRefTokens reuse (টেইল-যাচাই + inner-ভ্যালিড
+ * সেখানেই; bare-ফরম্যাট টোকেন বাদ — শুধু ব্র্যাকেট)।
+ * রিটার্ন: টেইল-শুরুর অফসেট (হেড খালি হলে null — সেটা isRefOnlyPara-র কাজ)।
+ */
+function findTailRefStart(text: string): number | null {
+  const toks = findRefTokens(text).filter((t) => /^[(\[]/.test(t.text));
+  if (!toks.length) return null;
+  const start = toks[0].start;
+  const head = text.slice(0, start).trim();
+  if (!head) return null;
+  return start;
+}
+
+/**
+ * পুরো প্যারাটাই রেফারেন্স-ব্র্যাকেট — "(JU: 21-22)" / "(নমুনা - 93)" / "[X] [Y]"।
+ * অন্তত একটা গ্রুপে ডিজিট লাগবে ("(a)"-জাতীয় খালি অপশন ও "(কেন্দ্র)"-জাতীয়
+ * শব্দ-ব্র্যাকেট রক্ষা)।
+ */
+function isRefOnlyPara(text: string): boolean {
+  const stripped = text
+    .replace(/\([^()]*\)/g, "")
+    .replace(/\[[^\[\]]*\]/g, "")
+    .trim();
+  if (stripped) return false;
+  const groups = text.match(/\([^()]*\)|\[[^\[\]]*\]/g) ?? [];
+  return groups.some((g) => /[0-9০-৯]/.test(g));
+}
+
+
+// ---------- প্যারা-স্প্লিট সার্জারি ----------
+
+/**
+ * প্যারাকে জয়েন্ট w:t-টেক্সটের `offset`-এ দু-ভাগ করে — head (মূল el-ই, বাকি লেখা) +
+ * tail (নতুন <w:p>; pPr ক্লোনসহ — numPr বাদ, রান-rPr ক্লোন)। রান-বাউন্ডারি ও
+ * মাঝ-রান (w:t ভাঙা) দুটোই সামলায়; oMath/ছবি হারায় না (অফসেটের পরেরটা tail-এ যায়)।
+ * রিটার্ন: tail প্যারা — অফসেট বাইরে/টেইল খালি হলে null (মূল el অপরিবর্তিত থাকে)।
+ */
+function splitParaAtOffset(p: Element, offset: number): Element | null {
+  if (offset <= 0) return null;
+  const doc = p.ownerDocument;
+  if (!doc) return null;
+  const stream: Element[] = [];
+  collectTsLocal(p, stream);
+  let total = 0;
+  for (const t of stream) total += (t.textContent ?? "").length;
+  if (offset >= total) return null;
+  const rest = stream
+    .map((t) => t.textContent ?? "")
+    .join("")
+    .slice(offset);
+  if (!rest.trim()) return null;
+
+  const tail = doc.createElementNS(W_NS, "w:p");
+  const srcPPr = Array.from(p.children).find((c) => c.localName === "pPr") ?? null;
+  if (srcPPr) {
+    const pPr = srcPPr.cloneNode(true) as Element;
+    // লিস্ট-নাম্বারিং থাকলে বাদ — টেইল-প্যারা নিজের নম্বর পেয়ে বসবে না
+    const numPr = pPr.getElementsByTagNameNS(W_NS, "numPr")[0];
+    if (numPr?.parentNode) numPr.parentNode.removeChild(numPr);
+    tail.appendChild(pPr);
+  }
+
+  let pos = 0;
+  for (const child of Array.from(p.childNodes)) {
+    if (child.nodeType !== 1) continue; // টেক্সট/প্রসেসিং নোড — head-এই
+    const el = child as Element;
+    if (el.localName === "pPr") continue; // head-এই (tail-এ ক্লোন হয়ে গেছে)
+    const ts: Element[] = [];
+    if (el.localName === "t") ts.push(el);
+    else collectTsLocal(el, ts);
+    const len = ts.reduce((a, t) => a + (t.textContent ?? "").length, 0);
+    const cStart = pos;
+    const cEnd = pos + len;
+    pos = cEnd;
+    if (cEnd <= offset) continue; // পুরোটা head-এ
+    if (cStart >= offset) {
+      // পুরোটা tail-এ
+      p.removeChild(el);
+      tail.appendChild(el);
+      continue;
+    }
+    // স্ট্র্যাডল — বাউন্ডারি এই চাইল্ডের ভিতরে
+    if (el.localName === "r") splitRun(el, offset - cStart, tail);
+    else {
+      // কনটেইনার (hyperlink ইত্যাদি) — পুরোটা tail-এ (এজ-কেস; কনটেন্ট হারায় না)
+      p.removeChild(el);
+      tail.appendChild(el);
+    }
+  }
+  return tail;
+}
+
+/** রান-ভিতরে `relOffset`-এ ভাগ — পরের অংশ (w:t-রেমাইন্ডার/ট্যাব) ক্লোন-rPr-সহ tail-রানে */
+function splitRun(run: Element, relOffset: number, tail: Element): void {
+  const doc = run.ownerDocument;
+  if (!doc) return;
+  const tailRun = doc.createElementNS(W_NS, "w:r");
+  for (const c of Array.from(run.childNodes)) {
+    if (c.nodeType === 1 && (c as Element).localName === "rPr") {
+      tailRun.appendChild(c.cloneNode(true));
+      break;
+    }
+  }
+  let pos = 0;
+  for (const c of Array.from(run.childNodes)) {
+    if (c.nodeType === 1 && (c as Element).localName === "rPr") continue;
+    if (c.nodeType === 1 && (c as Element).localName === "t") {
+      const t = c as Element;
+      const s = t.textContent ?? "";
+      const sEnd = pos + s.length;
+      if (sEnd <= relOffset) {
+        pos = sEnd;
+        continue; // head-এই
+      }
+      if (pos >= relOffset) {
+        // পুরোটা tail-এ
+        run.removeChild(t);
+        tailRun.appendChild(t);
+        pos = sEnd;
+        continue;
+      }
+      // স্ট্র্যাডল — w:t দু-ভাগ
+      const cut = relOffset - pos;
+      t.textContent = s.slice(0, cut);
+      if (/^\s|\s$/.test(t.textContent)) t.setAttribute("xml:space", "preserve");
+      const tt = doc.createElementNS(W_NS, "w:t");
+      tt.setAttribute("xml:space", "preserve");
+      tt.textContent = s.slice(cut);
+      tailRun.appendChild(tt);
+      pos = sEnd;
+      continue;
+    }
+    // শূন্য-প্রস্থ (w:tab/w:br/w:drawing/...) — বাউন্ডারির পরে হলে tail-এ
+    if (pos >= relOffset) {
+      run.removeChild(c);
+      tailRun.appendChild(c);
+    }
+  }
+  if (tailRun.childNodes.length) tail.appendChild(tailRun);
+}
+
+/**
+ * `*`-উত্তরের জন্য নতুন উত্তর-প্যারা ("Dt X") — ফন্ট/বিন্যাস সোর্স অপশন-প্যারা থেকে
+ * ক্লোন (Bijoy ফাইলে SutonnyMJ-ই থাকে, তাই "Dt X" ওই ফন্টেই "উঃ ক" দেখায়)।
+ */
+function makeStarAnswerPara(doc: Document, srcPara: Element, letter: string): Element {
+  const p = doc.createElementNS(W_NS, "w:p");
+  const srcPPr = Array.from(srcPara.children).find((c) => c.localName === "pPr") ?? null;
+  if (srcPPr) {
+    const pPr = srcPPr.cloneNode(true) as Element;
+    const numPr = pPr.getElementsByTagNameNS(W_NS, "numPr")[0];
+    if (numPr?.parentNode) numPr.parentNode.removeChild(numPr);
+    p.appendChild(pPr);
+  }
+  const r = doc.createElementNS(W_NS, "w:r");
+  const firstRun = srcPara.getElementsByTagNameNS(W_NS, "r")[0] ?? null;
+  const srcRPr = firstRun
+    ? Array.from(firstRun.children).find((c) => c.localName === "rPr") ?? null
+    : null;
+  if (srcRPr) r.appendChild(srcRPr.cloneNode(true));
+  const t = doc.createElementNS(W_NS, "w:t");
+  t.setAttribute("xml:space", "preserve");
+  t.textContent = `Dt ${letter}`;
+  r.appendChild(t);
+  p.appendChild(r);
+  return p;
 }
 
 // ---------- ওয়াটারমার্ক এক্সট্র্যাকশন ----------

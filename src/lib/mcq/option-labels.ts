@@ -36,7 +36,7 @@ export const DEFAULT_OPTION_LABEL_SETTINGS: OptionLabelSettings = {
   separator: ".",
 };
 
-/** প্রতিটা স্টাইলের ৪-অপশন সিকোয়েন্স (ক্রম: ক/খ/গ/ঘ ↔ a/b/c/d ↔ 0..3) */
+/** প্রতিটা স্টাইলের ৪-অপশন সিকোয়েন্স (ক্রম: ক/খ/গ/ঘ ↔ K/L/M/N ↔ a/b/c/d ↔ 0..3) */
 export const OPTION_LABEL_SEQ: Record<OptionLabelStyle, readonly string[]> = {
   A: ["A", "B", "C", "D"],
   a: ["a", "b", "c", "d"],
@@ -55,12 +55,21 @@ export const OPTION_LABEL_STYLE_CHOICES: ReadonlyArray<{
   { value: "ka", label: "ক  খ  গ  ঘ" },
 ];
 
-/** সোর্স-লেবেল অক্ষর → সিকোয়েন্স-ইনডেক্স (0-3) */
+/** সোর্স-লেবেল অক্ষর → সিকোয়েন্স-ইনডেক্স (0-3)। K/L/M/N = Bijoy-ফাইলে টাইপ
+ * করা ক/খ/গ/ঘ (Physics/Chemistry/Botany ফরম্যাটের প্রধান লেবেল) */
 const SOURCE_IDX: Record<string, number> = {
   "ক": 0,
   "খ": 1,
   "গ": 2,
   "ঘ": 3,
+  K: 0,
+  L: 1,
+  M: 2,
+  N: 3,
+  k: 0,
+  l: 1,
+  m: 2,
+  n: 3,
   a: 0,
   b: 1,
   c: 2,
@@ -69,12 +78,12 @@ const SOURCE_IDX: Record<string, number> = {
 
 /**
  * অপশন-লেবেল টোকেন — চার রূপ:
- *  ① paren   "(ক)" "(a)"      ② bracket "[ক]" "[a]"
- *  ③ বাংলা   "ক." "খ।" "গ)"   ④ ল্যাটিন "a." "B)" "d)"
+ *  ① paren   "(ক)" "(a)" "(K)"   ② bracket "[ক]" "[a]"
+ *  ③ বাংলা/বিজয় "ক." "খ।" "গ)" "K." "N)"  ④ ল্যাটিন "a." "B)" "d)"
  * paren/bracket আগে — নাহলে "(ক)"-এর ভিতরের "ক)" bare রূপে ধরা পড়ত।
  */
 const OPTION_TOK_RE =
-  /\(\s*([কখগঘA-Da-d])\s*\)|\[\s*([কখগঘA-Da-d])\s*\]|([কখগঘ])\s*([.।):])|([A-Da-d])\s*([.):])/g;
+  /\(\s*([কখগঘK-Nk-nA-Da-d])\s*\)|\[\s*([কখগঘK-Nk-nA-Da-d])\s*\]|([কখগঘK-Nk-n])\s*([.।):])|([A-Da-d])\s*([.):])/g;
 
 /**
  * options-কাইন্ড প্যারা (cloneNode-করা এলিমেন্ট) রিলেবেল করে —
