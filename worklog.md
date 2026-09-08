@@ -980,3 +980,21 @@ Stage Summary:
 - সব পেন্ডিং কাজ শেষ: Tasks 1→52 কমপ্লিট, লাইভ সাইটে Mode Change বাটন + shuffle-সহ সব মোডে ফরম্যাট-প্রিজার্ভ চালু
 - লাইভ: https://afnan-samin.github.io/MCQ_Shuffler_Pro/
 - ⚠️ টোকেন নিরাপত্তা: ghp_Mm2R…husW0 চ্যাটে পাঠানো হয়েছে — ব্যবহারকারীকে কাজ শেষে github.com/settings/tokens-এ REVOKE করতে বলা হয়েছে (আগের দুই টোকেনও রিভোকড)
+
+---
+Task ID: 53
+Agent: Cline
+Task: Redownload part-by-part MCQ বিভাজন — Format/ ফোল্ডারের ৪০টা বাস্তব .docx বিশ্লেষণ করে টেইল-উত্তর / টেইল-রেফারেন্স / `*`-উত্তর-মার্কার ডিটেকশন + প্যারা-স্প্লিট সার্জারি (user-অনুমোদিত প্ল্যান, উত্তর-লাইন = Option A)
+
+Work Log:
+- Format/ ফোল্ডারের ৪০টা ফাইল প্যারা-লেভেলে স্ক্যান — ৬ ফরম্যাট-ফ্যামিলি চিহ্নিত: ① সেট-স্টাইল (Physics/Botany/Chemistry set A Raw/Ans/Ques — আলাদা লাইনে বা প্রশ্ন-লাইনের শেষে (JU: 21-22) রেফ, অপশন-লাইনের শেষে গ্লুড "Dt X") ② B-টাইমার+Exam Batch (অ-ধারাবাহিক সিরিয়াল, `*`-উত্তর-মার্কার লেবেলের আগে/টেক্সটের পরে, "e¨vL¨v :" ব্যাখ্যা) ③ Chemistry Set-C (উত্তর-টোকেন "DËit" = উত্তর Bijoy) ④ Botany Typewise (৯৩১২ প্যারা) ⑤ Doc1 (ইংরেজি, "D: L + N" multipart উত্তর) ⑥ Chemistry 2nd Sheet ("Ans: C")
+- docx-xml.ts: ANSWER_TAIL_RE + ANSWER_DANGLING_RE-তে `DËi?t?` টোকেন (Bijoy উত্তর) + ANSWER_TAIL_RE export; looksOptionLed-এ `*`-প্রিফিক্স ("*A. টেক্সট" অপশন-লিড)
+- redownload.ts (পার্স): RdSplit type + RdParseResult.splits/starStrips + RdQuestion.answerFromStar; পাস-১.৫ — ① অপশন-প্যারার শেষে গ্লুড উত্তর (glue-guard: স্পেস-ছাড়া বসলে শুধু নির্দিষ্ট টোকেন বিশ্বস্ত — "…wbDwU K"-জাতীয় বিজয়-প্রত্যয় রক্ষা) ② প্রশ্ন-প্যারার শেষ-প্রান্তের রেফারেন্স (findRefTokens reuse — trailing-chain + inner-ভ্যালিড সেখানেই; bare-টোকেন বাদ) ③ `*`-মার্কার (label-after / label-before দুই রূপ, প্যারার সব `*` স্প্যান) ④ isRefOnlyPara রুল (পুরো প্যারা ব্র্যাকেট + ডিজিট-গার্ড — "(a)"/"(কেন্দ্র)" রক্ষা)
+- redownload.ts (build): splitParaAtOffset/splitRun — প্যারা ২ ভাগ (pPr ক্লোন+numPr বাদ, রান-rPr ক্লোন, w:t-স্ট্র্যাডল ভাঙা, শূন্য-প্রস্থ নোড অবস্থান-সচেতন, oMath হারায় না); স্প্লিট-আগে-পরে-renumber (অফসেট নিরাপত্তা); হেড/টেইল স্বাধীন অংশ-টিক; `*`-স্ট্রিপ (replaceSpansLocal); `*`-উত্তরে শেষ অপশন-প্যারার পরে "Dt X" জেনারেট (makeStarAnswerPara — সোর্স-ফন্ট ক্লোন) + প্রিভিউ-অপশন থেকে `*` সরানো
+- option-labels.ts: SOURCE_IDX/OPTION_TOK_RE-তে K/L/M/N + k/l/m/n (Bijoy ক-ঘ — Physics/Chemistry/Botany ফরম্যাটের প্রধান লেবেল; আগে রিম্যাপ-বাইরে ছিল — আসল বাগ)
+- টেস্ট: test-redownload-splits.ts নতুন — ৪৩/৪৩ (৬ ফ্যামিলি ফিক্সচার: শুধু-প্রশ্ন+উত্তর, রেফ/উত্তর বাদে পরিষ্কার অপশন, `*`→Dt X, DËit, D: L+N, option-labels সহাবস্থান, renumber+split অফসেট-নিরাপত্তা, well-formed XML); রিগ্রেশন সব সবুজ — redownload ৪১, option-labels ২৭, font-remap ১১০, docx ৫৭, multi-docx ৬৫, color-serial ১০৪, mcq ৭১; tsc src-ক্লিন, eslint ক্লিন; dev HTTP 200
+- কমিট: f9e0fac (font-remap+pdf), 56111ac (option-labels ফিচার), 926746a (ফন্ট-ডিফল্ট OFF + Latin ground-truth), cd80fab (এই টাস্ক)
+
+Stage Summary:
+- Redownload মোডে প্রতি MCQ এখন অংশ-প্রতি আলাদা: সিরিয়াল/প্রশ্ন/রেফারেন্স/অপশন/উত্তর/ব্যাখ্যা — "শুধু প্রশ্ন+উত্তর" ডাউনলোডে রেফারেন্স/ব্যাখ্যা/গ্লুড-উত্তর/`*` সব পরিষ্কার; user-এর ৪০ ফাইলের ৬ ফরম্যাট-ই কভার
+- সীমাবদ্ধতা: ছবি-নির্ভর প্রশ্ন-টেক্সট (Physics Q2 জাতীয়) ইমেজ হিসেবেই থাকে; push পেন্ডিং — local main = origin/main (c668a1c) + ৪ কমিট, টোকেন revoked (নতুন টোকেন দিলে পুশ হবে)
