@@ -17,6 +17,7 @@ const {
   applyFontRemapStylesXml,
   applyFontRemap,
   FONT_CHOICES,
+  FONT_DEFAULT,
   DEFAULT_FONT_REMAP_SETTINGS,
 } = await import("../src/lib/mcq/font-remap");
 type FontRemapSettings = import("../src/lib/mcq/font-remap").FontRemapSettings;
@@ -434,9 +435,9 @@ if (!existsSync(FIXTURE)) {
 // ---------- ৬. FONT_CHOICES ও ডিফল্ট ----------
 
 console.log("\n── FONT_CHOICES ও ডিফল্ট সেটিংস ──");
-ok(FONT_CHOICES.english.length === 5 && FONT_CHOICES.english.includes("Times New Roman"), "FONT_CHOICES.english (৫টি, TNR-সহ)");
-ok(FONT_CHOICES.bijoy.length === 5 && FONT_CHOICES.bijoy.includes("SutonnyMJ") && FONT_CHOICES.bijoy.includes("Shibly"), "FONT_CHOICES.bijoy (৫টি)");
-ok(FONT_CHOICES.unicode.length === 5 && FONT_CHOICES.unicode.includes("Noto Serif Bengali"), "FONT_CHOICES.unicode (৫টি)");
+ok(FONT_CHOICES.english.length === 6 && FONT_CHOICES.english[0] === FONT_DEFAULT && FONT_CHOICES.english.includes("Times New Roman"), "FONT_CHOICES.english (৬টি, Default+TNR-সহ)");
+ok(FONT_CHOICES.bijoy.length === 6 && FONT_CHOICES.bijoy[0] === FONT_DEFAULT && FONT_CHOICES.bijoy.includes("SutonnyMJ") && FONT_CHOICES.bijoy.includes("Shibly"), "FONT_CHOICES.bijoy (৬টি)");
+ok(FONT_CHOICES.unicode.length === 6 && FONT_CHOICES.unicode[0] === FONT_DEFAULT && FONT_CHOICES.unicode.includes("Noto Serif Bengali"), "FONT_CHOICES.unicode (৬টি)");
 ok(DEFAULT_FONT_REMAP_SETTINGS.enabled === false, "ডিফল্ট: enabled=false (ডাউনলোড অরিজিনাল ফন্টই রাখে)");
 ok(DEFAULT_FONT_REMAP_SETTINGS.englishFont === "Times New Roman", "ডিফল্ট: englishFont");
 ok(DEFAULT_FONT_REMAP_SETTINGS.bijoyFont === "SutonnyMJ", "ডিফল্ট: bijoyFont");
@@ -565,6 +566,41 @@ console.log("\n── ওয়্যারিং — zip-লেভেল রি
     const singleOff = await replaceDocumentXml(baseBlob, DOC_XML);
     ok((await partOf(singleOff, "word/document.xml")) === DOC_XML, "replaceDocumentXml (বন্ধ): বাইট-অভিন্ন");
   }
+}
+
+// ---------- ৮. Default স্লট + মিশ্র-রান সেগমেন্টেশন ----------
+
+console.log("\n── Default (keep original) + মিশ্র-রান ──");
+{
+  ok(FONT_CHOICES.english[0] === FONT_DEFAULT, "FONT_CHOICES.english: ১ম = Default");
+  ok(FONT_CHOICES.bijoy[0] === FONT_DEFAULT, "FONT_CHOICES.bijoy: ১ম = Default");
+  ok(FONT_CHOICES.unicode[0] === FONT_DEFAULT, "FONT_CHOICES.unicode: ১ম = Default");
+
+  // English-only Default: শুধু bijoy/unicode বদলায়, latin/english স্পর্শ নয়
+  const SD: FontRemapSettings = { enabled: true, englishFont: FONT_DEFAULT, bijoyFont: "Shibly", unicodeFont: "SolaimanLipi" };
+  const docEn = wrapDoc(`<w:p><w:r><w:t>English words</w:t></w:r></w:p>`);
+  const outEn = applyFontRemapXml(docEn, SD);
+  ok(outEn === docEn, "english=Default → latin-রান byte-অপরিবর্তিত (অরিজিনাল ফন্টই থাকে)");
+
+  // bijoy-only Default: বাংলা-রান স্পর্শ নয়, English বদলায়
+  const SBN: FontRemapSettings = { enabled: true, englishFont: "Arial", bijoyFont: FONT_DEFAULT, unicodeFont: "SoLoma" };
+  const bijoyRun = `<w:p><w:r><w:t>Avgvi †KvW</w:t></w:r></w:p>`;
+  const docB = wrapDoc(bijoyRun);
+  const outB = applyFontRemapXml(docB, SBN);
+  ok(outB === docB, "bijoy=Default → bijoy-রান byte-অপরিবর্তিত (Sutonny/অরিজিনালই থাকে)");
+
+  // styles.xml Default bijoy → byte-অপরিবর্তিত
+  const stylesD = `<?xml version="1.0"?><w:styles xmlns:w="${W_NS}"><w:style w:type="paragraph" w:styleId="Normal"><w:rPr><w:rFonts w:ascii="SutonnyMJ" w:hAnsi="SutonnyMJ"/></w:rPr></w:style></w:styles>`;
+  ok(applyFontRemapStylesXml(stylesD, SBN) === stylesD, "styles: bijoy=Default → অস্পৃশ্য");
+
+  // মিশ্র-রান (বাংলা + English এক w:t) — স্ক্রিপ্ট-বাউন্ডারিতে ভাঙে, প্রতি অংশ নিজের ফন্ট
+  const mixed = wrapDoc(`<w:p><w:r><w:t>প্রশ্ন answer (Board 2019)</w:t></w:r></w:p>`);
+  const SM: FontRemapSettings = { enabled: true, englishFont: "Arial", bijoyFont: "Shibly", unicodeFont: "SolaimanLipi" };
+  const outMix = applyFontRemapXml(mixed, SM);
+  ok(outMix.includes(`w:ascii="SolaimanLipi"`), "মিশ্র: বাংলা অংশ → unicodeFont");
+  ok(outMix.includes(`w:ascii="Arial"`), "মিশ্র: English অংশ → englishFont");
+  ok(outMix.includes("প্রশ্ন") && outMix.includes("Board 2019"), "মিশ্র: টেক্সট-নির্ভুল (সব অংশ অক্ষত)");
+  ok(wellFormed(outMix), "মিশ্র: XML well-formed");
 }
 
 // ---------- ফলাফল ----------

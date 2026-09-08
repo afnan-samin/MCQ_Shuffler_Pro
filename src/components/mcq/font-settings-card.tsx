@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CheckCircle2, ChevronDown, RotateCcw, Type } from "lucide-react";
-import { DEFAULT_FONT_REMAP_SETTINGS, FONT_CHOICES, type FontSettings } from "@/lib/mcq/font-remap";
+import { DEFAULT_FONT_REMAP_SETTINGS, FONT_CHOICES, FONT_DEFAULT, type FontSettings } from "@/lib/mcq/font-remap";
 
 export interface FontSettingsCardProps {
   /** বর্তমানে প্রয়োগ করা সেটিংস (page.tsx-এ persisted) */
@@ -125,13 +125,23 @@ export function FontSettingsCard({ settings, onChange }: FontSettingsCardProps) 
 
       {open && (
         <CardContent id="font-settings-content" className="space-y-4">
-          {/* কী রিম্যাপ হয় — তথ্য-লাইন */}
+          {/* কী রিম্যাপ হয় — তথ্য-লাইন (Default স্লটে "keeps original" দেখায়) */}
           <p className="rounded-xl border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
-            Bengali (Unicode) text runs get <b className="text-foreground">{draft.unicodeFont}</b>,
-            Bijoy/ANSI text runs get <b className="text-foreground">{draft.bijoyFont}</b>, and
-            everything else (English, numbers, symbols) gets{" "}
-            <b className="text-foreground">{draft.englishFont}</b>. Fonts are applied to the
-            downloaded .docx after all other edits — text and formatting stay untouched.
+            Bengali (Unicode) text runs get{" "}
+            <b className="text-foreground">
+              {draft.unicodeFont === FONT_DEFAULT ? "their original font" : draft.unicodeFont}
+            </b>
+            , Bijoy/ANSI text runs get{" "}
+            <b className="text-foreground">
+              {draft.bijoyFont === FONT_DEFAULT ? "their original font" : draft.bijoyFont}
+            </b>
+            , and everything else (English, numbers, symbols) gets{" "}
+            <b className="text-foreground">
+              {draft.englishFont === FONT_DEFAULT ? "their original font" : draft.englishFont}
+            </b>
+            . A <b className="text-foreground">Default</b> slot keeps that text's original font —
+            only the chosen classes change (fonts are applied to the downloaded .docx after
+            all other edits).
           </p>
 
           {/* রিম্যাপ ON/OFF */}
@@ -163,7 +173,7 @@ export function FontSettingsCard({ settings, onChange }: FontSettingsCardProps) 
                   <SelectContent>
                     {f.choices.map((font) => (
                       <SelectItem key={font} value={font}>
-                        {font}
+                        {font === FONT_DEFAULT ? `${FONT_DEFAULT} (keep original)` : font}
                       </SelectItem>
                     ))}
                   </SelectContent>

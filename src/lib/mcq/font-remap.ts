@@ -30,7 +30,7 @@
 //   bijoyFont দিয়ে বদলানো হয় — থিম-অ্যাট্রিবিউট/অন্য ফন্ট অস্পৃশ্য (simple)।
 // ============================================================
 
-import { isCommonEnglishWord } from "./encoding";
+import { isCommonEnglishWord, tokenizeWithContext, type Enc, type Tok } from "./encoding";
 
 // ---------- পাবলিক টাইপ ----------
 
@@ -41,11 +41,11 @@ export type RunScriptClass = "bijoy" | "unicode-bengali" | "latin";
 export type RemapDominant = RunScriptClass | null;
 
 export interface FontRemapSettings {
-  /** ল্যাটিন/English রানের ফন্ট */
+  /** ল্যাটিন/English রানের ফন্ট — "Default" হলে এই শ্রেণি অস্পৃশ্য (অরিজিনাল ফন্ট) */
   englishFont: string; // default "Times New Roman"
-  /** Bijoy/ANSI এনকোডেড রানের ফন্ট */
+  /** Bijoy/ANSI এনকোডেড রানের ফন্ট — "Default" হলে অস্পৃশ্য */
   bijoyFont: string; // default "SutonnyMJ"
-  /** ইউনিকোড বাংলা রানের ফন্ট */
+  /** ইউনিকোড বাংলা রানের ফন্ট — "Default" হলে অস্পৃশ্য */
   unicodeFont: string; // default "Noto Serif Bengali"
   /** false হলে সব ফাংশন ইনপুট অপরিবর্তিত ফেরত দেয় */
   enabled: boolean;
@@ -53,6 +53,13 @@ export interface FontRemapSettings {
 
 /** GOAL-সিগনেচারের নাম-সামঞ্জস্যের জন্য অ্যালিয়াস */
 export type FontSettings = FontRemapSettings;
+
+/**
+ * "Default" স্লট-মান — ওই শ্রেণির রান সম্পূর্ণ অস্পৃশ্য থাকে (আপলোড করা ফাইলের
+ * ফন্টই থাকে)। যেমন: english=Times New Roman + bijoy=Default → শুধু English
+ * অক্ষর TNR-এ যায়, Bijoy লেখা হাত দেয়া হয় না।
+ */
+export const FONT_DEFAULT = "Default";
 
 export const DEFAULT_FONT_REMAP_SETTINGS: FontRemapSettings = {
   englishFont: "Times New Roman",
@@ -63,11 +70,11 @@ export const DEFAULT_FONT_REMAP_SETTINGS: FontRemapSettings = {
   enabled: false,
 };
 
-/** UI-ড্রপডাউনের জন্য ফন্ট-তালিকা */
+/** UI-ড্রপডাউনের জন্য ফন্ট-তালিকা — প্রতিটার শুরুতে "Default" (অরিজিনাল রাখে) */
 export const FONT_CHOICES = {
-  english: ["Times New Roman", "Arial", "Calibri", "Georgia", "Cambria"],
-  bijoy: ["SutonnyMJ", "SutonnyMJLT", "SutonnyIt", "SutonnyOMJ", "Shibly"],
-  unicode: ["Noto Serif Bengali", "Noto Sans Bengali", "SolaimanLipi", "Kalpurush", "Bangla"],
+  english: [FONT_DEFAULT, "Times New Roman", "Arial", "Calibri", "Georgia", "Cambria"],
+  bijoy: [FONT_DEFAULT, "SutonnyMJ", "SutonnyMJLT", "SutonnyIt", "SutonnyOMJ", "Shibly"],
+  unicode: [FONT_DEFAULT, "Noto Serif Bengali", "Noto Sans Bengali", "SolaimanLipi", "Kalpurush", "Bangla"],
 } as const;
 
 // ---------- ক্লাসিফিকেশন সিগন্যাল ----------
@@ -241,10 +248,17 @@ function remapRunInner(inner: string, font: string): string {
   return inner.slice(0, start) + newTag + inner.slice(start + tag.length);
 }
 
-function fontForClass(cls: RunScriptClass, settings: FontRemapSettings): string {
-  if (cls === "bijoy") return settings.bijoyFont;
-  if (cls === "unicode-bengali") return settings.unicodeFont;
-  return settings.englishFont;
+/**
+ * ক্লাসের টার্গেট ফন্ট — স্লট "Default" হলে null (রান অস্পৃশ্য = অরিজিনাল ফন্টই থাকে)।
+ */
+function fontForClass(cls: RunScriptClass, settings: FontRemapSettings): string | null {
+  const v =
+    cls === "bijoy"
+      ? settings.bijoyFont
+      : cls === "unicode-bengali"
+        ? settings.unicodeFont
+        : settings.englishFont;
+  return v === FONT_DEFAULT ? null : v;
 }
 
 export interface FontRemapOptions {
@@ -266,9 +280,73 @@ function runAsciiFontOf(runInner: string): string | null {
   return am ? am[1] : null;
 }
 
+// ---------- মিশ্র-রান সেগমেন্টেশন (স্ক্রিপ্ট-বাউন্ডারিতে রান ভাঙা) ----------
+
+/** XML-টেক্সট এস্কেপ — সেগমেন্ট-রিরাইটে w:t-কনটেন্ট নিরাপদ রাখতে */
+function escXmlText(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/**
+ * রান-টেক্সটকে স্ক্রিপ্ট-সেগমেন্টে ভাগ — encoding.ts-এর শব্দ-ধরে টোকেনাইজার
+ * (কনটেক্সট-ইনহেরিটেন্সসহ)। Bijoy ডকে "K."/"wb‡Pi" → bijoy, "(Board 2019)" →
+ * english — প্রতিটা অক্ষর নিজের ক্লাস পায়; neutral (স্পেস/সংখ্যা) পাশের
+ * সেগমেন্টেই জমা হয়।
+ */
+function scriptSegments(
+  text: string,
+  dominant: RemapDominant
+): Array<{ cls: RunScriptClass; text: string }> {
+  const encDominant: Enc | null =
+    dominant === "bijoy" ? "bijoy" : dominant === "unicode-bengali" ? "unicode" : null;
+  const toks = tokenizeWithContext(text, encDominant);
+  const segs: Tok[] = [];
+  for (const t of toks) {
+    if (!t.text) continue;
+    const last = segs[segs.length - 1];
+    if (!last) {
+      segs.push({ ...t });
+      continue;
+    }
+    if (last.enc === t.enc) last.text += t.text;
+    else if (t.enc === "neutral") last.text += t.text;
+    else if (last.enc === "neutral") {
+      last.text += t.text;
+      last.enc = t.enc;
+    } else segs.push({ ...t });
+  }
+  return segs.map((s) => ({
+    cls: (s.enc === "bijoy" ? "bijoy" : s.enc === "unicode" ? "unicode-bengali" : "latin") as RunScriptClass,
+    text: s.text,
+  }));
+}
+
+/** রানের inner-এ প্রথম w:t-তে লেখা বসানো, বাকি w:t বাদ (ট্যাব-জাতীয় শূন্য-প্রস্থ চাইল্ড রক্ষা) */
+function setRunInnerText(runInner: string, text: string): string {
+  let first = true;
+  return runInner.replace(WT_RE, (tm: string) => {
+    if (!first) return "";
+    first = false;
+    if (tm.endsWith("/>")) {
+      return tm.slice(0, tm.length - 2) + ">" + escXmlText(text) + "</w:t>";
+    }
+    const openEnd = tm.indexOf(">") + 1;
+    return tm.slice(0, openEnd) + escXmlText(text) + "</w:t>";
+  });
+}
+
+/** সেগমেন্ট-গ্রুপের জন্য নতুন রান — অরিজিনাল rPr ক্লোন + লেখা; font থাকলে rFonts বসায় */
+function buildSegRun(rprXml: string | null, font: string | null, text: string): string {
+  const inner = (rprXml ?? "") + `<w:t xml:space="preserve">${escXmlText(text)}</w:t>`;
+  return `<w:r>${font ? remapRunInner(inner, font) : inner}</w:r>`;
+}
+
 /**
  * word/document.xml-এর প্রতিটি টেক্সটধারী <w:r>-এর ফন্ট রিম্যাপ করে।
  * w:t-হীন রান (w:tab/w:br/w:drawing/w:fldChar) ও self-closing <w:r/> অস্পৃশ্য।
+ * স্লট "Default" হলে ওই শ্রেণির রান অস্পৃশ্য (অরিজিনাল ফন্টই থাকে)।
+ * মিশ্র রান (বাংলা+English এক রানে) স্ক্রিপ্ট-বাউন্ডারিতে ভেঙে প্রতি অংশ
+ * নিজের ফন্ট পায় — প্রতি অক্ষর সঠিক ফন্টে।
  * Idempotent + XML-corruption-free (নেমস্পেস/xml:space/কনটেন্ট রক্ষা)।
  */
 export function applyFontRemapXml(
@@ -288,21 +366,63 @@ export function applyFontRemapXml(
       text += decodeXmlEntities(tm[2] ?? "");
     }
     if (!hasT) return m; // w:t নেই — w:tab/w:br/ফিল্ড-কোড রান অস্পৃশ্য
-    let cls = classifyRunText(text, dominant);
-    const runFont = runAsciiFontOf(runInner);
-    if (runFont) {
-      if (LEGACY_BIJOY_FONT_VALUE_RE.test(runFont)) {
-        // লিগ্যাসি-Bijoy ফন্ট ground-truth — মার্কারহীন খাঁটি-ASCII বাংলা
-        // রান ("Avgvi"-জাতীয়) English ফন্টে চলে যায় না
-        if (cls === "latin") cls = "bijoy";
-      } else if (KNOWN_LATIN_FONT_VALUE_RE.test(runFont)) {
-        // পরিচিত English-ফন্ট ground-truth — Bijoy-প্রধান ডকেও English রান
-        // ইংরেজি ফন্টেই থাকে (ভুল করে SutonnyMJ পেয়ে ভাঙে না)
-        cls = "latin";
-      }
-    }
-    const font = fontForClass(cls, settings);
     const openEnd = m.length - runInner.length - "</w:r>".length;
+
+    // ---- ফন্ট ground-truth: রানের নিজস্ব ফন্টই পুরো-রান শ্রেণি ঘোষণা করে ----
+    const runFont = runAsciiFontOf(runInner);
+    if (runFont && LEGACY_BIJOY_FONT_VALUE_RE.test(runFont)) {
+      // লিগ্যাসি-Bijoy ফন্ট — মার্কারহীন খাঁটি-ASCII বাংলা ("Avgvi"-জাতীয়) বিজয়;
+      // ইউনিকোড-বাংলা অক্ষর (BN ব্লক) নিজের ক্লাসেই (unambiguous)
+      let cls: RunScriptClass = classifyRunText(text, dominant);
+      if (cls === "latin") cls = "bijoy";
+      const font = fontForClass(cls, settings);
+      if (font == null) return m; // Default — রান অস্পৃশ্য
+      return m.slice(0, openEnd) + remapRunInner(runInner, font) + "</w:r>";
+    }
+    let cls = classifyRunText(text, dominant);
+    if (runFont && KNOWN_LATIN_FONT_VALUE_RE.test(runFont) && cls === "bijoy") {
+      // পরিচিত English-ফন্ট ground-truth — Bijoy-প্রধান ডকেও English রান
+      // ইংরেজি ফন্টেই থাকে (ভুল করে SutonnyMJ পেয়ে ভাঙে না)
+      const font = fontForClass("latin", settings);
+      if (font == null) return m;
+      return m.slice(0, openEnd) + remapRunInner(runInner, font) + "</w:r>";
+    }
+
+    // ---- সেগমেন্টেশন: শুধুই যখন একই রানে ইউনিকোড-বাংলা C English মিশে থাকে।
+    // Bijoy-(Sutonny) ASCII রান উপরে রানের নিজের ফন্ট ground-truth-এ পুরো-রানই
+    // যায় ("Avgvi"-জাতীয় খাঁটি-ASCII বিজয়) — ওদের ভাঙলে ভুল হতো।
+    let font: string | null = null;
+    let didSeg = false;
+    if (BN_RE.test(text) && /[A-Za-z]/.test(text)) {
+      const sg = scriptSegments(text, dominant);
+      const gr: Array<{ font: string | null; text: string }> = [];
+      for (const s of sg) {
+        const f = fontForClass(s.cls, settings);
+        const last = gr[gr.length - 1];
+        if (last && last.font === f) last.text += s.text;
+        else gr.push({ font: f, text: s.text });
+      }
+      if (gr.length > 1) {
+        // মিশ্র — রান ভেঙে প্রতি অংশ নিজের ফন্টে
+        const rprM = RPR_RE.exec(runInner);
+        const rprXml = rprM && !rprM[0].endsWith("/>") ? rprM[0] : null;
+        let out = m.slice(0, openEnd);
+        gr.forEach((g, gi) => {
+          if (gi === 0) {
+            let head = setRunInnerText(runInner, g.text);
+            if (g.font) head = remapRunInner(head, g.font);
+            out += head + "</w:r>";
+          } else {
+            out += buildSegRun(rprXml, g.font, g.text);
+          }
+        });
+        return out; // head+tail সবগুলো রানই complete — অতিরিক্ত </w:r> নেই
+      }
+      didSeg = true;
+      font = gr[0]?.font ?? null;
+    }
+    if (!didSeg) font = fontForClass(cls, settings);
+    if (font == null) return m; // Default — রান অস্পৃশ্য
     return m.slice(0, openEnd) + remapRunInner(runInner, font) + "</w:r>";
   });
 }
@@ -334,6 +454,7 @@ const STYLE_FONTVAL_RE = /((?:w:ascii|w:hAnsi|w:cs|w:eastAsia)=")([^"]*)(")/g;
  */
 export function applyFontRemapStylesXml(stylesXml: string, settings: FontRemapSettings): string {
   if (!settings?.enabled || !stylesXml) return stylesXml;
+  if (settings.bijoyFont === FONT_DEFAULT) return stylesXml; // Default — styles অস্পৃশ্য
   return stylesXml.replace(
     STYLE_FONTVAL_RE,
     (m: string, pre: string, val: string, post: string) =>
