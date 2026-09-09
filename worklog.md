@@ -1077,3 +1077,23 @@ Work Log:
 Stage Summary:
 - UI emoji-মুক্ত: ট্যাব "MCQ Shuffle / MCQ Serial / MCQ Redownload", টোস্ট প্লেইন ("Serial fixed", "ZIP downloaded", "PDF file downloaded"...), কার্ড-স্ট্যাটাস টেক্সট প্লেইন (সবুজ/অ্যাম্বার রং + lucide আইকনই মানে বহন করে)
 - push পেন্ডিং — হেড 72f2770, origin/main ee32753 থেকে ৫ কমিট এগিয়ে (নতুন টোকেন লাগবে)
+
+---
+Task ID: 58
+Agent: Cline
+Task: পুরো ওয়েবসাইট বাটন-অপশন অডিট — Format/ ফোল্ডারের বাস্তব ফাইল দিয়ে Playwright e2e (full-audit + focused probes)
+
+Work Log:
+- scripts/tmp-e2e/full-audit.ts — ২৬-ধাপ অডিট: আপলোড/স্টেজ/clear, শাফল (সেট-কাউন্ট, ৪ ডিস্ট্রিবিউশন, সুইচ, ডাউনলোড docx/pdf, কপি), সিরিয়াল (মাল্টি লিস্ট, রিমুভ, মার্জ, পেস্ট), রিডাউনলোড (অ্যাকর্ডিয়ন, সিলেকশন, ডাউনলোড), পারসিস্ট, কনসোল-এরর
+- রাউন্ড-১: ২০ পাস / ৬ ফেল — ৬টাই টেস্ট-সিলেক্টর আর্টিফ্যাক্ট (format-টগল বাটনে ক্লিক, PDF-মোড পারসিস্ট কারণে সিরিয়াল টাইমআউট, ট্রানকেট-সিলেক্টর, এক-ফাইল ভিউতে ZIP বাটন by-design অনুপস্থিত)
+- ফোকাসড প্রোব (probe-labels2/rd/rd2/final) দিয়ে সঠিক সিলেক্টরে পুনঃযাচাই — সব পাস:
+  B6 DOCX 282KB ✓ · B7 PDF 1.48MB (মাল্টি-পেজ স্লাইসিং) ✓ · B7b original-serial ✓
+  C4 সিরিয়াল মার্জ 307KB ✓ · C4b ZIP 846KB ✓ · সিরিয়াল remove/reorder ✓ · পেস্ট-ডিটেক্ট ✓
+  RD: অ্যাকর্ডিয়ন খোলা ✓ · Select all 48/48 ✓ · Deselect 0/48 ✓ · Range 3-8 → 6/48 ✓ · switch টগল ✓
+  RD1 একক (redownload).docx ✓ · RD2 মাল্টি ZIP + merged ✓
+  N1 NextModes ✓ · N2 Add files ✓ · F1 ফন্ট সুইচ ✓ · T1 .doc ডাউনলোড + Print popup ✓
+  কনসোল/পেজ-এরর শূন্য ✓
+- উপসংহার: কোনো অ্যাপ-বাগ পাওয়া যায়নি — সব বাটন/অপশন নিজের কাজ করছে; Select-range খালি ইনপুটে no-op (by design), এক-ফাইল ভিউতে ZIP বাটন নেই (by design — শুধু এক ডাউনলোড বাটন)
+
+Stage Summary:
+- পূর্ণ অডিট সবুজ; tmp-e2e প্রোবগুলো gitignored — প্রোডাকশন কোডে কোনো পরিবর্তন নেই
