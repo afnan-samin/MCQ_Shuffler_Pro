@@ -155,7 +155,11 @@ export function FileDropzone({
           aria-label={ariaLabel}
           onClick={() => !disabled && open()}
           onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") open();
+            // Space-এ preventDefault লাগে — নাহলে পেজ স্ক্রল হয়; disabled/busy-তে কিছুই হবে না
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              if (!disabled && !busy) open();
+            }
           }}
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}

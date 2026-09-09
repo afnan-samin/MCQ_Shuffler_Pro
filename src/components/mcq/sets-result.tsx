@@ -262,6 +262,19 @@ export function SetsResult({
                   </Badge>
                 )}
                 <div className="ml-auto flex gap-1.5">
+                  {/* শাফল্ড-থাকা সেটে নতুন-ক্রম — সিরিয়ালে থাকলে Sort-টগলেই ফেরে */}
+                  {!sortedFlags[si] && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 gap-1 px-2 text-xs"
+                      onClick={() => onReshuffleSet(si)}
+                      title="Reshuffle this set into a new order"
+                    >
+                      <Shuffle className="h-3 w-3" />
+                      Shuffle
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="outline"

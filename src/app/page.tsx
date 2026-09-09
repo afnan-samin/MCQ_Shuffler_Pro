@@ -1535,6 +1535,7 @@ export default function Home() {
   };
 
   // ---- TEXT mode সেট অ্যাকশন ----
+  /** একটা সেটকে সিরিয়াল-অর্ডারে সাজানো / আবার শাফল করা (টগল) */
   const toggleSort = (si: number) => {
     if (!sets) return;
     const wasSorted = sortedFlags[si];
@@ -1547,6 +1548,17 @@ export default function Home() {
     setSortedFlags((prev) => {
       const copy = prev.slice();
       copy[si] = !wasSorted;
+      return copy;
+    });
+  };
+
+  /** শাফল্ড-থাকা সেটকে নতুন করে শাফল — sort-ফ্ল্যাগ untouched থাকে */
+  const reshuffleSet = (si: number) => {
+    if (!sets) return;
+    setSets((prev) => {
+      if (!prev) return prev;
+      const copy = prev.map((s) => s.slice());
+      copy[si] = shuffled(copy[si]);
       return copy;
     });
   };
@@ -2026,7 +2038,7 @@ export default function Home() {
                       sets={sets}
                       sortedFlags={sortedFlags}
                       onToggleSort={toggleSort}
-                      onReshuffleSet={toggleSort}
+                      onReshuffleSet={reshuffleSet}
                       exportOpts={exportOpts}
                       onExportOptsChange={setExportOpts}
                       onExportDocx={handleExportDocx}
