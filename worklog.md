@@ -1037,3 +1037,24 @@ Work Log:
 Stage Summary:
 - রিভিউ-ফিক্স ৪টা ফাইলে ৩৬ ইনসার্ট/৩ ডিলিট + `.env` ফ্ল্যাগ-অফ; হেড d13de0c, origin/main ee32753 (পুশ পেন্ডিং — নতুন টোকেন লাগবে)
 - ⚠️ টোকেন নিরাপত্তা: আগের টোকেনগুলো REVOKE করতে হবে প্রতিবার কাজ শেষে
+---
+
+Task ID: 56
+Agent: Cline
+Task: Redownload "3. Pick questions" — মাল্টি-ফাইল আপলোডে একাধিক কার্ড হচ্ছিল; এক কার্ডে সব ফাইলের collapse-accordion section (ফন্ট-কার্ডের মতো), arrow-ক্লিকে ওই section-টা খোলে
+
+Work Log:
+- আগের অবস্থা: page.tsx-এ rdDocs.map() দিয়ে প্রতি ফাইলের আলাদা RedownloadQuestionsCard রেন্ডার — N ফাইল = N কার্ড (পৃষ্ঠা লম্বা)
+- ফিক্স: redownload-questions-card.tsx সম্পূর্ণ rewrite —
+  ① RedownloadQuestionsCard এখন শুধু একটা <Card id="step-rd-questions"> রেন্ডার করে, props: files: RdFileSectionProps[]
+  ② প্রতি ফাইলের নিজস্ব collapse-সেকশন: arrow (ChevronDown rotate) + filename + "N questions" + "M selected" ব্যাজ; ডিফল্ট সবার বন্ধ (aria-expanded=false)
+  ③ খোলা থাকলে ওই section-এর ভেতরে RdFileBody (পুরনো হুবহু: Select/Deselect/range টুলবার + ওয়াটারমার্ক + প্রশ্ন-তালিকা + Show more)
+  ④ উপরে সামারি-স্ট্রিপ "X / Y question(s) selected" — সব section বন্ধ থাকলেও দেখা যায়
+  ⑤ page.tsx: files={rdDocs.map(...)} এক কল; e2e-modes.ts C3-তে section খোলার ধাপ যোগ
+- ভেরিফাই: tsc 0, eslint 0, ফুল রিগ্রেশন ১২ স্যুট সবুজ (mcq 71, docx 57, color 104, multi 65, font 120, labels 27, redownload 41, splits 43, reference 43, doc1 27, export 7, pdf 11)
+- e2e smoke (playwright, tmp-e2e/rd-accordion-smoke.ts — gitignored): ১৮/১৮ — ১ কার্ড, ডিফল্ট-বন্ধ, toggle, ২-ফাইল-স্বাধীন-খোলা, সামারি-স্ট্রিপ, console-এরর 0
+- কমিট: ebd7b67
+
+Stage Summary:
+- "3. Pick questions" এখন মাল্টি-ফাইলেও এক কার্ড: ফাইলগুলো accordion-সেকশনে (ডিফল্ট বন্ধ; arrow-ক্লিকে ওইটাই খোলে) — ফন্ট-কার্ড/রিডাউনলোড-পার্টস-কার্ডের মতোই প্যাটার্ন
+- subsequent: d13de0c (রিভিউ-ফিক্স) + 6327033 (Task 55 worklog) — origin/main ee32753 থেকে হেড ৪ কমিট এগিয়ে (push পেন্ডিং, নতুন টোকেন লাগবে)
