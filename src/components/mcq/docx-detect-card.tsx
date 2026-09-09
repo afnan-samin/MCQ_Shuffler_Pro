@@ -237,7 +237,7 @@ export function DocxDetectCard({
                   {serial.status === "ok" ? (
                     <>
                       <div className="font-semibold text-brand-800 dark:text-brand-300">
-                        ✅ Serial is correct — ready to shuffle!
+                        Serial is correct — ready to shuffle!
                       </div>
                       <div className="mt-0.5 text-sm text-brand-700/80 dark:text-brand-400/80">
                         {questions.length} question(s) in consecutive order (starting at {serial.startAt}).
@@ -246,7 +246,7 @@ export function DocxDetectCard({
                   ) : restartOnly ? (
                     <>
                       <div className="font-semibold text-sky-800 dark:text-sky-300">
-                        📂 Multiple sections/exams in one file — numbering restarts at 1 in {serial.issues.length} place(s)
+                        Multiple sections/exams in one file — numbering restarts at 1 in {serial.issues.length} place(s)
                       </div>
                       <div className="mt-0.5 text-sm text-sky-700/90 dark:text-sky-400/90">
                         That's not an error — each section has its own numbering (starting at {serial.startAt}). To shuffle, enable "Run as-is" below.
@@ -255,7 +255,7 @@ export function DocxDetectCard({
                   ) : (
                     <>
                       <div className="font-semibold text-amber-800 dark:text-amber-300">
-                        ⚠️ {Math.min(serial.issues.length, 30)} serial problem(s) (duplicates/jumps)
+                        {Math.min(serial.issues.length, 30)} serial problem(s) (duplicates/jumps)
                       </div>
                       <div className="mt-1 text-sm text-amber-700/90 dark:text-amber-400/90">
                         {serial.issues.slice(0, 3).map((is, i) => (
@@ -275,7 +275,7 @@ export function DocxDetectCard({
                 <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-amber-200 pt-3 dark:border-amber-800">
                   <Button size="sm" className="gap-2 bg-amber-600 hover:bg-amber-700" onClick={onSerialFix} disabled={fixing}>
                     <Download className="h-4 w-4" />
-                    {fixing ? "Building..." : "🔧 Fix serial & download .docx (1..N)"}
+                    {fixing ? "Building..." : "Fix serial & download .docx (1..N)"}
                   </Button>
                   <div className="flex items-center gap-2">
                     <Switch id="docx-allow-broken" checked={allowBroken} onCheckedChange={onAllowBrokenChange} />

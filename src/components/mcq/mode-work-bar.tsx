@@ -127,8 +127,7 @@ export function ModeWorkBar({ mode, onBack, onModeChange, onAddFiles, busy, file
       </div>
 
       <div className="min-w-0 flex-1 text-center">
-        <span className="text-sm font-bold sm:text-base">{meta.emoji} {meta.title}</span>
-        <span className="ml-2 hidden text-xs text-muted-foreground sm:inline">— press the arrow to go home</span>
+        <span className="text-sm font-bold sm:text-base">{meta.title}</span>
       </div>
 
       {maxFiles !== undefined && filesCount !== undefined && (

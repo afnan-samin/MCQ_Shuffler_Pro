@@ -109,7 +109,7 @@ export function ShuffleCard({
             {enabled && !countInvalid && !isOriginal && (
               <p className="text-xs text-muted-foreground">
                 ≈ <span className="font-semibold text-brand-700 dark:text-brand-400">{perSet}</span> questions per set
-                {remainder > 0 && ` (first ${remainder} set(s) get one extra)`}
+                {remainder > 0 && `(first ${remainder} set(s) get one extra)`}
               </p>
             )}
           </div>
@@ -220,7 +220,7 @@ export function ShuffleCard({
             className={`h-14 gap-3 text-base font-bold ${enabled ? "bg-brand-600 hover:bg-brand-700" : ""}`}
           >
             {enabled ? <Shuffle className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
-            {shuffling ? "Shuffling..." : "🔀 Shuffle & build sets"}
+            {shuffling ? "Shuffling..." : "Shuffle & build sets"}
           </Button>
           {lockReason ? (
             <p className="flex items-center justify-center gap-1.5 text-center text-sm text-amber-700 dark:text-amber-400">

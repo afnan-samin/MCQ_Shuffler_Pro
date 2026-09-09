@@ -164,7 +164,7 @@ a) Beijing  b) Tokyo  c) Seoul  d) Bangkok`}
             className="gap-2 bg-brand-600 hover:bg-brand-700"
           >
             {detecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-            {detecting ? "Detecting..." : "🔍 Detect questions (paste mode)"}
+            {detecting ? "Detecting..." : "Detect questions"}
           </Button>
           {rawText.trim() && (
             <Badge variant="secondary" className="gap-1">

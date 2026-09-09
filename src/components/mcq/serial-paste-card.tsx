@@ -9,7 +9,7 @@ import { DownloadFormatToggle } from "@/components/mcq/download-format-toggle";
 
 interface SerialPasteCardProps {
   result: ParseOutput;
-  /** "🔧 অটো নম্বরিং ঠিক করুন" চলছে */
+  /** "অটো নম্বরিং ঠিক করুন" চলছে */
   fixing: boolean;
   /** সিরিয়াল .docx ডাউনলোড চলছে */
   downloading: boolean;
@@ -90,7 +90,7 @@ export function SerialPasteCard({ result, fixing, downloading, onFix, onDownload
                 {serialOk ? (
                   <>
                     <div className="font-semibold text-brand-800 dark:text-brand-300">
-                      ✅ Serial is correct — download enabled!
+                      Serial is correct — download enabled!
                     </div>
                     <div className="mt-0.5 text-sm text-brand-700/80 dark:text-brand-400/80">
                       Question numbers run consecutively from {serial.startAt} to {lastNumber}.
@@ -100,7 +100,7 @@ export function SerialPasteCard({ result, fixing, downloading, onFix, onDownload
                 ) : (
                   <>
                     <div className="font-semibold text-amber-800 dark:text-amber-300">
-                      ⚠️ Found {serial.issues.length} problem(s) in the serial
+                      Found {serial.issues.length} problem(s) in the serial
                     </div>
                     <div className="mt-1 text-sm text-amber-700/90 dark:text-amber-400/90">
                       {serial.issues.slice(0, 3).map((is, i) => (
@@ -119,7 +119,7 @@ export function SerialPasteCard({ result, fixing, downloading, onFix, onDownload
               <div className="mt-3 flex flex-wrap items-center border-t border-amber-200 pt-3 dark:border-amber-800">
                 <Button size="sm" className="gap-2 bg-amber-600 hover:bg-amber-700" onClick={onFix} disabled={fixing}>
                   <Wrench className="h-4 w-4" />
-                  {fixing ? "Fixing..." : "🔧 Fix numbering automatically"}
+                  {fixing ? "Fixing..." : " Fix numbering automatically"}
                 </Button>
               </div>
             )}

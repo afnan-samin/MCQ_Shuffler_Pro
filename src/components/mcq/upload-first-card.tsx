@@ -91,8 +91,8 @@ export function UploadFirstCard({
           <CardTitle className="text-lg md:text-xl">Upload a file first</CardTitle>
         </div>
         <CardDescription>
-          Word (.docx) uploads keep the formatting exactly — tabs, equations (math), sub/superscript, Bijoy (SutonnyMJ), nothing breaks.
-          After upload you'll see 3 modes below — click the one you want to work with.
+          Word (.docx) uploads keep the formatting exactly — tabs, equations, Bijoy fonts intact.
+          After upload, click a mode below to work with the file.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -150,7 +150,7 @@ a) Beijing  b) Tokyo  c) Seoul  d) Bangkok`}
             className="gap-2 bg-brand-600 hover:bg-brand-700"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-            {busy ? "Detecting..." : "🔍 Detect questions (paste mode)"}
+            {busy ? "Detecting..." : "Detect questions (paste mode)"}
           </Button>
           {rawText.trim() && (
             <Badge variant="secondary" className="gap-1">
@@ -182,7 +182,7 @@ export function StagedFilesCard({ files, onClear }: StagedFilesCardProps) {
           </span>
           <div className="min-w-0 flex-1">
             <CardTitle className="text-base md:text-lg">
-              📁 {files.length} files ready — pick a mode now
+              {files.length} files ready — pick a mode now
             </CardTitle>
             <CardDescription>
               Click any mode below and these files open straight into it — no re-upload needed.

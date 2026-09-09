@@ -568,7 +568,7 @@ export default function Home() {
       setSelected(new Set(result.questions.map((q) => q.id)));
       setAllowBroken(false);
       toast({
-        title: "🔧 Serial fixed",
+        title: "Serial fixed",
         description: `Renumbered ${result.questions.length} question(s) starting from 1.`,
       });
     } finally {
@@ -593,12 +593,12 @@ export default function Home() {
       });
     } else if (result.serial?.status === "ok") {
       toast({
-        title: `✅ ${result.questions.length} question(s) detected`,
+        title: `${result.questions.length} question(s) detected`,
         description: "Serial is correct — the shuffle button is enabled now!",
       });
     } else if (result.serial) {
       toast({
-        title: `⚠️ ${result.questions.length} question(s) found, but the serial has problems`,
+        title: `${result.questions.length} question(s) found, but the serial has problems`,
         description: '"Fix numbering automatically" fixes it in one click.',
       });
     }
@@ -648,7 +648,7 @@ export default function Home() {
 
       if (v.colorAn) {
         toast({
-          title: `🎨 Detected ${v.parse.questions.length} question(s) as one serial — stripped ${v.headersStripped} color header(s)${patternStripped ? ` + ${patternStripped} non-MCQ line(s)` : ""}`,
+          title: `Detected ${v.parse.questions.length} question(s) as one serial — stripped ${v.headersStripped} color header(s)${patternStripped ? `+ ${patternStripped} non-MCQ line(s)`: ""}`,
           description: "Headers/non-MCQ lines won't be shuffled — the full stripped-line list is below.",
         });
       } else if (v.parse.questions.length === 0) {
@@ -665,16 +665,16 @@ export default function Home() {
             : `${v.parse.serial?.issues.length ?? 0} serial problem(s) — turning serial replace ON during the shuffle fixes them.`;
 
         toast({
-          title: `✅ ${v.parse.questions.length} question(s) detected${patternStripped ? ` (${patternStripped} non-MCQ line(s) stripped)` : ""}`,
+          title: `${v.parse.questions.length} question(s) detected${patternStripped ? `(${patternStripped} non-MCQ line(s) stripped)`: ""}`,
           description: patternStripped
             ? `${patternStripped} header/title line(s) aren't MCQs — excluded from the shuffle (list below). ${serialMsg}`
-            : `${serialMsg}${v.parse.unicodeQuestionIds.length ? ` ⚠️ ${v.parse.unicodeQuestionIds.length} question(s) contain Unicode (kept as-is in the download).` : ""}`,
+            : `${serialMsg}${v.parse.unicodeQuestionIds.length ? `${v.parse.unicodeQuestionIds.length} question(s) contain Unicode (kept as-is in the download).`: ""}`,
         });
       }
 
       if (item.xml.length > 8_000_000) {
         toast({
-          title: "⚠️ Very large file",
+          title: "Very large file",
           description: "This file is big — shuffling and downloading may take a while; don't close the tab.",
         });
       }
@@ -732,8 +732,8 @@ export default function Home() {
           return next;
         });
         toast({
-          title: `✅ ${added.length} file(s) ${append ? "added" : "loaded"}`,
-          description: `${questions} question(s) in total${colors ? `, ${colors} color header(s)` : ""}.${added.length > 1 ? " Reorder from the list — merge/ZIP download below." : ""}`,
+          title: `${added.length} file(s) ${append ? "added" : "loaded"}`,
+          description: `${questions} question(s) in total${colors ? `, ${colors} color header(s)`: ""}.${added.length > 1 ? " Reorder from the list — merge/ZIP download below." : ""}`,
         });
       }
       if (errors.length) {
@@ -788,7 +788,7 @@ export default function Home() {
         })
       );
       toast({
-        title: `✅ Color-serial .${downloadFormat === "pdf" ? "pdf" : "docx"} downloaded`,
+        title: `Color-serial .${downloadFormat === "pdf" ? "pdf" : "docx"} downloaded`,
         description:
           scheme.kind === "continuous"
             ? `${plan.size} question(s) numbered continuously 1,2,3…. Everything else untouched.`
@@ -820,9 +820,9 @@ export default function Home() {
         items.push({ xml, file: await replaceDocumentXml(d.file, xml) });
       }
       const merged = await buildMergedDocxBlob(items, fontSettings);
-      await finalizeDownload({ blob: merged, fileName: `${serialDocs[0].baseName} (merged serial).docx` });
+      await finalizeDownload({ blob: merged, fileName: `${serialDocs[0].baseName} (merged serial).docx`});
       toast({
-        title: `✅ Merged .${downloadFormat === "pdf" ? "pdf" : "docx"} downloaded`,
+        title: `Merged .${downloadFormat === "pdf" ? "pdf" : "docx"} downloaded`,
         description:
           serialStrategy === "global"
             ? "All files in order with page breaks — one continuous serial start to finish."
@@ -850,7 +850,7 @@ export default function Home() {
       const zip = await buildZipBlob(await finalizeZipEntries(out));
       downloadBlob(zip, "MCQ-serial-files.zip");
       toast({
-        title: "✅ ZIP downloaded",
+        title: "ZIP downloaded",
         description: `${out.length} file(s), each serialized separately — all inside.`,
       });
     } catch (e) {
@@ -879,12 +879,12 @@ export default function Home() {
         });
       } else if (result.serial?.status === "ok") {
         toast({
-          title: `✅ ${result.questions.length} question(s) detected`,
+          title: `${result.questions.length} question(s) detected`,
           description: "Serial is correct — the serial download button below is enabled!",
         });
       } else {
         toast({
-          title: `⚠️ ${result.questions.length} question(s) found, but the serial has problems`,
+          title: `${result.questions.length} question(s) found, but the serial has problems`,
           description: '"Fix numbering automatically" fixes it in one click.',
         });
       }
@@ -903,7 +903,7 @@ export default function Home() {
       setSerialPasteText(fixed);
       setSerialPaste(result);
       toast({
-        title: "🔧 Serial fixed",
+        title: "Serial fixed",
         description: `Renumbered ${result.questions.length} question(s) starting from 1.`,
       });
     } finally {
@@ -927,7 +927,7 @@ export default function Home() {
         }, fontSettings)
       );
       toast({
-        title: `✅ Serial .${downloadFormat === "pdf" ? "pdf" : "docx"} downloaded`,
+        title: `Serial .${downloadFormat === "pdf" ? "pdf" : "docx"} downloaded`,
         description: `${renumbered.length} question(s) numbered 1..N by position — order and options exactly intact.`,
       });
     } catch (e) {
@@ -957,7 +957,7 @@ export default function Home() {
     // carry বাইপাস — changeMode-এর carryToMode স্টেল serialDocs=[] পড়ে ফাইলটা আবার লোড করত (ডাবল-বিশ্লেষণ + ডাবল-টোস্ট)
     changeMode("serial", true);
     toast({
-      title: "🔢 File opened in Serial mode",
+      title: "File opened in Serial mode",
       description: "Pick a color below and download the serial file.",
     });
   };
@@ -979,8 +979,8 @@ export default function Home() {
       }, 80);
       toast({
         title: isOriginal
-          ? `🔀 ${setCount} set(s) built — all ${pool.length} question(s) in each!`
-          : `🔀 ${setCount} set(s) built!`,
+          ? `${setCount} set(s) built — all ${pool.length} question(s) in each!`
+          : `${setCount} set(s) built!`,
         description: isOriginal
           ? "Each set's serial order is distinct — no two sets share an order."
           : "You can download the Word file now — one set per page.",
@@ -1007,7 +1007,7 @@ export default function Home() {
         })
       );
       toast({
-        title: downloadFormat === "pdf" ? "✅ PDF file downloaded" : "✅ Word file downloaded",
+        title: downloadFormat === "pdf" ? "PDF file downloaded" : "Word file downloaded",
         description: doRenumber
           ? "One set per page, serials 1,2,3…. Formatting exactly intact."
           : "One set per page, with the questions' original numbers. Formatting exactly intact.",
@@ -1034,7 +1034,7 @@ export default function Home() {
         })
       );
       toast({
-        title: `🔧 Serial-fixed .${downloadFormat === "pdf" ? "pdf" : "docx"} downloaded`,
+        title: `Serial-fixed .${downloadFormat === "pdf" ? "pdf" : "docx"} downloaded`,
         description: "Questions in original order with serials 1..N — formatting exactly intact.",
       });
     } catch (e) {
@@ -1166,7 +1166,7 @@ export default function Home() {
         });
         const totalQ = added.reduce((a, d) => a + d.parse.questions.length, 0);
         toast({
-          title: `✅ ${added.length} file(s) ${append ? "added" : "loaded"}`,
+          title: `${added.length} file(s) ${append ? "added" : "loaded"}`,
           description: `${totalQ} question(s) in total. Now pick parts and download.`,
         });
       }
@@ -1256,10 +1256,10 @@ export default function Home() {
           ? await replaceDocumentXml(items[0].file, items[0].xml, fontSettings)
           : await buildMergedDocxBlob(items, fontSettings);
       const name =
-        items.length === 1 ? `${items[0].baseName} (redownload).docx` : "MCQ-Redownload-merged.docx";
+        items.length === 1 ? `${items[0].baseName} (redownload).docx`: "MCQ-Redownload-merged.docx";
       await finalizeDownload({ blob, fileName: name });
       toast({
-        title: "✅ Redownload file created",
+        title: "Redownload file created",
         description: `Picked parts from ${items.length} file(s) in the new file — tabs, equations, watermark all intact.`,
       });
     } catch (e) {
@@ -1285,7 +1285,7 @@ export default function Home() {
       const zip = await buildZipBlob(await finalizeZipEntries(files));
       downloadBlob(zip, "MCQ-Redownload.zip");
       toast({
-        title: "✅ ZIP downloaded",
+        title: "ZIP downloaded",
         description: `${files.length} separate file(s) — each with the picked parts.`, 
       });
     } catch (e) {
@@ -1314,8 +1314,8 @@ export default function Home() {
       }, 80);
       toast({
         title: isOriginal
-          ? `🔀 ${setCount} set(s) built — all ${pool.length} question(s) in each!`
-          : `🔀 ${setCount} set(s) built!`,
+          ? `${setCount} set(s) built — all ${pool.length} question(s) in each!`
+          : `${setCount} set(s) built!`,
         description: isOriginal
           ? "Each set's serial order is distinct — no two sets share an order."
           : `${pool.length} question(s) split. You can download the Word file now.`, 
@@ -1350,7 +1350,7 @@ export default function Home() {
         const take = Math.max(0, SHUFFLE_MAX_FILES - (append ? existingCount : 0));
         list = files.slice(0, take);
         toast({
-          title: `⚠️ Shuffle mode: max ${SHUFFLE_MAX_FILES} files`,
+          title: `Shuffle mode: max ${SHUFFLE_MAX_FILES} files`,
           description: take > 0
             ? `Between 1 and ${SHUFFLE_MAX_FILES} files at a time — took the first ${take}, dropped the rest.`
             : `Already ${SHUFFLE_MAX_FILES} files — remove some from the list to add new ones.`,
@@ -1408,7 +1408,7 @@ export default function Home() {
       if (isAppend) {
         if (loaded.length) {
           toast({
-            title: `✅ ${loaded.length} file(s) added — ${items.length} in total`,
+            title: `${loaded.length} file(s) added — ${items.length} in total`,
             description: "Reorder from the list — merge/ZIP keeps exactly this order.",
           });
         }
@@ -1416,7 +1416,7 @@ export default function Home() {
         const totalQuestions = items.reduce((a, i) => a + i.parse.questions.length, 0);
         const zeroQ = items.filter((i) => i.parse.questions.length === 0).length;
         toast({
-          title: `✅ ${items.length} file(s) loaded — ${totalQuestions} question(s) in total`,
+          title: `${items.length} file(s) loaded — ${totalQuestions} question(s) in total`,
           description: zeroQ
             ? `${zeroQ} file(s) have no questions — remove them from the list. Drag to reorder.`
             : "Reorder from the list — the shuffle config below shuffles all files together.",
@@ -1465,7 +1465,7 @@ export default function Home() {
         resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 80);
       toast({
-        title: `🔀 ${shuffleItems.length} file(s) shuffled — ${multiEffectiveSets} set(s) per file!`,
+        title: `${shuffleItems.length} file(s) shuffled — ${multiEffectiveSets} set(s) per file!`,
         description: "Merge (.docx) or ZIP below — both ways available.",
       });
     } finally {
@@ -1491,10 +1491,10 @@ export default function Home() {
       }
       if (items.length < 2) throw new Error("Not enough files to merge");
       const merged = await buildMergedDocxBlob(items, fontSettings);
-      await finalizeDownload({ blob: merged, fileName: `${shuffleItems[0].baseName} (merged shuffled).docx` });
+      await finalizeDownload({ blob: merged, fileName: `${shuffleItems[0].baseName} (merged shuffled).docx`});
       toast({
         title:
-          downloadFormat === "pdf" ? "✅ Merged PDF file downloaded" : "✅ Merged Word file downloaded",
+          downloadFormat === "pdf" ? "Merged PDF file downloaded" : "Merged Word file downloaded",
         description: "All files' sets in order — page breaks between files, formatting exactly intact.",
       });
     } catch (e) {
@@ -1524,7 +1524,7 @@ export default function Home() {
       const zip = await buildZipBlob(await finalizeZipEntries(out));
       downloadBlob(zip, "MCQ-shuffled-files.zip");
       toast({
-        title: "✅ ZIP downloaded",
+        title: "ZIP downloaded",
         description: `${out.length} separate shuffled file(s) inside.`, 
       });
     } catch (e) {
@@ -1570,7 +1570,7 @@ export default function Home() {
     try {
       await finalizeDownload(await buildSetsDocxBlob(sets, exportOpts, fontSettings));
       toast({
-        title: downloadFormat === "pdf" ? "✅ PDF file downloaded" : "✅ Word file downloaded",
+        title: downloadFormat === "pdf" ? "PDF file downloaded" : "Word file downloaded",
         description: "Each set is on its own page.",
       });
     } catch (e) {
@@ -1586,7 +1586,7 @@ export default function Home() {
       // NOTE: the .doc (legacy Word) path stays DOCX/HTML-only by design — the
       // "Download as" PDF toggle does not affect it (nor the Print button below).
       exportDocHtml(sets, exportOpts);
-      toast({ title: "✅ .doc file downloaded" });
+      toast({ title: ".doc file downloaded" });
     } catch (e) {
       toast({ title: "Download failed", description: String(e), variant: "destructive" });
     }
@@ -1637,7 +1637,7 @@ export default function Home() {
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-bold tracking-tight md:text-2xl">MCQ Shuffler Pro</h1>
             <p className="text-xs text-muted-foreground md:text-sm">
-              Upload a file → pick a mode and work (🔀 shuffle+sets • 🔢 color-serial • 📥 redownload) — go back to run the same files in another mode • .docx preserved exactly
+              Upload a file, pick a mode, and work — switch modes any time, your files come along
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -1860,7 +1860,7 @@ export default function Home() {
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base md:text-lg">
-                      📂 Uploaded files ({shuffleItems.length})
+                      Uploaded files ({shuffleItems.length})
                     </CardTitle>
                     <CardDescription>
                       Drag or use the arrows to reorder — merge/ZIP keeps exactly this order. Each file is shuffled within itself.
@@ -2068,7 +2068,7 @@ export default function Home() {
       {/* ফুটার */}
       <footer className="mt-auto border-t bg-white/60 py-4 dark:bg-background/60">
         <div className="mx-auto max-w-5xl px-4 text-center text-xs text-muted-foreground">
-          MCQ Shuffler Pro — a free tool for offices, schools, coaching centers and universities. Everything runs in your browser; no question ever reaches a server.
+          MCQ Shuffler Pro — everything runs in your browser; no question ever leaves your device.
         </div>
       </footer>
     </div>

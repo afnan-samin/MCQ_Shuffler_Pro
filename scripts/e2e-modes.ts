@@ -204,7 +204,7 @@ ok(dlZip2.suggestedFilename() === "MCQ-serial-files.zip", "২-ফাইল ZIP 
 // B6. সিরিয়াল পেস্ট-পাথ — পেস্ট-ট্যাব (ফাইল লোড থাকলেও ট্যাব ক্লিকযোগ্য) → ডিটেক্ট (docx-লিস্ট অটো-ক্লিয়ার) → ফিক্স → ডাউনলোড
 await page.click('button[role="tab"]:has-text("Paste")');
 await page.fill("textarea", "1. পানির সংকেত কী?\nক) H2O খ) CO2 গ) O2 ঘ) NaCl\n2. বাতাসে সবচেয়ে বেশি কী আছে?\nক) অক্সিজেন খ) নাইট্রোজেন গ) হিলিয়াম ঘ) হাইড্রোজেন\n5. লোহার প্রতীক?\nক) Fe খ) Au গ) Ag ঘ) Cu");
-await page.click('button:has-text("🔍 Detect questions")');
+await page.click('button:has-text("Detect questions")');
 await page.waitForSelector("#serial-paste-result", { timeout: 30000 });
 ok(await toastSeen("the serial has problems"), "ভাঙা সিরিয়াল ডিটেক্ট (৩,৪ লাফ)");
 await page.click('button:has-text("Fix numbering automatically")');

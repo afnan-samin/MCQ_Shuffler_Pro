@@ -125,7 +125,7 @@ a) Beijing  b) Tokyo  c) Seoul  d) Bangkok`}
                 className="gap-2 bg-brand-600 hover:bg-brand-700"
               >
                 {pasteBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                {pasteBusy ? "Detecting..." : "🔍 Detect questions"}
+                {pasteBusy ? "Detecting..." : "Detect questions"}
               </Button>
               <span className="text-xs text-muted-foreground">
                 Paste = text pipeline — detecting clears the uploaded file list (the two can't coexist).

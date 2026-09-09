@@ -24,7 +24,7 @@ export function NextModesCard({ current, filesCount, onOpen }: NextModesCardProp
   return (
     <Card className="border-dashed border-brand-300 bg-brand-50/40 dark:border-brand-800 dark:bg-brand-950/10">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base md:text-lg">✅ Keep working with these files</CardTitle>
+        <CardTitle className="text-base md:text-lg">Keep working with these files</CardTitle>
         <CardDescription>
           Take all {filesCount} file(s) straight into another mode — they open there automatically, no re-upload needed.
         </CardDescription>
