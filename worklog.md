@@ -1015,3 +1015,25 @@ Stage Summary:
 - পেন্ডিং ওয়ার্কিং-ট্রি পরিষ্কার — PDF কাট গ্যাপ-স্ন্যাপ + ফন্ট-সোয়াপ + হুক-রিফ্যাক্টর সব GitHub-এ
 - ⚠️ টোকেন নিরাপত্তা: চ্যাট/শেল-হিস্ট্রিতে থাকা নতুন টোকেন কাজ শেষে github.com/settings/tokens-এ REVOKE করতে হবে
 
+---
+
+Task ID: 55
+Agent: Cline
+Task: ফুল প্রজেক্ট রিভিউ — bug/error স্ক্যান + সেগুলো ঠিক করে commit (user request: "poro project review kre bug error ba hole ber kro.. and tik kre felo")
+
+Work Log:
+- স্ক্যান: tsc --noEmit (exit 0), eslint src+scripts (exit 0), ফুল ১২-স্যুট টেস্ট (mcq 71, docx 57, color 104, multi 65, font 120, labels 27, redownload 41, splits 43, reference 43, doc1 27, export 7, pdf 11) — সব সবুজ, কোনো লাল নেই
+- src-এ process.exit/TODO/FIXME/@ts-ignore-মুক্ত; secret-স্ক্যান (ghp_/github_pat_/AKIA/PRIVATE KEY) ক্লিন; .vscode/tasks.json (ভেতরের-টার্মিনাল dev টাস্ক) আগের টাস্ক থেকে
+- পাওয়া বাগ + ফিক্স:
+  ① onReshuffleSet={toggleSort} — "Reshuffle" চাপলে আসলে পুনরায় serial-সর্ট হতো; এখন dedicated reshuffleSet() (প্রতি শাফল্ড-সেট নতুন-শাফল, sort-ফ্ল্যাগ untouched)
+  ② sets-result.tsx-এ শাফল্ড সেটের জন্য আলাদা "Shuffle" বাটন (icon+title) — সিরিয়াল-সেটে শুধু Sort-টগল থাকে (টগল-এরর উন্নয়ন: বাটন-লেবেল "Shuffle"/"Sort serial" + Icon)
+  ③ file-dropzone.tsx: compact ড্রপজোনের Space-key-তে preventDefault আগে ছিল না — পেজ স্ক্রল হতো; এখন Space/Enter গার্ডেড (disabled/busy-তে কিছুই হয় না)
+  ④ package.json: test:font/labels/splits/all স্ক্রিপ্ট যোগ
+  ⑤ .env ট্র্যাকড ছিল (sandbox-নির্দিষ্ট DATABASE_URL) — index থেকে বাদ (রিপোতে যাবে না; এখন .gitignore .env* কভার করে); src-এ process.env/DATABASE_URL কোনো রেফ নেই — নিরাপদ
+  ⑥ sets-result.tsx index-মোড 100755→100644 normalize
+- Mode-change স্টেটমেন্টে এখনো সংশয়: SetsResult-এ sortedFlags শুধু shuffle-মোডে আসে — গেট-পাথ যাচাই করে, এখন সঠিক
+- কমিট: d13de0c
+
+Stage Summary:
+- রিভিউ-ফিক্স ৪টা ফাইলে ৩৬ ইনসার্ট/৩ ডিলিট + `.env` ফ্ল্যাগ-অফ; হেড d13de0c, origin/main ee32753 (পুশ পেন্ডিং — নতুন টোকেন লাগবে)
+- ⚠️ টোকেন নিরাপত্তা: আগের টোকেনগুলো REVOKE করতে হবে প্রতিবার কাজ শেষে
