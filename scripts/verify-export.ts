@@ -4,6 +4,8 @@ import { parseMcq } from "../src/lib/mcq/parser";
 import { buildSets } from "../src/lib/mcq/set-engine";
 import { runsForLine, DEFAULT_EXPORT_OPTIONS, type ExportOptions } from "../src/lib/mcq/exporter";
 import { writeFileSync } from "fs";
+import { dirname, join } from "path";
+import { fileURLToPath } from "url";
 
 const BIJOY_DOC = `টেস্ট কলেজ
 1. evsjv Av‡i Pµgvb?
@@ -41,13 +43,19 @@ sets.forEach((questions, si) => {
 
 const doc = new Document({ sections: [{ children: paras }] });
 const buf = await Packer.toBuffer(doc);
-writeFileSync("/home/z/my-project/scripts/test-export.docx", Buffer.from(buf));
+// স্ক্রিপ্টের নিজের ফোল্ডারে লেখা — কোনো OS-নির্দিষ্ট absolute path নয় (.gitignore-এ আগেই বাদ)
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+writeFileSync(join(scriptDir, "test-export.docx"), Buffer.from(buf));
 
-// XML ইন্সপেক্ট
-const { execSync } = await import("child_process");
-const { readFileSync: readF } = await import("fs");
-execSync("cd /home/z/my-project/scripts && python3 -c \"import zipfile; open('document.xml','wb').write(zipfile.ZipFile('test-export.docx').read('word/document.xml'))\"");
-const xml = readF("/home/z/my-project/scripts/document.xml", "utf8");
+// XML ইন্সপেক্ট — JSZip দিয়ে মেমরিতেই document.xml পড়া (python3/shell দরকার নেই, সব OS-এ চলে)
+const { default: JSZip } = await import("jszip");
+const zip = await JSZip.loadAsync(buf);
+const xmlFile = zip.file("word/document.xml");
+if (!xmlFile) {
+  console.error("  ✗ FAIL: word/document.xml পাওয়া যায়নি");
+  process.exit(1);
+}
+const xml = await xmlFile.async("string");
 
 let pass = 0, fail = 0;
 const check = (name: string, cond: boolean, extra = "") => {

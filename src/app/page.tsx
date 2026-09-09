@@ -98,6 +98,7 @@ import {
 } from "@/lib/mcq/file-pipeline";
 import { MAX_FILE_BYTES, SHUFFLE_MAX_FILES } from "@/lib/mcq/limits";
 import { toast } from "@/hooks/use-toast";
+import { usePersistedJson, usePersistedString } from "@/hooks/use-persisted-state";
 import { Dices, ShieldCheck, Zap } from "lucide-react";
 
 const STORAGE_KEY = "mcq-shuffler-text";
@@ -126,6 +127,14 @@ function sanitizeFontSettings(raw: unknown): FontSettings {
 }
 /** "Download as" ফরম্যাট-টগলের শেষ পছন্দ (DOCX ডিফল্ট — অনুপস্থিত/ভাঙা মানে DOCX) */
 const DOWNLOAD_FORMAT_KEY = "mcq-download-format";
+/** localStorage থেকে আসা মোড-ভ্যালুর গার্ড — অজানা ভ্যালু এলে ডিফল্ট "shuffle" থাকে */
+function isMcqMode(raw: string): raw is McqMode {
+  return raw === "shuffle" || raw === "serial" || raw === "redownload";
+}
+/** "Download as" ফরম্যাট-ভ্যালুর গার্ড */
+function isDownloadFormat(raw: string): raw is DownloadFormat {
+  return raw === "docx" || raw === "pdf";
+}
 // মাল্টি-ফাইল লিস্টের আইটেম-id (reorder/remove-এর জন্য স্টেবল কী দরকার)
 let multiIdCounter = 0;
 const nextMultiId = () => `mf-${++multiIdCounter}-${Date.now().toString(36)}`;
@@ -179,8 +188,8 @@ interface RdDocState {
 }
 
 export default function Home() {
-  // ---- মোড (শাফল / সিরিয়াল / রিডাউনলোড — আপলোডের পরে দেখা যায়) ----
-  const [mode, setMode] = useState<McqMode>("shuffle");
+  // ---- মোড (persisted — শেষ ব্যবহৃত মোড মনে থাকে) ----
+  const [mode, setMode] = usePersistedString<McqMode>(MODE_KEY, "shuffle", isMcqMode);
 
   // ---- স্টেজড ফাইল — আপলোড হয়েছে, কিন্তু এখনো কোনো মোডে খোলা হয়নি ----
   // ইউজার যেকোনো মোডে ক্লিক করলে এই ফাইলগুলো ওই মোডে লোড হয়ে যায়
@@ -213,11 +222,19 @@ export default function Home() {
   // রেফারেন্স-ট্যাগ ([CU-A: 22-23] স্টাইল) কী করা হবে — ডিফল্ট রাখা
   const [refMode, setRefMode] = useState<RefMode>("keep");
 
-  // ---- আউটপুট ফাইলের ফন্ট-রিম্যাপ — ডাউনলোডের সময় document.xml (+styles.xml)-এ প্রয়োগ হয় ----
-  const [fontSettings, setFontSettings] = useState<FontSettings>(DEFAULT_FONT_REMAP_SETTINGS);
+  // ---- আউটপুট ফাইলের ফন্ট-রিম্যাপ (persisted) — ডাউনলোডের সময় document.xml (+styles.xml)-এ প্রয়োগ হয় ----
+  const [fontSettings, updateFontSettings] = usePersistedJson<FontSettings>(
+    FONT_SETTINGS_KEY,
+    DEFAULT_FONT_REMAP_SETTINGS,
+    sanitizeFontSettings
+  );
 
-  // ---- "Download as" ফরম্যাট (DOCX ডিফল্ট / PDF) — সব মোডের সব ডাউনলোডে এক পছন্দ (persisted) ----
-  const [downloadFormat, setDownloadFormat] = useState<DownloadFormat>("docx");
+  // ---- "Download as" ফরম্যাট (persisted — DOCX ডিফল্ট) — সব মোডের সব ডাউনলোডে এক পছন্দ ----
+  const [downloadFormat, updateDownloadFormat] = usePersistedString<DownloadFormat>(
+    DOWNLOAD_FORMAT_KEY,
+    "docx",
+    isDownloadFormat
+  );
 
   // ---- রেজাল্ট ----
   const [sets, setSets] = useState<McqQuestion[][] | null>(null);
@@ -262,8 +279,10 @@ export default function Home() {
   // কোন অংশগুলো নতুন ফাইলে থাকবে (ডিফল্ট: সিরিয়াল + প্রশ্ন)
   const [rdParts, setRdParts] = useState<PartSel>(DEFAULT_PART_SELECTION);
   const [rdRenumber, setRdRenumber] = useState(true);
-  const [optionLabels, setOptionLabels] = useState<OptionLabelSettings>(
-    DEFAULT_OPTION_LABEL_SETTINGS
+  const [optionLabels, updateOptionLabels] = usePersistedJson<OptionLabelSettings>(
+    OPTION_LABELS_KEY,
+    DEFAULT_OPTION_LABEL_SETTINGS,
+    sanitizeOptionLabelSettings
   );
   const [rdMergedBusy, setRdMergedBusy] = useState(false);
   const [rdZipBusy, setRdZipBusy] = useState(false);
@@ -333,69 +352,9 @@ export default function Home() {
   /** লোডার রি-এন্ট্রান্সি গার্ড — state নয়, ref (stale-closure এড়াতে); চলমান লোড থাকলে নতুন কল নীরবে বাদ */
   const loadersBusyRef = useRef(false);
 
-  // শেষ ব্যবহৃত মোড মনে রাখা
-  useEffect(() => {
-    try {
-      const m = localStorage.getItem(MODE_KEY);
-      if (m === "shuffle" || m === "serial" || m === "redownload") setMode(m);
-    } catch { // কোটা/প্রাইভেসি-মোড — নীরবে উপেক্ষা
-    }
-  }, []);
-
-  // ফন্ট-রিম্যাপ সেটিংস হাইড্রেট (প্রথম লোডে একবারই) — FONT_CHOICES-এর বাইরের
-  // ভ্যালু ড্রপ (Radix Select খালি রেন্ডার না করে ডিফল্টে ফেরে)
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(FONT_SETTINGS_KEY);
-      if (raw) setFontSettings(sanitizeFontSettings(JSON.parse(raw)));
-    } catch { // ভাঙা JSON/কোটা — ডিফল্টেই থাকুক
-    }
-  }, []);
-
-  // অপশন-লেবেল সেটিংস হাইড্রেট (প্রথম লোডে একবারই) — অজানা ভ্যালু ড্রপ
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(OPTION_LABELS_KEY);
-      if (raw) setOptionLabels(sanitizeOptionLabelSettings(JSON.parse(raw)));
-    } catch { // ভাঙা JSON/কোটা — ডিফল্টেই থাকুক
-    }
-  }, []);
-
-  // ডাউনলোড-ফরম্যাট হাইড্রেট (প্রথম লোডে একবারই) — DOCX ডিফল্ট যখন key অনুপস্থিত
-  useEffect(() => {
-    try {
-      const f = localStorage.getItem(DOWNLOAD_FORMAT_KEY);
-      if (f === "docx" || f === "pdf") setDownloadFormat(f);
-    } catch { // কোটা/প্রাইভেসি-মোড — নীরবে উপেক্ষা
-    }
-  }, []);
-
-  /** ফন্ট-সেটিংস কমিট (কার্ডের "Use fonts"/"Reset") — state + localStorage দুটোতেই */
-  const updateFontSettings = useCallback((s: FontSettings) => {
-    setFontSettings(s);
-    try {
-      localStorage.setItem(FONT_SETTINGS_KEY, JSON.stringify(s));
-    } catch { // কোটা/প্রাইভেসি-মোড — নীরবে উপেক্ষা
-    }
-  }, []);
-
-  /** অপশন-লেবেল সেটিংস কমিট (কার্ডের "Use labels"/"Reset") — state + localStorage */
-  const updateOptionLabels = useCallback((s: OptionLabelSettings) => {
-    setOptionLabels(s);
-    try {
-      localStorage.setItem(OPTION_LABELS_KEY, JSON.stringify(s));
-    } catch { // কোটা/প্রাইভেসি-মোড — নীরবে উপেক্ষা
-    }
-  }, []);
-
-  /** ডাউনলোড-ফরম্যাট কমিট ("Download as" টগল) — state + localStorage দুটোতেই */
-  const updateDownloadFormat = useCallback((f: DownloadFormat) => {
-    setDownloadFormat(f);
-    try {
-      localStorage.setItem(DOWNLOAD_FORMAT_KEY, f);
-    } catch { // কোটা/প্রাইভেসি-মোড — নীরবে উপেক্ষা
-    }
-  }, []);
+  // মোড / ফন্ট-সেটিংস / অপশন-লেবেল / ডাউনলোড-ফরম্যাট — use-persisted-state হুকে
+  // হাইড্রেট + কমিট হয় (updateFontSettings / updateOptionLabels /
+  // updateDownloadFormat এখন হুকের setter — JSX-এ কোনো পরিবর্তন নেই)।
 
   /**
    * ফরম্যাট-টগল অনুযায়ী চূড়ান্ত ডাউনলোড — DOCX হলে হুবহু আগের ব্লব+নাম
@@ -424,11 +383,7 @@ export default function Home() {
 
   /** skipCarry=true → carry-over বাইপাস (openInSerialMode নিজেই স্টেট সাজিয়ে রাখে — দুইবার লোড/টোস্ট ঠেকাতে) */
   const changeMode = (m: McqMode, skipCarry = false) => {
-    setMode(m);
-    try {
-      localStorage.setItem(MODE_KEY, m);
-    } catch { // কোটা/প্রাইভেসি-মোড — নীরবে উপেক্ষা
-    }
+    setMode(m); // persisted — localStorage-এও লেখে
     if (!skipCarry) carryToMode(m, mode);
     setFlowStep("work");
   };
@@ -565,12 +520,8 @@ export default function Home() {
     setAllowBroken(false);
     // পেস্ট/.txt ফ্লো — প্রশ্ন পেলেই সরাসরি শাফল-মোডের কাজের ভিউতে (মোড-বাছাই লাগে না)
     if (result.questions.length > 0) {
-      setMode("shuffle");
+      setMode("shuffle"); // persisted — localStorage-এও লেখে
       setFlowStep("work");
-      try {
-        localStorage.setItem(MODE_KEY, "shuffle");
-      } catch { // কোটা/প্রাইভেসি-মোড — নীরবে উপেক্ষা
-      }
     }
     announceDetect(result);
   };
@@ -1855,7 +1806,7 @@ export default function Home() {
                 />
                 <MultiDownloadCard
                   title="Serial all files together"
-                  description="Every question in every file gets a consecutive number — color headers, equations, images all stay intact. For color-based serials, upload that file alone."
+                  description="Color headers, equations and images stay intact. Files with colored headers can restart at 1 per section (scheme card above); files without colors always run continuous 1,2,3…"
                   stats={`${serialDocs.length} file(s) • ${serialDocs.reduce((a, d) => a + d.analysis.questionCount, 0)} question(s) in total`}
                   showSerialChoice
                   serialStrategy={serialStrategy}

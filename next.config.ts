@@ -20,9 +20,9 @@ const nextConfig: NextConfig = {
   // সব মোডে সেট — খালি হলে আচরণ অপরিবর্তিত (রুট-পাথ ডিপ্লয়)
   basePath: process.env.NEXT_PUBLIC_BASE_PATH ?? "",
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
-  reactStrictMode: false,
+  reactStrictMode: true,
 };
 
 export default nextConfig;

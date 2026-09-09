@@ -998,3 +998,20 @@ Work Log:
 Stage Summary:
 - Redownload মোডে প্রতি MCQ এখন অংশ-প্রতি আলাদা: সিরিয়াল/প্রশ্ন/রেফারেন্স/অপশন/উত্তর/ব্যাখ্যা — "শুধু প্রশ্ন+উত্তর" ডাউনলোডে রেফারেন্স/ব্যাখ্যা/গ্লুড-উত্তর/`*` সব পরিষ্কার; user-এর ৪০ ফাইলের ৬ ফরম্যাট-ই কভার
 - সীমাবদ্ধতা: ছবি-নির্ভর প্রশ্ন-টেক্সট (Physics Q2 জাতীয়) ইমেজ হিসেবেই থাকে; push পেন্ডিং — local main = origin/main (c668a1c) + ৪ কমিট, টোকেন revoked (নতুন টোকেন দিলে পুশ হবে)
+
+---
+
+Task ID: 54
+Agent: Cline
+Task: বাকি uncommitted কাজ কমিট+পুশ — PDF gap-snapping, Noto Serif Bengali ফন্ট-সোয়াপ, use-persisted-state হুক, test-স্ক্রিপ্ট
+
+Work Log:
+- স্টেজিং সিদ্ধান্ত: ১২ modified + ২ নতুন ফাইল (scripts/test-pdf-slices.ts, src/hooks/use-persisted-state.ts) কমিট; Format/ (৪০টা আসল .docx) + dev-server.err বাদ — রিপোতে যাবে না
+- core.fileMode=false — শুধু আসল কনটেন্ট-ডিফ থাকল: bun.lock (playwright), next.config.ts (strict+tsc), package.json (test:* স্ক্রিপ্ট), kalpurush.ttf/woff2 ডিলিট, verify-export.ts (OS-নিরপেক্ষ পাথ), globals.css+theme.ts+layout.tsx (Kalpurush→Noto Serif Bengali display ফন্ট), page.tsx (persisted হুক), serial-extra-cards.tsx, pdf-export.ts (snapSliceCut gap-snapping)
+- ভেরিফাই: tsc-exit 0; test-pdf-slices 11/11; ফুল রিগ্রেশন 8/8 সবুজ (mcq 71, docx ~57, color 104, multi 65, font-remap 120, option-labels 27, redownload 41, splits 43)
+- কমিট + push origin/main
+
+Stage Summary:
+- পেন্ডিং ওয়ার্কিং-ট্রি পরিষ্কার — PDF কাট গ্যাপ-স্ন্যাপ + ফন্ট-সোয়াপ + হুক-রিফ্যাক্টর সব GitHub-এ
+- ⚠️ টোকেন নিরাপত্তা: চ্যাট/শেল-হিস্ট্রিতে থাকা নতুন টোকেন কাজ শেষে github.com/settings/tokens-এ REVOKE করতে হবে
+

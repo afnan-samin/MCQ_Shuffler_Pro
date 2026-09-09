@@ -234,8 +234,13 @@ function SchemeSwatch({ hex, size = "h-4 w-4" }: { hex: string | null; size?: st
  * মাল্টি-ফাইল সিরিয়ালে প্রতি ফাইলের সিরিয়াল-স্কিম বাছাই — ডিফল্ট একটানা
  * (আগের আচরণ হুবহু); রঙ-হেডারওয়ালা ফাইলে রঙ বেছে নিলে ওই ফাইলের প্রতি
  * সেকশনে নম্বর ১ থেকে রিস্টার্ট হয়। চিপ-টগল স্টাইল color-serial-card অনুযায়ী।
+ *
+ * সরল UI: কোনো ফাইলেই রঙ না থাকলে কার্ড রেন্ডারই হয় না (সব একটানা — নিচের
+ * ডাউনলোড-কার্ডই যথেষ্ট); রঙহীন ফাইলের "No colors" রো-ও দেখানো হয় না।
  */
 export function MultiSerialSchemeCard({ docs, schemes, onSchemeChange }: MultiSerialSchemeCardProps) {
+  const colorDocs = docs.filter((d) => d.analysis.colors.length > 0);
+  if (colorDocs.length === 0) return null;
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -252,9 +257,8 @@ export function MultiSerialSchemeCard({ docs, schemes, onSchemeChange }: MultiSe
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {docs.map((d) => {
+        {colorDocs.map((d) => {
           const scheme = schemes[d.id] ?? { kind: "continuous" as const };
-          const hasColors = d.analysis.colors.length > 0;
           return (
             <div key={d.id} className="space-y-2 rounded-xl border p-3">
               {/* ফাইল-রো — নাম + প্রশ্ন-সংখ্যা (span.flex-1.truncate নয়: মাল্টি-লিস্ট কাউন্টার ভাঙে না) */}
@@ -268,53 +272,49 @@ export function MultiSerialSchemeCard({ docs, schemes, onSchemeChange }: MultiSe
                 </Badge>
               </div>
 
-              {hasColors ? (
-                <div className="flex flex-wrap gap-2">
-                  {/* একটানা চিপ */}
-                  <button
-                    type="button"
-                    onClick={() => onSchemeChange(d.id, { kind: "continuous" })}
-                    className={cn(
-                      "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors",
-                      scheme.kind === "continuous"
-                        ? "border-primary bg-primary/10 font-semibold ring-1 ring-primary"
-                        : "bg-background hover:bg-muted/60"
-                    )}
-                  >
-                    <span className="inline-block h-4 w-4 shrink-0 rounded-md border border-border bg-gradient-to-r from-brand-400 to-sky-500 shadow-sm" />
-                    Continuous
-                    {scheme.kind === "continuous" && <CheckCircle2 className="h-4 w-4 text-primary" />}
-                  </button>
+              <div className="flex flex-wrap gap-2">
+                {/* একটানা চিপ */}
+                <button
+                  type="button"
+                  onClick={() => onSchemeChange(d.id, { kind: "continuous" })}
+                  className={cn(
+                    "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors",
+                    scheme.kind === "continuous"
+                      ? "border-primary bg-primary/10 font-semibold ring-1 ring-primary"
+                      : "bg-background hover:bg-muted/60"
+                  )}
+                >
+                  <span className="inline-block h-4 w-4 shrink-0 rounded-md border border-border bg-gradient-to-r from-brand-400 to-sky-500 shadow-sm" />
+                  Continuous
+                  {scheme.kind === "continuous" && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                </button>
 
-                  {/* প্রতি রঙের চিপ — সোয়াচ + নাম + সেকশন-ব্যাজ */}
-                  {d.analysis.colors.map((c) => {
-                    const active = scheme.kind === "color" && scheme.key === c.key;
-                    const hex = colorKeyHex(c.key);
-                    return (
-                      <button
-                        key={c.key}
-                        type="button"
-                        onClick={() => onSchemeChange(d.id, { kind: "color", key: c.key })}
-                        className={cn(
-                          "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors",
-                          active
-                            ? "border-primary bg-primary/10 font-semibold ring-1 ring-primary"
-                            : "bg-background hover:bg-muted/60"
-                        )}
-                      >
-                        <SchemeSwatch hex={hex} />
-                        <span className={cn("font-mono font-semibold", !hex && "font-sans")}>{colorKeyName(c.key)}</span>
-                        <Badge variant="secondary" className="px-1.5 py-0 text-[11px]">
-                          {c.sections} sections
-                        </Badge>
-                        {active && <CheckCircle2 className="h-4 w-4 text-primary" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">No colors — continuous</p>
-              )}
+                {/* প্রতি রঙের চিপ — সোয়াচ + নাম + সেকশন-ব্যাজ */}
+                {d.analysis.colors.map((c) => {
+                  const active = scheme.kind === "color" && scheme.key === c.key;
+                  const hex = colorKeyHex(c.key);
+                  return (
+                    <button
+                      key={c.key}
+                      type="button"
+                      onClick={() => onSchemeChange(d.id, { kind: "color", key: c.key })}
+                      className={cn(
+                        "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors",
+                        active
+                          ? "border-primary bg-primary/10 font-semibold ring-1 ring-primary"
+                          : "bg-background hover:bg-muted/60"
+                      )}
+                    >
+                      <SchemeSwatch hex={hex} />
+                      <span className={cn("font-mono font-semibold", !hex && "font-sans")}>{colorKeyName(c.key)}</span>
+                      <Badge variant="secondary" className="px-1.5 py-0 text-[11px]">
+                        {c.sections} sections
+                      </Badge>
+                      {active && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           );
         })}

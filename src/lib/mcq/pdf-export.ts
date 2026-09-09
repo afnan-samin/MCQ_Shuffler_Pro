@@ -18,6 +18,12 @@
 // becomes its own jsPDF A4 page — natural aspect, centered, no
 // distortion. The last (shorter) slice leaves the page remainder white.
 //
+// GAP-SNAPPING: a fixed-grid cut can land in the middle of a text line
+// (the line renders torn across two PDF pages). So every cut is snapped
+// to the nearest near-white horizontal gap within ±90px (snapSliceCut) —
+// cuts fall between lines, never through them. If the whole band holds
+// text (dense math/figure), the ideal grid cut is kept as fallback.
+//
 // MEMORY GUARD: the total page count is estimated from the rendered
 // layout BEFORE any rasterization — above 300 pages the conversion
 // aborts with a clear message instead of freezing/crashing the tab.
@@ -59,10 +65,58 @@ export function pdfFileNameOf(docxName: string): string {
 const A4_RATIO = 297 / 210;
 
 /** How many A4 pages a canvas of w×h splits into (1 when it already
- * fits the A4 aspect at its own width). */
-function sliceCountOf(w: number, h: number): number {
+ * fits the A4 aspect at its own width). Exported for unit tests. */
+export function sliceCountOf(w: number, h: number): number {
   const pageSliceH = Math.round(w * A4_RATIO);
   return h <= pageSliceH ? 1 : Math.ceil(h / pageSliceH);
+}
+
+/** Cut-snapping search radius on each side of the ideal grid cut (canvas px). */
+const SNAP_BAND_PX = 90;
+
+/** A row counts as "gap" white when this fraction of sampled pixels is near-white. */
+const GAP_WHITE_FRACTION = 0.85;
+
+/**
+ * Snap an ideal horizontal cut to the nearest text-free gap.
+ * Scans rows within ±SNAP_BAND_PX of idealY and returns the whitest row's
+ * y (a line-gap between text lines). Returns the ideal y unchanged when
+ * every nearby row holds text (dense figure/math) or pixels are unreadable
+ * (tainted canvas) — callers always get a valid cut.
+ * Exported for unit tests (scripts/test-pdf-slices.ts).
+ */
+export function snapSliceCut(canvas: HTMLCanvasElement, idealY: number): number {
+  const h = canvas.height;
+  const ideal = Math.max(0, Math.min(h, Math.round(idealY)));
+  if (ideal <= 0 || ideal >= h) return ideal;
+  try {
+    const ctx = canvas.getContext("2d", { willReadFrequently: true }) ?? canvas.getContext("2d");
+    if (!ctx) return ideal;
+    const w = canvas.width;
+    const lo = Math.max(0, ideal - SNAP_BAND_PX);
+    const hi = Math.min(h - 1, ideal + SNAP_BAND_PX);
+    let bestY = ideal;
+    let bestScore = -1;
+    for (let y = lo; y <= hi; y += 2) {
+      const row = ctx.getImageData(0, y, w, 1).data;
+      let white = 0;
+      let total = 0;
+      for (let x = 0; x < row.length; x += 16) {
+        // every 4th pixel (RGBA stride 4)
+        total++;
+        if (row[x] > 245 && row[x + 1] > 245 && row[x + 2] > 245) white++;
+      }
+      const score = total === 0 ? 0 : white / total;
+      if (score > bestScore) {
+        bestScore = score;
+        bestY = y;
+      }
+      if (score > 0.995) break; // প্রায় পুরো সাদা লাইন — এর চেয়ে ভালো হবে না
+    }
+    return bestScore < GAP_WHITE_FRACTION ? ideal : bestY;
+  } catch {
+    return ideal; // tainted canvas বা অন্য read-ব্যর্থতা — ideal-কাটাই রাখা
+  }
 }
 
 /**
@@ -200,8 +254,12 @@ export async function docxBlobToPdfBlob(docx: Blob, baseName: string): Promise<B
       // Slice a taller-than-A4 canvas into one page per A4-height chunk
       // (continuous documents have no explicit page breaks → one huge
       // section; without slicing it would shrink onto a single page).
+      // Cuts snap to text-free gaps (snapSliceCut) so no text line tears.
       const sliceCount = sliceCountOf(canvas.width, canvas.height);
       const pageSliceH = Math.round(canvas.width * A4_RATIO);
+      const cuts: number[] = [0];
+      for (let s = 1; s < sliceCount; s++) cuts.push(snapSliceCut(canvas, s * pageSliceH));
+      cuts.push(canvas.height);
       pdfPages += sliceCount;
       if (pdfPages > PDF_MAX_PAGES) {
         throw new PdfExportError(
@@ -210,9 +268,10 @@ export async function docxBlobToPdfBlob(docx: Blob, baseName: string): Promise<B
       }
 
       for (let s = 0; s < sliceCount; s++) {
-        const sliceY = s * pageSliceH;
-        // Last slice may be shorter — its height is what remains.
-        const sliceH = Math.min(pageSliceH, canvas.height - sliceY);
+        const sliceY = cuts[s];
+        // Snapped cut — last slice may be shorter; remainder stays white.
+        const sliceH = cuts[s + 1] - sliceY;
+        if (sliceH <= 0) continue; // দুই কাট একই গ্যাপে পড়লে — খালি পেজ স্কিপ
         let dataUrl: string;
         if (sliceCount === 1) {
           // Normal case — the whole canvas is one A4-proportioned page.

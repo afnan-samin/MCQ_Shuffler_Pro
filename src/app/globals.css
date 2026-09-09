@@ -17,12 +17,12 @@
    …) are re-pointed at the injected --st-* variables, and @theme inline
    maps them to Tailwind utilities (bg-card, rounded-lg, bg-brand-600, …).
 
-   --------------------------------------------------------------------------
-   OLD COMMENT (font embed): Kalpurush & SutonnyMJ are embedded via
-   next/font/local in layout.tsx — CSS variables: --font-kalpurush /
-   --font-sutonny (works on GitHub Pages subpaths too). To change which font
-   the site uses, edit src/config/theme.ts (fonts section), not here.
-   -------------------------------------------------------------------------- */
+    --------------------------------------------------------------------------
+    OLD COMMENT (font embed): Noto Serif Bengali (Google) & SutonnyMJ (local)
+    are embedded via next/font in layout.tsx — CSS variables: --font-display
+    / --font-sutonny (works on GitHub Pages subpaths too). To change which
+    font the site uses, edit src/config/theme.ts (fonts section), not here.
+    -------------------------------------------------------------------------- */
 
 @theme inline {
   --color-background: var(--background);

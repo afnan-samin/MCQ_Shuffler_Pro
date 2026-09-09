@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Noto_Sans_Bengali } from "next/font/google";
+import { Geist, Geist_Mono, Noto_Sans_Bengali, Noto_Serif_Bengali } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
@@ -20,14 +20,16 @@ const notoBengali = Noto_Sans_Bengali({
   subsets: ["bengali"],
 });
 
-/* Kalpurush — সাইটের মূল ফন্ট (next/font/local দিয়ে এমবেড; GitHub Pages সাবপাথেও কাজ করে) */
-const kalpurush = localFont({
-  src: "../../public/fonts/kalpurush.woff2",
-  variable: "--font-kalpurush",
+/* Noto Serif Bengali — the site's main premium font (Google Fonts, self-hosted
+   at build time by next/font; works on GitHub Pages subpaths too) */
+const displaySerif = Noto_Serif_Bengali({
+  variable: "--font-display",
+  subsets: ["bengali", "latin"],
+  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
-/* SutonnyMJ — Bijoy (ANSI লিগ্যাসি) টেক্সট ওয়েবে দেখানোর ওয়েব-ফন্ট */
+/* SutonnyMJ — web font for rendering legacy Bijoy (ANSI) text */
 const sutonny = localFont({
   src: "../../public/fonts/SutonnyMJ.woff",
   variable: "--font-sutonny",
@@ -37,9 +39,9 @@ const sutonny = localFont({
 export const metadata: Metadata = {
   title: "MCQ Shuffler Pro — Free MCQ Shuffler & Exam Set Generator",
   description:
-    "Shuffle MCQ questions into multiple sets, or keep all questions per set (Original Shuffle). Word-by-word Bijoy/Unicode/English detection, serial detection & auto-fix. Kalpurush + Bijoy (SutonnyMJ) font support, Word (.docx) export — one set per page, plain-text serials. Completely free.",
-  keywords: ["MCQ shuffle", "MCQ set maker", "Original Shuffle", "Bijoy font", "SutonnyMJ", "Kalpurush", "বাংলা MCQ", "exam set generator", "question shuffle", "Word export"],
-  // favicon: src/app/icon.svg|icon.png|apple-icon.png — App Router অটো-সার্ভ করে (basePath-সহ)
+    "Shuffle MCQ questions into multiple sets, or keep all questions per set (Original Shuffle). Word-by-word Bijoy/Unicode/English detection, serial detection & auto-fix. Noto Serif Bengali + Bijoy (SutonnyMJ) font support, Word (.docx) export — one set per page, plain-text serials. Completely free.",
+  keywords: ["MCQ shuffle", "MCQ set maker", "Original Shuffle", "Bijoy font", "SutonnyMJ", "Bengali MCQ", "exam set generator", "question shuffle", "Word export"],
+  // favicon: src/app/icon.svg|icon.png|apple-icon.png — auto-served by App Router (with basePath)
   openGraph: {
     title: "MCQ Shuffler Pro",
     description: "MCQ shuffle, set building & serial detection — completely free",
@@ -59,7 +61,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${kalpurush.variable} ${sutonny.variable} ${geistSans.variable} ${geistMono.variable} ${notoBengali.variable}`}
+      className={`${displaySerif.variable} ${sutonny.variable} ${geistSans.variable} ${geistMono.variable} ${notoBengali.variable}`}
     >
       <body className="antialiased bg-background text-foreground">
         {/* Site theme tokens (fonts/colors/radius/popups) — generated from

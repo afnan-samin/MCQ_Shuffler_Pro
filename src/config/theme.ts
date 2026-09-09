@@ -22,9 +22,9 @@
  *     (sans-serif / serif / monospace) at the end as a safety net.
  *   • Sizes: CSS lengths — "0.625rem", "12px", …
  *
- * NOTE ABOUT WEB FONTS: this site loads 4 real web fonts in
+ * NOTE ABOUT WEB FONTS: this site loads 5 real web fonts in
  * src/app/layout.tsx via next/font (they get CSS variables:
- * --font-kalpurush, --font-sutonny, --font-geist-sans, --font-geist-mono,
+ * --font-display, --font-sutonny, --font-geist-sans, --font-geist-mono,
  * --font-bengali). The stacks below reference those variables. To use a
  * DIFFERENT web font site-wide: (1) add its import in src/app/layout.tsx
  * with variable: "--font-myfont", (2) put "var(--font-myfont)" FIRST in the
@@ -41,7 +41,7 @@ export interface ThemeFonts {
   serif: string;
   /** Font for code / preformatted text. */
   mono: string;
-  /** Font used for Bengali (বাংলা) glyphs — it is part of the `sans` stack,
+  /** Font used for Bengali glyphs — it is part of the `sans` stack,
    *  so Bengali characters automatically fall through to it. */
   bengali: string;
 }
@@ -144,10 +144,10 @@ export const siteTheme: SiteTheme = {
    * `sans` drives ALL body text. Bengali glyphs fall through to the
    * bengali web font automatically (it sits in the sans stack). */
   fonts: {
-    sans: 'var(--font-kalpurush), var(--font-bengali), var(--font-geist-sans), "Noto Sans Bengali", sans-serif',
-    serif: 'Georgia, Cambria, "Times New Roman", Times, var(--font-bengali), serif',
+    sans: 'var(--font-display), var(--font-bengali), "Noto Serif Bengali", "Noto Sans Bengali", Georgia, serif',
+    serif: 'var(--font-display), "Noto Serif Bengali", Georgia, Cambria, "Times New Roman", serif',
     mono: 'var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
-    bengali: 'var(--font-bengali), "Noto Sans Bengali", var(--font-kalpurush), sans-serif',
+    bengali: 'var(--font-display), var(--font-bengali), "Noto Serif Bengali", "Noto Sans Bengali", serif',
   },
 
   /* ---------- COLORS (light = the normal site) ---------- */
