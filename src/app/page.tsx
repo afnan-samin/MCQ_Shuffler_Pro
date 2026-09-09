@@ -1710,20 +1710,20 @@ export default function Home() {
                   questionsCount={rdTotalQuestions}
                 />
 
-                {rdDocs.map((d) => (
-                  <RedownloadQuestionsCard
-                    key={d.id}
-                    fileName={d.file.name}
-                    questions={d.parse.questions}
-                    selected={rdSelOf(d.id)}
-                    onToggle={(qid) => toggleRdQuestion(d.id, qid)}
-                    onSelectAll={() => selectAllRd(d.id)}
-                    onSelectNone={() => selectNoneRd(d.id)}
-                    onSelectRange={(f, t) => selectRangeRd(d.id, f, t)}
-                    watermark={d.watermark}
-                    dominant={null}
-                  />
-                ))}
+                <RedownloadQuestionsCard
+                  files={rdDocs.map((d) => ({
+                    id: d.id,
+                    fileName: d.file.name,
+                    questions: d.parse.questions,
+                    selected: rdSelOf(d.id),
+                    onToggle: (qid) => toggleRdQuestion(d.id, qid),
+                    onSelectAll: () => selectAllRd(d.id),
+                    onSelectNone: () => selectNoneRd(d.id),
+                    onSelectRange: (f, t) => selectRangeRd(d.id, f, t),
+                    watermark: d.watermark,
+                    dominant: null,
+                  }))}
+                />
 
                 <OptionLabelsCard settings={optionLabels} onChange={updateOptionLabels} />
 

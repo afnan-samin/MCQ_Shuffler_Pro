@@ -262,6 +262,9 @@ ok(true, "৬ অংশ all-ON + রিনাম্বার ON টগল স্
 
 // C3. সিলেকশন — সব বাদ → ডাউনলোড ব্লক-টোস্ট; রেঞ্জ ১–৫ → ডাউনলোড
 const rdCard = page.locator("#step-rd-questions");
+// কার্ড এখন accordion — প্রশ্ন-সিলেকশন টুলবার section ভেতরে; আগে section খুলে নিই
+await rdCard.locator('[data-testid="rd-file-section"]').first().click();
+await page.waitForTimeout(200);
 await rdCard.locator('button:has-text("Deselect all")').click();
 await page.waitForTimeout(300);
 await page.click(rdSingle);
