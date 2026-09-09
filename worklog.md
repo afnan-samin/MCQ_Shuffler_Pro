@@ -1058,3 +1058,22 @@ Work Log:
 Stage Summary:
 - "3. Pick questions" এখন মাল্টি-ফাইলেও এক কার্ড: ফাইলগুলো accordion-সেকশনে (ডিফল্ট বন্ধ; arrow-ক্লিকে ওইটাই খোলে) — ফন্ট-কার্ড/রিডাউনলোড-পার্টস-কার্ডের মতোই প্যাটার্ন
 - subsequent: d13de0c (রিভিউ-ফিক্স) + 6327033 (Task 55 worklog) — origin/main ee32753 থেকে হেড ৪ কমিট এগিয়ে (push পেন্ডিং, নতুন টোকেন লাগবে)
+---
+
+Task ID: 57
+Agent: Cline
+Task: পুরো সাইট থেকে সব emoji + অপ্রয়োজনীয় টেক্সট সরানো — clean look (user request)
+
+Work Log:
+- scan: src-এ ৬০+ emoji-হিট (page.tsx toast, mode-meta, cards) + scripts/e2e-তে ১টা সিলেক্টর
+- scripts/tmp-e2e/strip-emoji.ts (gitignored) — নির্দিষ্ট ১০ emoji (🔀🔢📥📂📁✅⚠️🔧🎨🔍) ৭টা UI-ফাইল থেকে সরায়; প্রথম রানে replace() single-occurrence বাগ ধরা পড়ে → replaceAll ঠিক
+- ম্যানুয়াল: mode-meta emoji ফিল্ড পুরো বাদ (interface+values); mode-work-bar `{meta.emoji}` + "press the arrow to go home" span বাদ; input-card/serial-input-card "🔍 Detect questions" প্লেইন
+- টেক্সট সংক্ষেপ: হেডার-ট্যাগলাইন "Upload a file, pick a mode, and work — switch modes any time, your files come along"; ফুটার "everything runs in your browser; no question ever leaves your device"; upload-card description ছোট; StagedFilesCard "📁 files ready" প্লেইন
+- ফিক্স-পরবর্তী অবশিষ্ট leading-space (" Very large file", " Serial fixed") ম্যানুয়ালি ঠিক
+- e2e-modes.ts:207 সিলেক্টর emoji-বর্জিত "Detect questions" আপডেট
+- ভেরিফাই: tsc 0, eslint 0, ফুল রিগ্রেশন ১২ স্যুট সবুজ, rd-accordion smoke ১৮/১৮
+- কমিট: 72f2770
+
+Stage Summary:
+- UI emoji-মুক্ত: ট্যাব "MCQ Shuffle / MCQ Serial / MCQ Redownload", টোস্ট প্লেইন ("Serial fixed", "ZIP downloaded", "PDF file downloaded"...), কার্ড-স্ট্যাটাস টেক্সট প্লেইন (সবুজ/অ্যাম্বার রং + lucide আইকনই মানে বহন করে)
+- push পেন্ডিং — হেড 72f2770, origin/main ee32753 থেকে ৫ কমিট এগিয়ে (নতুন টোকেন লাগবে)
