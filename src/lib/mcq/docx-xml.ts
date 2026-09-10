@@ -11,7 +11,7 @@
 
 import JSZip from "jszip";
 
-import { MAX_SERIAL_NUMBER } from "./limits";
+import { MARKER_WINDOW_PARAS, MAX_SERIAL_NUMBER, MIN_OPTIONS_PER_MCQ } from "./limits";
 
 export const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 export const M_NS = "http://schemas.openxmlformats.org/officeDocument/2006/math";
@@ -216,10 +216,14 @@ export function isExamTitleLine(text: string): boolean {
   return ORDINAL_HEAD_RE.test(t) || EXAM_TITLE_KEYWORD_RE.test(t);
 }
 
-/** সেকশন সেপারেটর/শিরোনাম ("PHYSICS", "A", পরীক্ষা-টাইটেল ইত্যাদি) — প্রশ্ন নয় */
+/** সেকশন সেপারেটর/শিরোনাম ("PHYSICS", "A", পরীক্ষা-টাইটেল ইত্যাদি) — প্রশ্ন নয়।
+ * ট্যাব-গার্ড কাঁচা টেক্সটে (trim-এর আগে): ট্যাব-লেড সারি (অপশন/কনটেন্ট)
+ * কখনো হেডার নয় — trim-এর পরে চেক করলে "\tA. CH3…" → "A. CH3…" হয়ে
+ * ALL-CAPS নিয়মে হেডার ধরা পড়ত, প্রশ্ন-ব্লক ভেঙে অপশন-সারি হারিয়ে যেত
+ * (shuffle-এ প্রশ্ন কমে যাওয়া/ড্রপের কারণ)। */
 export function isSectionSeparator(text: string): boolean {
+  if (!text.trim() || text.includes("\t")) return false;
   const t = text.trim();
-  if (!t || t.includes("\t")) return false;
   if (isExamTitleLine(t)) return true;
   if (t.length <= 3) return true;
   return /^[A-Za-z][A-Za-z0-9 .\-]{1,29}$/.test(t) && t === t.toUpperCase();
@@ -232,10 +236,12 @@ export function isQuestionStart(si: SerialPrefix, hasRunTab: boolean, nextText: 
   // সিলিং = MAX_SERIAL_NUMBER (৪-ডিজিট, SERIAL_RE-এর {1,4}-এর সাথে সামঞ্জস্য) —
   // টেক্সট-পার্সারের (parser.ts) সাথে ইউনিফাইড; আগে এখানে 5000 ছিল (Task 21-a)
   if (si.num > MAX_SERIAL_NUMBER) return false;
-  // সাল-গার্ড (parser.ts-এর সাথে সামঞ্জস্য): "2016 সালের ফলাফল…" — সিরিয়াল নয়
-  if (si.num >= 1900 && si.num <= 2100) {
+  // সাল-গার্ড (parser.ts-এর সাথে সামঞ্জস্য + Bijoy "mv‡?j"/সালে): "1815 mv‡j…" /
+  // "2016 সালের ফলাফল…" — ইতিহাস-নোটের সাল-লাইন, সিরিয়াল নয়
+  // (‡ হলো SutonnyMJ া-কার: সালে = m+v+‡+j)
+  if (si.num >= 1500 && si.num <= 2100) {
     const head = si.after.trimStart().slice(0, 10).toLowerCase();
-    if (head.includes("সাল") || head.includes("year")) return false;
+    if (/সাল|year|mv‡?j/.test(head)) return false;
   }
   // ক্রমবাচক-গার্ড: সেপারেটর-হীন সিরিয়ালের পরে সরাসরি "তম/শে/য়…" — টাইটেল
   if (!si.separator && ORDINAL_AFTER_RE.test(si.after)) return false;
@@ -284,6 +290,50 @@ const OPTION_FAMILIES: string[][] = [
   ["a", "b", "c", "d"],
   ["A", "B", "C", "D"],
 ];
+
+/**
+ * `*`-উত্তর-অক্ষর (B-টাইমার ফরম্যাট): লেবেলের আগে ("*C. টেক্সট", "*A.B.")
+ * বা সঠিক অপশনের টেক্সটের পরে ("টেক্সট*", "টেক্সট*D.")। redownload-এর
+ * findStarAnswer-এর হুবহু নিয়ম (দুই মোডে উত্তর-গণনা এক থাকে) — লেবেল
+ * না মিললে null (গুণের `*` বা বুলেট ভুল করে উত্তর হয় না)।
+ */
+export function findStarAnswerLetter(text: string): string | null {
+  const at: number[] = [];
+  for (let i = 0; i < text.length; i++) if (text[i] === "*") at.push(i);
+  if (!at.length) return null;
+  const labelAfter = /^([KLMNklmnকখগঘa-dA-D])\s*[.।):]/;
+  const labelScan = /([KLMNklmnকখগঘa-dA-D])\s*[.।):]/g;
+  for (const s of at) {
+    // ① স্টারের ঠিক পরেই লেবেল ("*C. টেক্সট" / "*A.B.")
+    const after = labelAfter.exec(text.slice(s + 1));
+    if (after) return after[1];
+    // ② স্টারের আগের নিকটতম লেবেল — ওই অপশনের টেক্সটের শেষেই স্টার
+    const before = text.slice(0, s);
+    labelScan.lastIndex = 0;
+    let last: RegExpExecArray | null = null;
+    let mm: RegExpExecArray | null;
+    while ((mm = labelScan.exec(before))) last = mm;
+    if (last) return last[1];
+  }
+  return null;
+}
+
+/**
+ * অপশন-মার্কার গণনা (টাইপো-সহনশীল MCQ-শর্তের জন্য): অপশন-অক্ষর
+ * (K/L/M/N, ক/খ/গ/ঘ, a-d/A-D) + পরে সেপারেটর/স্পেস/শেষ।
+ * ডট-ছাড়া লেবেল ("A ivB"), glued উত্তর ("Dt M"), `*`-মার্কড অপশনও
+ * ধরা পড়ে; কিন্তু ডিজিট-সিরিয়াল ("1.", "২."), আইসোটোপ ("714N"),
+ * দশমিক ("5.3"), শব্দের ভিতরের অক্ষর ("Credit", "Genome") নয় —
+ * অক্ষরের আগে লাইন-শুরু/স্পেস/ট্যাব/ব্র্যাকেট/`*` লাগে, পরে সেপ/স্পেস/শেষ।
+ */
+const OPTION_MARKER_RE = /(?:^|[\s\(\[*])([KLMNklmnকখগঘa-dA-D])(?=[\s.,;।:)\-–—\]/|]|$)/gm;
+
+export function countOptionMarkers(text: string): number {
+  OPTION_MARKER_RE.lastIndex = 0;
+  let n = 0;
+  while (OPTION_MARKER_RE.exec(text) !== null) n++;
+  return n;
+}
 
 /**
  * প্রশ্ন-ব্লকের জয়েন্ট টেক্সট থেকে অপশন/উত্তর/ব্যাখ্যা আলাদা করে।
@@ -337,6 +387,17 @@ export function scanOptions(blockText: string, serialRaw: string): { options: Op
       if (!m) continue;
       cutAnswerLine(i, m);
       break;
+    }
+  }
+  if (answer === null) {
+    // `*`-উত্তর (B-টাইমার: "*A. টেক্সট" / "টেক্সট*") — অক্ষর বসিয়ে সব
+    // `*` মোছা (মার্কারটা কনটেন্ট নয়; redownload-প্রিভিউর সাথে সামঞ্জস্য)
+    const star = findStarAnswerLetter(regionLines.join("\n"));
+    if (star !== null) {
+      answer = star;
+      for (let i = 0; i < regionLines.length; i++) {
+        if (regionLines[i].includes("*")) regionLines[i] = regionLines[i].replace(/\*/g, "");
+      }
     }
   }
   const region = regionLines.join("\n");
@@ -457,6 +518,8 @@ export function parseDocxXml(xml: string): DocxParseResult {
     texts: string[];
   }
   let cur: Cur | null = null;
+  /** প্রশ্ন-প্রার্থী ব্লক — MCQ-শর্ত (৪ মার্কার) যাচাইয়ের পর pushQuestion হয় */
+  const cands: Cur[] = [];
 
   const pushQuestion = (c: Cur) => {
     const text = c.texts.join("\n");
@@ -490,7 +553,7 @@ export function parseDocxXml(xml: string): DocxParseResult {
     if (el.localName === "p") {
       const si = detectSerialPrefix(text);
       if (si && isQuestionStart(si, hasRunTabs[i], nextNonEmptyText(i + 1))) {
-        if (cur) pushQuestion(cur);
+        if (cur) cands.push(cur);
         cur = { start: i, end: i, si, texts: [text] };
         started = true;
       }
@@ -500,7 +563,7 @@ export function parseDocxXml(xml: string): DocxParseResult {
       if (!cur) {
         if (isSectionSeparator(text)) separators.push(text.trim());
       } else if (isSectionSeparator(text)) {
-        pushQuestion(cur);
+        cands.push(cur);
         cur = null;
         separators.push(text.trim());
       } else {
@@ -509,7 +572,33 @@ export function parseDocxXml(xml: string): DocxParseResult {
       }
     }
   }
-  if (cur) pushQuestion(cur);
+  if (cur) cands.push(cur);
+
+  // MCQ-শর্ত (সিরিয়াল + প্রশ্ন + ৪ অপশন-মার্কার): কম মার্কারের ব্লক
+  // স্বতন্ত্র MCQ নয় — আগের ব্লকের ধারাবাহিক অংশ হিসেবে জুড়ে যায়
+  // (ব্যাখ্যার ভিতরের "1./2./3." তালিকা, সাল/রেঞ্জ-লাইন — এরা নতুন প্রশ্ন
+  // ভেঙে shuffle/redownload-এর সংখ্যা বাড়াবে না)। গণনা ব্লকের প্রথম
+  // কয় প্যারায় (MARKER_WINDOW_PARAS) — প্রশ্ন+অপশন পাশাপাশি থাকতে হবে।
+  // গ্লোবাল-গেট: পুরো ফাইলে গড়ে ৪-এর কম মার্কার থাকলে (অপশন-বিহীন ফাইল —
+  // যেমন শুধু সিরিয়াল+প্রশ্নের রিডাউনলোড) নিয়ম প্রযোজ্য নয় — সিরিয়াল-
+  // বিভাজনই থাকে, সব ব্লক আলাদা প্রশ্ন হিসেবে থাকে।
+  const totalMarkers = cands.reduce((a, c) => a + countOptionMarkers(c.texts.join("\n")), 0);
+  const applyMcqRule = totalMarkers >= MIN_OPTIONS_PER_MCQ * cands.length;
+  const merged: Cur[] = [];
+  for (const c of cands) {
+    if (
+      applyMcqRule &&
+      merged.length > 0 &&
+      countOptionMarkers(c.texts.slice(0, MARKER_WINDOW_PARAS).join("\n")) < MIN_OPTIONS_PER_MCQ
+    ) {
+      const prev = merged[merged.length - 1];
+      prev.end = c.end;
+      prev.texts.push(...c.texts);
+    } else {
+      merged.push(c);
+    }
+  }
+  for (const c of merged) pushQuestion(c);
 
   // সিরিয়াল রিপোর্ট
   let serial: DocxParseResult["serial"] = null;

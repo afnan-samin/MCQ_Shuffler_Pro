@@ -239,7 +239,9 @@ export default function Home() {
   // ---- রেজাল্ট ----
   const [sets, setSets] = useState<McqQuestion[][] | null>(null);
   const [setsDocx, setSetsDocx] = useState<number[][] | null>(null);
-  const [renumber, setRenumber] = useState(true);
+  // শাফল মোডে সিরিয়াল বদলের দরকার নেই (সিরিয়ালের আলাদা মোড আছেই) —
+  // ডিফল্ট OFF: ডাউনলোডে প্রশ্নের আসল নম্বরই থাকে; চাইলে টগল ON করে ১,২,৩…
+  const [renumber, setRenumber] = useState(false);
   const [sortedFlags, setSortedFlags] = useState<boolean[]>([]);
   const [exportOpts, setExportOpts] = useState<ExportOptions>(DEFAULT_EXPORT_OPTIONS);
   const [busy, setBusy] = useState<string | null>(null);
@@ -299,6 +301,20 @@ export default function Home() {
   );
   const rdTotalQuestions = rdDocs.reduce((a, d) => a + d.parse.questions.length, 0);
   const rdSelTotal = rdDocs.reduce((a, d) => a + (rdSel[d.id]?.size ?? 0), 0);
+  // প্রতি অংশ কয়টা প্রশ্নে পাওয়া গেছে (প্যারা-কাউন্ট নয় — গ্লুড উত্তর / এক-প্যারায় ৪ অপশনও ধরা পড়ে)
+  const rdFoundStats = rdDocs.reduce(
+    (acc, d) => {
+      for (const q of d.parse.questions) {
+        if (q.kinds.includes("reference")) acc.withReference++;
+        if (q.options.length > 0) acc.withOptions++;
+        acc.optionsTotal += q.options.length;
+        if (q.answer) acc.withAnswer++;
+        if (q.bekkha) acc.withBekkha++;
+      }
+      return acc;
+    },
+    { withReference: 0, withOptions: 0, optionsTotal: 0, withAnswer: 0, withBekkha: 0 }
+  );
 
   // ---- রেফারেন্স-ট্যাগ রিপোর্ট (শাফল মোডের ডাউনলোড-কার্ডে সেকশন) ----
   // সিঙ্গেল docx ফ্লো: সিলেক্ট করা প্রশ্নগুলোতেই দেখায়; মাল্টি ফ্লো: সব প্রশ্ন
@@ -1708,6 +1724,7 @@ export default function Home() {
                   onRenumberChange={setRdRenumber}
                   filesCount={rdDocs.length}
                   questionsCount={rdTotalQuestions}
+                  found={rdFoundStats}
                 />
 
                 <RedownloadQuestionsCard

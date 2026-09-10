@@ -434,16 +434,19 @@ const { parseDocxXml } = await import("../src/lib/mcq/docx-xml");
 console.log("\n== ৭) stripShadedParasXml (শাফল মোডে হেডার বাদ) ==");
 {
   // সিনথেটিক: লিড + হেডার(B1) + প্রশ্ন + সাদা-শেড প্যারা + হেডার(A5) + প্রশ্ন
+  // (MCQ-শর্ত: প্রতিটা প্রশ্নে ৪ অপশন-মার্কার — নাহলে আগের MCQ-এর অংশ হয়)
+  const opt4 = (a: string, b: string, c: string, d: string) =>
+    q(`ক) ${a}`) + q(`খ) ${b}`) + q(`গ) ${c}`) + q(`ঘ) ${d}`);
   const tableWithShadedCell =
     `<w:tbl><w:tr><w:tc><w:p xmlns:w="${W}"><w:pPr><w:shd w:val="clear" w:fill="000000"/></w:pPr>` +
     `<w:r><w:t>টেবিলের ভিতরের শেড</w:t></w:r></w:p></w:tc></w:tr></w:tbl>`;
   const body =
     plainP("ভূমিকা — প্রশ্নব্যাংক") +
     shadedP("অধ্যায়-১", "000000") +
-    q("1.ক-১") + q("2.ক-২") +
+    q("1.ক-১") + opt4("এ", "বি", "সি", "ডি") + q("2.ক-২") + opt4("ঙ", "চ", "ছ", "জ") +
     `<w:p xmlns:w="${W}"><w:pPr><w:shd w:val="clear" w:fill="FFFFFF"/></w:pPr><w:r><w:t xml:space="preserve">সাদা-শেড (হেডার না)</w:t></w:r></w:p>` +
     shadedP("সাব-১", "A6A6A6") +
-    q("3.ক-৩") +
+    q("3.ক-৩") + opt4("ঝ", "ঞ", "ট", "ঠ") +
     tableWithShadedCell +
     shadedP("", "000000"); // খালি শেডেড সেপারেটর প্যারা
   const xml1 = wrapDoc(body);
@@ -542,17 +545,21 @@ ok(
 ok(isNonMcqText("অধ্যায়-" + "ক".repeat(60)), "৬৭ অক্ষরের লাইনে প্যাটার্ন থাকলে ধরা পড়ে");
 
 // ---- stripNonMcqLinesXml: সিনথেটিক ----
+// (MCQ-শর্ত: প্রতিটা প্রশ্নে ৪ অপশন-মার্কার — নাহলে আগের MCQ-এর অংশ হয়)
 {
+  const opt4b = (a: string, b: string, c: string, d: string) =>
+    plainP(`ক) ${a}`) + plainP(`খ) ${b}`) + plainP(`গ) ${c}`) + plainP(`ঘ) ${d}`);
   const body =
     plainP("কৃষি বিশ্ববিদ্যালয় ভর্তি পরীক্ষা") + // প্রথম প্রশ্নের আগে — কাটা হয় না (প্রশ্ন-ব্লকের অংশ না হলেও প্যাটার্ন-ম্যাচ নেই)
     q("1.ক-১") +
     plainP("K. অপশন-১") + // অপশন লাইন — কাটা হয় না
+    opt4b("এ", "বি", "সি", "ডি") +
     plainP("Aa¨vq-2") + // রঙহীন অধ্যায়-হেডার — কাটা হবে
-    q("2.ক-২") +
+    q("2.ক-২") + opt4b("ঙ", "চ", "ছ", "জ") +
     plainP("অধ্যায়-৩") + // Unicode — কাটা হবে
-    q("3.ক-৩") +
+    q("3.ক-৩") + opt4b("ঝ", "ঞ", "ট", "ঠ") +
     plainP("Chapter 4") + // English — কাটা হবে
-    q("4.ক-৪") +
+    q("4.ক-৪") + opt4b("ড", "ঢ", "ণ", "ত") +
     plainP("type 2 ডায়াবেটিস হলো একটা রোগ"); // বডি-লাইন কিন্তু প্যাটার্ন-ম্যাচ — কাটা হবে (ডকুমেন্টেড আচরণ)
   const sXml = wrapDoc(body);
   const st = stripNonMcqLinesXml(sXml);

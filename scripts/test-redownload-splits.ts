@@ -169,16 +169,18 @@ const outStarOn = buildRedownloadXml(F2, parse2, [0, 1], {
   renumber: false,
   expandAnswer: false,
 });
-ok(outStarOn.includes("Dt C") && outStarOn.includes("Dt A"), "`*`-উত্তর লাইন জেনারেট");
+ok(outStarOn.includes("Ans: C") && outStarOn.includes("Ans: A"), "`*`-উত্তর লাইন জেনারেট (English → Ans:)");
 ok(!outStarOn.includes("*"), "জেনারেটেও `*` নেই");
 
 // ---- ফিক্সচার ৩: DËit (Chemistry Set-C) + D: L + N (multipart) ----
+// (MCQ-শর্ত: প্রতিটা প্রশ্নে ৪ অপশন-মার্কার — নাহলে আগের MCQ-এর অংশ হয়)
 const F3 = [
   W_DOC_OPEN,
   p("1.প্রশ্ন এক?"),
   p("K. aa L. bb"),
   p("M. cc N. ddDËit K"),
   p("2.English question?"),
+  p("K. xx L. yy"),
   p("M. mediaN.sandD: L + N"),
   W_DOC_CLOSE,
 ].join("");
@@ -235,6 +237,40 @@ ok(
   "রিনাম্বার ১ + প্রশ্ন (রেফ ছাড়া) — স্প্লিট-অফসেট নিরাপদ"
 );
 ok(renParas.some((t) => t.startsWith("2.") && t.includes("বল")), "রিনাম্বার ২ + প্রশ্ন");
+
+// ---- ফিক্সচার ৭: উত্তর-বিস্তারে as-is ফন্ট (অপশনের নিজের ফন্ট) ----
+console.log("\n== ১০) উত্তর as-is ফন্ট ==");
+const pf = (text: string, font: string) =>
+  `<w:p xmlns:w="${WNS}"><w:r><w:rPr><w:rFonts w:ascii="${font}" w:hAnsi="${font}" w:cs="${font}" w:eastAsia="${font}"/></w:rPr><w:t xml:space="preserve">${text}</w:t></w:r></w:p>`;
+const WNS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+// প্রশ্ন SutonnyMJ-তে, অপশন-সারি Times-এ (ইনলাইন ৪ অপশন + গ্লুড উত্তর)
+const F7 = [
+  W_DOC_OPEN,
+  pf("1.Which is correct?", "SutonnyMJ"),
+  pf("A. Alpha B. Beta C. Gamma D. Delta Dt C", "Times New Roman"),
+  W_DOC_CLOSE,
+].join("");
+const parse7 = parseRedownloadXml(F7);
+ok(parse7.questions.length === 1 && parse7.questions[0].answer === "C", "ফিক্সচার পার্স (উত্তর C)");
+const out7 = buildRedownloadXml(F7, parse7, [0], {
+  partSel: PARTS_QA,
+  renumber: false,
+  expandAnswer: true,
+});
+const doc7 = new DOMParser().parseFromString(out7, "application/xml");
+const runs7: Array<{ font: string; text: string }> = [];
+for (const r of Array.from(doc7.getElementsByTagNameNS(WNS, "r"))) {
+  const rf = (r as Element).getElementsByTagNameNS(WNS, "rFonts")[0];
+  const font = rf ? rf.getAttributeNS(WNS, "ascii") ?? "?" : "?";
+  const t = Array.from((r as Element).getElementsByTagNameNS(WNS, "t"))
+    .map((x) => x.textContent ?? "")
+    .join("");
+  if (t) runs7.push({ font: font ?? "?", text: t });
+}
+const ansRun7 = runs7.find((x) => x.text === "Dt ");
+ok(ansRun7?.font === "Times New Roman", `"Dt " প্রিফিক্স as-is (সারির Times ফন্ট) — "Ans: " বানানো হয় না (পেয়েছি ${ansRun7?.font})`);
+const gammaRun7 = runs7.find((x) => x.text.includes("Gamma"));
+ok(gammaRun7?.font === "Times New Roman", "উত্তর-লেখা অপশনের নিজের ফন্টে (Times), প্রশ্নের SutonnyMJ-তে নয়");
 
 // ---- ফলাফল ----
 console.log(`\n${passed} passed, ${failed} failed`);

@@ -217,11 +217,11 @@ console.log("\n== ৯) সিনথেটিক: টাইটেল (প্র�
   const docXml = (body: string) =>
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${W}"><w:body>${body}<w:sectPr/></w:body></w:document>`;
 
-  // টাইটেল (separator-শ্রেণি) + ২ প্রশ্ন + শেষে "END" সমাপ্তি-লাইন (separator → ব্লক-বাইরে)
+  // টাইটেল (separator-শ্রেণি) + ২ প্রশ্ন (MCQ-শর্ত: ৪ অপশন-মার্কার) + শেষে "END" সমাপ্তি-লাইন (separator → ব্লক-বাইরে)
   const syn = docXml(
     p("MADRASAH BOARD 2024") +
-      p("১. প্রথম প্রশ্ন") + p("ক) এক") + p("খ) দুই") +
-      p("২. দ্বিতীয় প্রশ্ন") + p("ক) তিন") + p("খ) চার") +
+      p("১. প্রথম প্রশ্ন") + p("ক) এক") + p("খ) দুই") + p("গ) তিন") + p("ঘ) চার") +
+      p("২. দ্বিতীয় প্রশ্ন") + p("ক) পাঁচ") + p("খ) ছয়") + p("গ) সাত") + p("ঘ) আট") +
       p("END")
   );
   const synParse = parseDocxXml(syn);

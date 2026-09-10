@@ -8,8 +8,16 @@ import { Badge } from "@/components/ui/badge";
 import { PART_LABELS, type PartKind, type PartSel } from "@/lib/mcq/redownload";
 import { FileCheck2, Hash, Sparkles } from "lucide-react";
 
+export interface RedownloadFoundStats {
+  withReference: number;
+  withOptions: number;
+  optionsTotal: number;
+  withAnswer: number;
+  withBekkha: number;
+}
+
 export interface RedownloadPartsCardProps {
-  /** সব ফাইল মিলিয়ে প্রতি অংশের প্যারা-সংখ্যা */
+  /** সব ফাইল মিলিয়ে প্রতি অংশের প্যারা-সংখ্যা (legacy — ব্যাজে আর ব্যবহার হয় না) */
   counts: Record<PartKind, number>;
   sel: PartSel;
   onChange: (kind: PartKind, v: boolean) => void;
@@ -17,6 +25,8 @@ export interface RedownloadPartsCardProps {
   onRenumberChange: (v: boolean) => void;
   filesCount: number;
   questionsCount: number;
+  /** কয়টা প্রশ্নে কোন অংশ পাওয়া গেছে — ব্যাজে এটাই দেখায় */
+  found?: RedownloadFoundStats;
 }
 
 const KIND_ORDER: PartKind[] = ["serial", "question", "reference", "options", "answer", "bekkha"];
@@ -39,8 +49,29 @@ export function RedownloadPartsCard({
   onRenumberChange,
   filesCount,
   questionsCount,
+  found,
 }: RedownloadPartsCardProps) {
   const expansionActive = !sel.options && sel.answer;
+
+  /** প্রতি অংশের ব্যাজ-টেক্সট — কয়টায় পাওয়া গেছে (০ হলেও দেখায়) */
+  const badgeText = (k: PartKind): string => {
+    switch (k) {
+      case "serial":
+        return `${questionsCount} found`;
+      case "question":
+        return `${questionsCount} found`;
+      case "reference":
+        return found ? `${found.withReference}/${questionsCount} qs` : `${counts[k]} lines`;
+      case "options":
+        return found ? `${found.optionsTotal} opts • ${found.withOptions}/${questionsCount} qs` : `${counts[k]} lines`;
+      case "answer":
+        return found ? `${found.withAnswer}/${questionsCount} qs` : `${counts[k]} lines`;
+      case "bekkha":
+        return found ? `${found.withBekkha}/${questionsCount} qs` : `${counts[k]} lines`;
+      default:
+        return `${counts[k]} lines`;
+    }
+  };
 
   return (
     <Card>
@@ -58,11 +89,22 @@ export function RedownloadPartsCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* ছয় অংশের চেকবক্স */}
+        {/* ছয় অংশের চেকবক্স — পুরো রো-তেই ক্লিক করলে টগল হয় */}
         <div className="grid gap-2 sm:grid-cols-2">
           {KIND_ORDER.map((k) => (
-            <label
+            <div
               key={k}
+              role="checkbox"
+              aria-checked={sel[k]}
+              aria-label={PART_LABELS[k]}
+              tabIndex={0}
+              onClick={() => onChange(k, !sel[k])}
+              onKeyDown={(e) => {
+                if (e.key === " " || e.key === "Enter") {
+                  e.preventDefault();
+                  onChange(k, !sel[k]);
+                }
+              }}
               className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${
                 sel[k] ? "border-brand-400 bg-brand-50/60 dark:border-brand-700 dark:bg-brand-950/20" : "border-border hover:bg-muted/50"
               }`}
@@ -70,21 +112,21 @@ export function RedownloadPartsCard({
               <Checkbox
                 checked={sel[k]}
                 onCheckedChange={(v) => onChange(k, v === true)}
+                onClick={(e) => e.stopPropagation()}
                 className="mt-0.5"
                 aria-label={PART_LABELS[k]}
+                tabIndex={-1}
               />
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-2 text-sm font-semibold">
                   {PART_LABELS[k]}
-                  {counts[k] > 0 && (
-                    <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
-                      {counts[k]} lines
-                    </Badge>
-                  )}
+                  <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                    {badgeText(k)}
+                  </Badge>
                 </span>
                 <span className="mt-0.5 block text-xs text-muted-foreground">{KIND_HINTS[k]}</span>
               </span>
-            </label>
+            </div>
           ))}
         </div>
 

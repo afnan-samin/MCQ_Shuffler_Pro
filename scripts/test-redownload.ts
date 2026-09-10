@@ -124,9 +124,9 @@ const outExpand = buildRedownloadXml(SYNTH, parse, [0, 1], {
   expandAnswer: true,
 });
 const expParas = parasOf(outExpand);
-ok(expParas.some((t) => t.includes("উত্তর:") && t.includes("ক) H2O")), `ব্লক-উত্তর বিস্তৃত: "উত্তর: ক) H2O"`);
-ok(expParas.some((t) => t.includes("১.") && t.includes("ক) H2O")), 'উত্তরমালার "১. ক" বিস্তৃত');
-ok(expParas.some((t) => t.includes("২.") && t.includes("খ) ঢাকা")), 'উত্তরমালার "২. খ" বিস্তৃত (ঢাকা)');
+ok(expParas.some((t) => t.includes("উত্তর:") && t.includes("H2O") && !t.includes("ক) H2O")), `ব্লক-উত্তর বিস্তৃত: "উত্তর: H2O" (লেবেল ছাড়া)`);
+ok(expParas.some((t) => t.includes("১.") && t.includes("H2O") && !t.includes("ক) H2O")), 'উত্তরমালার "১. ক" বিস্তৃত → "১. H2O"');
+ok(expParas.some((t) => t.includes("২.") && t.includes("ঢাকা") && !t.includes("খ) ঢাকা")), 'উত্তরমালার "২. খ" বিস্তৃত → "২. ঢাকা"');
 ok(!expParas.some((t) => t.trim() === "ক) H2O"), "মূল অপশন-প্যারা একা নেই");
 ok(!outExpand.includes("পরমাণুর সমন্বয়ে"), "ব্যাখ্যা নেই (bekkha off)");
 
