@@ -209,7 +209,7 @@ console.log("\n== ৮) সিরিয়াল-সিলিং ইউনিফ�
   ok(rTier3.questions.length === 0, "টিয়ার-৩ ডেসিমাল-গার্ড অপরিবর্তিত: 2000 (ট্যাব/অপশন-লেড ছাড়া, >999) প্রশ্ন নয়");
 }
 
-console.log("\n== ৯) সিনথেটিক: টাইটেল (প্রি) + সমাপ্তি-লাইন (পোস্ট) প্রিজার্ভ ==");
+console.log("\n== ১০) repeat-লেবেল টাইপো (Physics Q27-কেস: K, L, L, N) — ৪ অপশনই গোনা হয় ==");
 {
   const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
   const p = (text: string) =>
@@ -217,12 +217,51 @@ console.log("\n== ৯) সিনথেটিক: টাইটেল (প্র�
   const docXml = (body: string) =>
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${W}"><w:body>${body}<w:sectPr/></w:body></w:document>`;
 
+  // ফাইলের টাইপো: "L. 100 mm" (৩য় অপশন) আসলে M-এর জায়গায়
+  const typo = docXml(
+    p("27.\tপ্রশ্ন-টেক্সট") +
+      p("\tK. 0.01 mm\tL. 0.001 cm") +
+      p("\tL. 100 mm\tN. A I B \tDt N")
+  );
+  const rTypo = parseDocxXml(typo);
+  ok(rTypo.questions.length === 1, `repeat-টাইপো: ১ প্রশ্ন [পেয়েছি ${rTypo.questions.length}]`);
+  ok(rTypo.questions[0].options.length === 4, `repeat-টাইপো: ৪ অপশনই গোনা [পেয়েছি ${rTypo.questions[0].options.length}]`);
+  ok(rTypo.questions[0].options[2].label === "L", "৩য় অপশনের আসল লেবেল L-ই থাকে");
+  ok(rTypo.questions[0].answer === "N", `উত্তর N [পেয়েছি ${rTypo.questions[0].answer}]`);
+}
+
+console.log("\n== ১১) repeat-টাইপো redownload-পার্সেও (scanOptions শেয়ার্ড) ==");
+{
+  const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  const p = (text: string) =>
+    `<w:p xmlns:w="${W}"><w:r><w:t xml:space="preserve">${text}</w:t></w:r></w:p>`;
+  const docXml = (body: string) =>
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${W}"><w:body>${body}<w:sectPr/></w:body></w:document>`;
+  const { parseRedownloadXml } = await import("../src/lib/mcq/redownload");
+  const typo = docXml(
+    p("27.\tপ্রশ্ন-টেক্সট") +
+      p("\tK. 0.01 mm\tL. 0.001 cm") +
+      p("\tL. 100 mm\tN. A I B \tDt N")
+  );
+  const rTypo = parseRedownloadXml(typo);
+  ok(rTypo.questions.length === 1, `RD repeat-টাইপো: ১ প্রশ্ন [পেয়েছি ${rTypo.questions.length}]`);
+  ok(rTypo.questions[0].options.length === 4, `RD repeat-টাইপো: ৪ অপশন [পেয়েছি ${rTypo.questions[0].options.length}]`);
+}
+
+console.log("\n== ১২) সিনথেটিক: টাইটেল (প্রি) + সমাপ্তি-লাইন (পোস্ট) প্রিজার্ভ ==");
+{
+  const W12 = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  const p12 = (text: string) =>
+    `<w:p xmlns:w="${W12}"><w:r><w:t xml:space="preserve">${text}</w:t></w:r></w:p>`;
+  const docXml12 = (body: string) =>
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${W12}"><w:body>${body}<w:sectPr/></w:body></w:document>`;
+
   // টাইটেল (separator-শ্রেণি) + ২ প্রশ্ন (MCQ-শর্ত: ৪ অপশন-মার্কার) + শেষে "END" সমাপ্তি-লাইন (separator → ব্লক-বাইরে)
-  const syn = docXml(
-    p("MADRASAH BOARD 2024") +
-      p("১. প্রথম প্রশ্ন") + p("ক) এক") + p("খ) দুই") + p("গ) তিন") + p("ঘ) চার") +
-      p("২. দ্বিতীয় প্রশ্ন") + p("ক) পাঁচ") + p("খ) ছয়") + p("গ) সাত") + p("ঘ) আট") +
-      p("END")
+  const syn = docXml12(
+    p12("MADRASAH BOARD 2024") +
+      p12("১. প্রথম প্রশ্ন") + p12("ক) এক") + p12("খ) দুই") + p12("গ) তিন") + p12("ঘ) চার") +
+      p12("২. দ্বিতীয় প্রশ্ন") + p12("ক) পাঁচ") + p12("খ) ছয়") + p12("গ) সাত") + p12("ঘ) আট") +
+      p12("END")
   );
   const synParse = parseDocxXml(syn);
   ok(synParse.questions.length === 2, `সিনথেটিক: ২ প্রশ্ন [পেয়েছি ${synParse.questions.length}]`);

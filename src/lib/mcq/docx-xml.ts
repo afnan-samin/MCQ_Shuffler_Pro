@@ -403,21 +403,73 @@ export function scanOptions(blockText: string, serialRaw: string): { options: Op
   const region = regionLines.join("\n");
 
   // ---- ③ ফ্যামিলি-স্ক্যান ----
+  // লেবেলগুলোর অবস্থান সব সেপারেটর-সহ সংগ্রহ করে ক্রম-ক্রমিক
+  // রান খোঁজা হয়: ফ্যামিলির পূর্ণ ক্রম (K→L→M→N) যেখানে মেলে সেখান
+  // থেকে অপশন কাটা হয়। টাইপো-টলারেন্ট: ক্রমে পরে থাকা লেবেলের
+  // repeat (যেমন "L. … L. …" — ২য় L) থাকলে ওই স্লটে আসল অক্ষরসহই
+  // বসে (Physics Q27-কেস: K, L, L(typo), N → ৪ অপশন) — লেবেল-ম্যাচিং
+  // তাই occurrence-ভিত্তিক (indexOf-স্ট্রিক্ট নয়)।
+  const SEPS = [".", "।", ")", ":"] as const;
+  /** লেবেলের সব occurrence-পজিশন (ক্রমবর্ধমান) */
+  const findAllLabels = (label: string): number[] => {
+    const out: number[] = [];
+    for (const sep of SEPS) {
+      let from = 0;
+      for (;;) {
+        const at = region.indexOf(label + sep, from);
+        if (at < 0) break;
+        out.push(at);
+        from = at + label.length + 1;
+      }
+    }
+    return out.sort((a, b) => a - b);
+  };
   let best: { labels: string[]; idxs: number[] } | null = null;
   for (const family of OPTION_FAMILIES) {
+    const occs = family.map(findAllLabels);
+    // ক্রমবর্ধমান রান: প্রতিটা স্লটে আগের পজিশনের পরের occurrence;
+    // লেবেল-ঘাটতি হলে আগের লেবেলের repeat ওই স্লটে বসে (টাইপো)
     const labels: string[] = [];
     const idxs: number[] = [];
-    let pos = 0;
-    for (const label of family) {
-      let found = -1;
-      for (const sep of [".", "।", ")", ":"]) {
-        const at = region.indexOf(label + sep, pos);
-        if (at >= 0 && (found === -1 || at < found)) found = at;
+    let pos = -1;
+    for (let li = 0; li < family.length; li++) {
+      let pick = -1;
+      for (const at of occs[li]) {
+        if (at > pos) {
+          pick = at;
+          break;
+        }
       }
-      if (found === -1) break;
-      labels.push(label);
-      idxs.push(found);
-      pos = found + label.length + 1;
+      if (pick === -1 && li + 1 < family.length) {
+        // প্রত্যাশিত লেবেলের আর occurrence নেই — আগের লেবেলগুলোর
+        // repeat (pos-এর পরের) কি এই স্লটের টাইপো?
+        for (let pi = li - 1; pi >= 0; pi--) {
+          for (const at of occs[pi]) {
+            if (at > pos) {
+              pick = at;
+              break;
+            }
+          }
+          if (pick !== -1) break;
+        }
+        // repeat-এর পরেও বাকি ক্রমের অন্তত একটা লেবেল থাকতে হবে
+        // (নাহলে trailing-নয়েজ — স্লট নয়, ক্রম শেষ)
+        if (pick !== -1) {
+          let restOk = false;
+          for (let rj = li + 1; rj < family.length; rj++) {
+            if (occs[rj].some((at) => at > pick)) {
+              restOk = true;
+              break;
+            }
+          }
+          if (!restOk) pick = -1;
+        }
+        if (pick === -1) break;
+      }
+      if (pick === -1) break;
+      labels.push(family[li]);
+      idxs.push(pick);
+      pos = pick;
     }
     if (labels.length >= 2 && (!best || labels.length > best.labels.length)) {
       best = { labels, idxs };
@@ -430,10 +482,13 @@ export function scanOptions(blockText: string, serialRaw: string): { options: Op
     const { labels, idxs } = best;
     qText = region.slice(0, idxs[0]).trim();
     for (let i = 0; i < labels.length; i++) {
-      const start = idxs[i] + labels[i].length + 1; // লেবেল + সেপারেটর বাদ
+      // occurrence-পজিশনের আসল অক্ষরই লেবেল (repeat-টাইপোতে প্রত্যাশিত
+      // অক্ষর নয় — "L. 100 mm" স্লটে L-ই থাকে, M বানানো হয় না)
+      const atLabel = region[idxs[i]] ?? labels[i];
+      const start = idxs[i] + atLabel.length + 1; // লেবেল + সেপারেটর বাদ
       const end = i + 1 < labels.length ? idxs[i + 1] : region.length;
       const text = region.slice(start, end).trim();
-      options.push({ label: labels[i], text });
+      options.push({ label: atLabel, text });
     }
   }
   return { options, answer, qText, bekkha };
