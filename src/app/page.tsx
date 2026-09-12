@@ -304,7 +304,7 @@ export default function Home() {
   const [setsDocx, setSetsDocx] = useState<number[][] | null>(null);
   // শাফল মোডে সিরিয়াল বদলের দরকার নেই (সিরিয়ালের আলাদা মোড আছেই) —
   // ডিফল্ট OFF: ডাউনলোডে প্রশ্নের আসল নম্বরই থাকে; চাইলে টগল ON করে ১,২,৩…
-  const [renumber, setRenumber] = useState(false);
+  const [renumber, setRenumber] = useState(true);
   const [sortedFlags, setSortedFlags] = useState<boolean[]>([]);
   const [exportOpts, setExportOpts] = useState<ExportOptions>(DEFAULT_EXPORT_OPTIONS);
   const [busy, setBusy] = useState<string | null>(null);
@@ -340,11 +340,11 @@ export default function Home() {
   /** সব ফাইলের সেট এক মাস্টার-ZIP-এ (nested: per-file ZIP + একক-সেট .docx) */
   const [multiSetsZipBusy, setMultiSetsZipBusy] = useState(false);
   /**
-   * মাল্টি-শাফলে প্রতি ফাইলের serial-replace (ডিফল্ট OFF — আসল নম্বর)।
+   * মাল্টি-শাফলে প্রতি ফাইলের serial-replace (ডিফল্ট ON — ১, ২, ৩…)।
    * সিঙ্গেল-ফাইলের গ্লোবাল টগল থেকে আলাদা — expand করা section-এ নিজের টগল।
    */
   const [multiRenumber, setMultiRenumber] = useState<Record<string, boolean>>({});
-  const fileRenumber = (id: string): boolean => multiRenumber[id] ?? false;
+  const fileRenumber = (id: string): boolean => multiRenumber[id] ?? true;
   const toggleFileRenumber = (id: string, v: boolean) =>
     setMultiRenumber((prev) => ({ ...prev, [id]: v }));
 

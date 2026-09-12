@@ -19,7 +19,7 @@ export interface ShuffleFileSets {
   /** এই ফাইলের সেটগুলো (প্রতি সেটে প্রশ্ন-id ক্রম) */
   setIds: number[][];
   questions: DocxQuestion[];
-  /** এই ফাইলের serial-replace (ডিফল্ট OFF — আসল নম্বর) */
+  /** এই ফাইলের serial-replace (ডিফল্ট ON — ১, ২, ৩…) */
   renumber: boolean;
 }
 
@@ -129,7 +129,7 @@ export function ShuffleMultiSetsCard({
               </div>
               {open && (
                 <div id={`shuffle-file-${f.id}`} className="space-y-3 border-t p-3">
-                  {/* এই ফাইলের serial-replace — শুধু ওই ফাইলে (ডিফল্ট OFF); নিচের নম্বরে ক্লিকেও টগল হয় */}
+                  {/* এই ফাইলের serial-replace — শুধু ওই ফাইলে (ডিফল্ট ON); নিচের নম্বরে ক্লিকেও টগল হয় */}
                   <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/40 p-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 text-sm font-medium">
@@ -147,6 +147,8 @@ export function ShuffleMultiSetsCard({
                       disabled={disabled || busyFileId !== null}
                     />
                   </div>
+                  {/* সেটগুলো পাশাপাশি (single-file view-এর মতো ২-কলাম গ্রিড) */}
+                  <div className="grid gap-4 lg:grid-cols-2">
                   {f.setIds.map((ids, si) => (
                     <div key={si} className="rounded-xl border bg-white dark:bg-background">
                       <div className="flex flex-wrap items-center gap-2 border-b bg-brand-50/70 px-4 py-2 dark:bg-brand-950/20">
@@ -179,6 +181,7 @@ export function ShuffleMultiSetsCard({
                       </div>
                     </div>
                   ))}
+                  </div>
                 </div>
               )}
             </div>
