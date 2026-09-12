@@ -1,0 +1,96 @@
+1:"$Sreact.fragment"
+5:I[39756,["/MCQ_Shuffler_Pro/_next/static/chunks/2f236954d6a65e12.js"],"default"]
+6:I[37457,["/MCQ_Shuffler_Pro/_next/static/chunks/2f236954d6a65e12.js"],"default"]
+7:I[77855,["/MCQ_Shuffler_Pro/_next/static/chunks/7cf214324df23181.js","/MCQ_Shuffler_Pro/_next/static/chunks/c5663c6493f0a2da.js"],"Toaster"]
+:HL["/MCQ_Shuffler_Pro/_next/static/chunks/9d7d766ee214b6cf.css","style"]
+2:Tc41,/* Auto-generated from src/config/theme.ts — DO NOT EDIT HERE.
+   To change the whole site (fonts, colors, radius, popups) edit theme.ts. */
+:root {
+  /* fonts, radius, popups */
+  --st-font-sans: var(--font-display), var(--font-bengali), "Noto Serif Bengali", "Noto Sans Bengali", Georgia, serif;
+  --st-font-serif: var(--font-display), "Noto Serif Bengali", Georgia, Cambria, "Times New Roman", serif;
+  --st-font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --st-font-bengali: var(--font-display), var(--font-bengali), "Noto Serif Bengali", "Noto Sans Bengali", serif;
+  --st-radius-base: 0.625rem;
+  --st-radius-sm: calc(var(--st-radius-base) - 4px);
+  --st-radius-md: calc(var(--st-radius-base) - 2px);
+  --st-radius-lg: var(--st-radius-base);
+  --st-radius-xl: calc(var(--st-radius-base) + 4px);
+  --st-radius-full: 9999px;
+  --st-popup-radius: var(--st-radius-md);
+  --st-popup-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --st-popup-shadow-sm: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --st-popup-border-width: 1px;
+  --st-popup-border-style: solid;
+  --st-popup-backdrop-blur: 8px;
+  /* colors (light) */
+  --st-background: #ffffff;
+  --st-foreground: #0a0a0a;
+  --st-card: #ffffff;
+  --st-card-foreground: #0a0a0a;
+  --st-popover: #ffffff;
+  --st-popover-foreground: #0a0a0a;
+  --st-primary: #171717;
+  --st-primary-foreground: #fafafa;
+  --st-secondary: #f5f5f5;
+  --st-secondary-foreground: #171717;
+  --st-muted: #f5f5f5;
+  --st-muted-foreground: #737373;
+  --st-accent: #f5f5f5;
+  --st-accent-foreground: #171717;
+  --st-destructive: #e7000b;
+  --st-destructive-foreground: #ffffff;
+  --st-success: #16a34a;
+  --st-warning: #d97706;
+  --st-border: #e5e5e5;
+  --st-input: #e5e5e5;
+  --st-ring: #a3a3a3;
+  --st-brand-50: #ecfdf5;
+  --st-brand-100: #d1fae5;
+  --st-brand-200: #a7f3d0;
+  --st-brand-300: #6ee7b7;
+  --st-brand-400: #34d399;
+  --st-brand-500: #10b981;
+  --st-brand-600: #059669;
+  --st-brand-700: #047857;
+  --st-brand-800: #065f46;
+  --st-brand-900: #064e3b;
+  --st-brand-950: #022c22;
+}
+.dark {
+  /* colors (dark) — same variable names, active when <html class="dark"> */
+  --st-background: #0a0a0a;
+  --st-foreground: #fafafa;
+  --st-card: #171717;
+  --st-card-foreground: #fafafa;
+  --st-popover: #171717;
+  --st-popover-foreground: #fafafa;
+  --st-primary: #e5e5e5;
+  --st-primary-foreground: #171717;
+  --st-secondary: #262626;
+  --st-secondary-foreground: #fafafa;
+  --st-muted: #262626;
+  --st-muted-foreground: #a3a3a3;
+  --st-accent: #262626;
+  --st-accent-foreground: #fafafa;
+  --st-destructive: #ff6467;
+  --st-destructive-foreground: #ffffff;
+  --st-success: #22c55e;
+  --st-warning: #f59e0b;
+  --st-border: rgb(255 255 255 / 0.1);
+  --st-input: rgb(255 255 255 / 0.15);
+  --st-ring: #737373;
+  --st-brand-50: #ecfdf5;
+  --st-brand-100: #d1fae5;
+  --st-brand-200: #a7f3d0;
+  --st-brand-300: #6ee7b7;
+  --st-brand-400: #34d399;
+  --st-brand-500: #10b981;
+  --st-brand-600: #059669;
+  --st-brand-700: #047857;
+  --st-brand-800: #065f46;
+  --st-brand-900: #064e3b;
+  --st-brand-950: #022c22;
+}0:{"buildId":"7qr3kown5pyv-8TRu4H8r","rsc":["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/MCQ_Shuffler_Pro/_next/static/chunks/9d7d766ee214b6cf.css","precedence":"next"}],["$","script","script-0",{"src":"/MCQ_Shuffler_Pro/_next/static/chunks/7cf214324df23181.js","async":true}],["$","script","script-1",{"src":"/MCQ_Shuffler_Pro/_next/static/chunks/c5663c6493f0a2da.js","async":true}]],["$","html",null,{"lang":"en","suppressHydrationWarning":true,"className":"noto_serif_bengali_5a972a05-module__AgEhEW__variable sutonny_498f74fa-module__7Fl8IG__variable geist_a71539c9-module__T19VSG__variable geist_mono_8d43a2aa-module__8Li5zG__variable noto_sans_bengali_38b135d3-module__jeFDMa__variable","children":["$","body",null,{"className":"antialiased bg-background text-foreground","children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"$2"}}],"$L3","$L4"]}]}]]}],"loading":null,"isPartial":false}
+3:["$","$L5",null,{"parallelRouterKey":"children","template":["$","$L6",null,{}],"notFound":[[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":404}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],[]]}]
+4:["$","$L7",null,{}]

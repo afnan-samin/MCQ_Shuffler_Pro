@@ -1,0 +1,117 @@
+1:"$Sreact.fragment"
+7:I[68027,[],"default"]
+:HL["/MCQ_Shuffler_Pro/_next/static/chunks/9d7d766ee214b6cf.css","style"]
+:HL["/MCQ_Shuffler_Pro/_next/static/media/6ea8d1bb8ea4af7a-s.p.524499be.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+:HL["/MCQ_Shuffler_Pro/_next/static/media/797e433ab948586e-s.p.29207c2f.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+:HL["/MCQ_Shuffler_Pro/_next/static/media/SutonnyMJ-s.p.fe80634a.woff","font",{"crossOrigin":"","type":"font/woff"}]
+:HL["/MCQ_Shuffler_Pro/_next/static/media/c972814ac2190658-s.p.357f7672.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+:HL["/MCQ_Shuffler_Pro/_next/static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+:HL["/MCQ_Shuffler_Pro/_next/static/media/fcdafff93183a575-s.p.aecc5519.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+2:Tc41,/* Auto-generated from src/config/theme.ts — DO NOT EDIT HERE.
+   To change the whole site (fonts, colors, radius, popups) edit theme.ts. */
+:root {
+  /* fonts, radius, popups */
+  --st-font-sans: var(--font-display), var(--font-bengali), "Noto Serif Bengali", "Noto Sans Bengali", Georgia, serif;
+  --st-font-serif: var(--font-display), "Noto Serif Bengali", Georgia, Cambria, "Times New Roman", serif;
+  --st-font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --st-font-bengali: var(--font-display), var(--font-bengali), "Noto Serif Bengali", "Noto Sans Bengali", serif;
+  --st-radius-base: 0.625rem;
+  --st-radius-sm: calc(var(--st-radius-base) - 4px);
+  --st-radius-md: calc(var(--st-radius-base) - 2px);
+  --st-radius-lg: var(--st-radius-base);
+  --st-radius-xl: calc(var(--st-radius-base) + 4px);
+  --st-radius-full: 9999px;
+  --st-popup-radius: var(--st-radius-md);
+  --st-popup-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --st-popup-shadow-sm: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --st-popup-border-width: 1px;
+  --st-popup-border-style: solid;
+  --st-popup-backdrop-blur: 8px;
+  /* colors (light) */
+  --st-background: #ffffff;
+  --st-foreground: #0a0a0a;
+  --st-card: #ffffff;
+  --st-card-foreground: #0a0a0a;
+  --st-popover: #ffffff;
+  --st-popover-foreground: #0a0a0a;
+  --st-primary: #171717;
+  --st-primary-foreground: #fafafa;
+  --st-secondary: #f5f5f5;
+  --st-secondary-foreground: #171717;
+  --st-muted: #f5f5f5;
+  --st-muted-foreground: #737373;
+  --st-accent: #f5f5f5;
+  --st-accent-foreground: #171717;
+  --st-destructive: #e7000b;
+  --st-destructive-foreground: #ffffff;
+  --st-success: #16a34a;
+  --st-warning: #d97706;
+  --st-border: #e5e5e5;
+  --st-input: #e5e5e5;
+  --st-ring: #a3a3a3;
+  --st-brand-50: #ecfdf5;
+  --st-brand-100: #d1fae5;
+  --st-brand-200: #a7f3d0;
+  --st-brand-300: #6ee7b7;
+  --st-brand-400: #34d399;
+  --st-brand-500: #10b981;
+  --st-brand-600: #059669;
+  --st-brand-700: #047857;
+  --st-brand-800: #065f46;
+  --st-brand-900: #064e3b;
+  --st-brand-950: #022c22;
+}
+.dark {
+  /* colors (dark) — same variable names, active when <html class="dark"> */
+  --st-background: #0a0a0a;
+  --st-foreground: #fafafa;
+  --st-card: #171717;
+  --st-card-foreground: #fafafa;
+  --st-popover: #171717;
+  --st-popover-foreground: #fafafa;
+  --st-primary: #e5e5e5;
+  --st-primary-foreground: #171717;
+  --st-secondary: #262626;
+  --st-secondary-foreground: #fafafa;
+  --st-muted: #262626;
+  --st-muted-foreground: #a3a3a3;
+  --st-accent: #262626;
+  --st-accent-foreground: #fafafa;
+  --st-destructive: #ff6467;
+  --st-destructive-foreground: #ffffff;
+  --st-success: #22c55e;
+  --st-warning: #f59e0b;
+  --st-border: rgb(255 255 255 / 0.1);
+  --st-input: rgb(255 255 255 / 0.15);
+  --st-ring: #737373;
+  --st-brand-50: #ecfdf5;
+  --st-brand-100: #d1fae5;
+  --st-brand-200: #a7f3d0;
+  --st-brand-300: #6ee7b7;
+  --st-brand-400: #34d399;
+  --st-brand-500: #10b981;
+  --st-brand-600: #059669;
+  --st-brand-700: #047857;
+  --st-brand-800: #065f46;
+  --st-brand-900: #064e3b;
+  --st-brand-950: #022c22;
+}0:{"P":null,"b":"7qr3kown5pyv-8TRu4H8r","c":["",""],"q":"","i":false,"f":[[["",{"children":["__PAGE__",{}]},"$undefined","$undefined",true],[["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/MCQ_Shuffler_Pro/_next/static/chunks/9d7d766ee214b6cf.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}],["$","script","script-0",{"src":"/MCQ_Shuffler_Pro/_next/static/chunks/7cf214324df23181.js","async":true,"nonce":"$undefined"}],["$","script","script-1",{"src":"/MCQ_Shuffler_Pro/_next/static/chunks/c5663c6493f0a2da.js","async":true,"nonce":"$undefined"}]],["$","html",null,{"lang":"en","suppressHydrationWarning":true,"className":"noto_serif_bengali_5a972a05-module__AgEhEW__variable sutonny_498f74fa-module__7Fl8IG__variable geist_a71539c9-module__T19VSG__variable geist_mono_8d43a2aa-module__8Li5zG__variable noto_sans_bengali_38b135d3-module__jeFDMa__variable","children":["$","body",null,{"className":"antialiased bg-background text-foreground","children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"$2"}}],"$L3","$L4"]}]}]]}],{"children":["$L5",{},null,false,false]},null,false,false],"$L6",false]],"m":"$undefined","G":["$7",[]],"S":true}
+8:I[39756,["/MCQ_Shuffler_Pro/_next/static/chunks/2f236954d6a65e12.js"],"default"]
+9:I[37457,["/MCQ_Shuffler_Pro/_next/static/chunks/2f236954d6a65e12.js"],"default"]
+a:I[77855,["/MCQ_Shuffler_Pro/_next/static/chunks/7cf214324df23181.js","/MCQ_Shuffler_Pro/_next/static/chunks/c5663c6493f0a2da.js"],"Toaster"]
+b:I[47257,["/MCQ_Shuffler_Pro/_next/static/chunks/2f236954d6a65e12.js"],"ClientPageRoot"]
+c:I[52683,["/MCQ_Shuffler_Pro/_next/static/chunks/7cf214324df23181.js","/MCQ_Shuffler_Pro/_next/static/chunks/c5663c6493f0a2da.js","/MCQ_Shuffler_Pro/_next/static/chunks/e6e6080671d9617e.js","/MCQ_Shuffler_Pro/_next/static/chunks/14a78ef4062d030b.js","/MCQ_Shuffler_Pro/_next/static/chunks/a96c7e5a8f8292a3.js","/MCQ_Shuffler_Pro/_next/static/chunks/d69c0d0489adf27c.js"],"default"]
+f:I[97367,["/MCQ_Shuffler_Pro/_next/static/chunks/2f236954d6a65e12.js"],"OutletBoundary"]
+10:"$Sreact.suspense"
+12:I[97367,["/MCQ_Shuffler_Pro/_next/static/chunks/2f236954d6a65e12.js"],"ViewportBoundary"]
+14:I[97367,["/MCQ_Shuffler_Pro/_next/static/chunks/2f236954d6a65e12.js"],"MetadataBoundary"]
+3:["$","$L8",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L9",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":404}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],[]],"forbidden":"$undefined","unauthorized":"$undefined"}]
+4:["$","$La",null,{}]
+5:["$","$1","c",{"children":[["$","$Lb",null,{"Component":"$c","serverProvidedParams":{"searchParams":{},"params":{},"promises":["$@d","$@e"]}}],[["$","script","script-0",{"src":"/MCQ_Shuffler_Pro/_next/static/chunks/e6e6080671d9617e.js","async":true,"nonce":"$undefined"}],["$","script","script-1",{"src":"/MCQ_Shuffler_Pro/_next/static/chunks/14a78ef4062d030b.js","async":true,"nonce":"$undefined"}],["$","script","script-2",{"src":"/MCQ_Shuffler_Pro/_next/static/chunks/a96c7e5a8f8292a3.js","async":true,"nonce":"$undefined"}],["$","script","script-3",{"src":"/MCQ_Shuffler_Pro/_next/static/chunks/d69c0d0489adf27c.js","async":true,"nonce":"$undefined"}]],["$","$Lf",null,{"children":["$","$10",null,{"name":"Next.MetadataOutlet","children":"$@11"}]}]]}]
+6:["$","$1","h",{"children":[null,["$","$L12",null,{"children":"$L13"}],["$","div",null,{"hidden":true,"children":["$","$L14",null,{"children":["$","$10",null,{"name":"Next.Metadata","children":"$L15"}]}]}],["$","meta",null,{"name":"next-size-adjust","content":""}]]}]
+d:{}
+e:"$5:props:children:0:props:serverProvidedParams:params"
+13:[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]
+16:I[27201,["/MCQ_Shuffler_Pro/_next/static/chunks/2f236954d6a65e12.js"],"IconMark"]
+11:null
+15:[["$","title","0",{"children":"MCQ Shuffler Pro — Free MCQ Shuffler & Exam Set Generator"}],["$","meta","1",{"name":"description","content":"Shuffle MCQ questions into multiple sets, or keep all questions per set (Original Shuffle). Word-by-word Bijoy/Unicode/English detection, serial detection & auto-fix. Noto Serif Bengali + Bijoy (SutonnyMJ) font support, Word (.docx) export — one set per page, plain-text serials. Completely free."}],["$","meta","2",{"name":"keywords","content":"MCQ shuffle,MCQ set maker,Original Shuffle,Bijoy font,SutonnyMJ,Bengali MCQ,exam set generator,question shuffle,Word export"}],["$","meta","3",{"property":"og:title","content":"MCQ Shuffler Pro"}],["$","meta","4",{"property":"og:description","content":"MCQ shuffle, set building & serial detection — completely free"}],["$","meta","5",{"property":"og:type","content":"website"}],["$","meta","6",{"name":"twitter:card","content":"summary"}],["$","meta","7",{"name":"twitter:title","content":"MCQ Shuffler Pro"}],["$","meta","8",{"name":"twitter:description","content":"MCQ shuffle, set building & serial detection — completely free"}],["$","link","9",{"rel":"icon","href":"/MCQ_Shuffler_Pro/icon.png?icon.490cce7b.png","sizes":"512x512","type":"image/png"}],["$","link","10",{"rel":"icon","href":"/MCQ_Shuffler_Pro/icon.svg?icon.b547bee2.svg","sizes":"any","type":"image/svg+xml"}],["$","link","11",{"rel":"apple-touch-icon","href":"/MCQ_Shuffler_Pro/apple-icon.png?apple-icon.8f1bc735.png","sizes":"180x180","type":"image/png"}],["$","$L16","12",{}]]
