@@ -15,11 +15,16 @@
 // শনাক্তযোগ্য সোর্স-লেবেল: "ক." "খ।" "গ)" "(ক)" "[a]" "a)" "B." ইত্যাদি —
 // উত্তর-মালা/সিরিয়াল প্যারা ধরা হয় না (শুধু options-কাইন্ড প্যারায় চলে)।
 // খাঁটি-শব্দের অক্ষর (যেমন "Md."-এর d) বাউন্ডারি-চেকে বাদ পড়ে।
+// এনকোডিং-নিয়ম: Bijoy (SutonnyMJ জাতীয়)-ফন্ট রানে Bangla-লেবেল (কখগঘ)
+// Bijoy-ASCII-তে (KLMN) বসে — Unicode ক SutonnyMJ-তে গার্বেজ হতো।
 // ============================================================
+
+import { LEGACY_BIJOY_FONT_VALUE_RE } from "./font-remap";
+
+const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 
 /** টার্গেট লেবেল-স্টাইল */
 export type OptionLabelStyle = "A" | "a" | "i" | "ka";
-
 /** টার্গেট সেপারেটর */
 export type OptionLabelSeparator = "." | ")";
 
@@ -77,43 +82,137 @@ const SOURCE_IDX: Record<string, number> = {
 };
 
 /**
- * অপশন-লেবেল টোকেন — চার রূপ:
+ * অপশন-লেবেল টোকেন — পাঁচ রূপ:
  *  ① paren   "(ক)" "(a)" "(K)"   ② bracket "[ক]" "[a]"
  *  ③ বাংলা/বিজয় "ক." "খ।" "গ)" "K." "N)"  ④ ল্যাটিন "a." "B)" "d)"
+ *  ⑤ সেপারেটর-ছাড়া সারি-শুরু ("A ivB" — ডট-টাইপো; শুধু প্যারা-শুরু/ট্যাবের পরে)
  * paren/bracket আগে — নাহলে "(ক)"-এর ভিতরের "ক)" bare রূপে ধরা পড়ত।
  */
 const OPTION_TOK_RE =
-  /\(\s*([কখগঘK-Nk-nA-Da-d])\s*\)|\[\s*([কখগঘK-Nk-nA-Da-d])\s*\]|([কখগঘK-Nk-n])\s*([.।):])|([A-Da-d])\s*([.):])/g;
+  /\(\s*([কখগঘK-Nk-nA-Da-d])\s*\)|\[\s*([কখগঘK-Nk-nA-Da-d])\s*\]|([কখগঘK-Nk-n])\s*([.।):])|([A-Da-d])\s*([.):])|(?:^|\t) ?([KLMNklmnকখগঘa-dA-D]) (?= ?\S)/gm;
+
+/** Bangla-লেবেলের Bijoy-ASCII রূপ (SutonnyMJ-ফন্টে ক খ গ ঘ হিসেবে দেখায়) */
+const BIJOY_LABEL: Record<string, string> = { "ক": "K", "খ": "L", "গ": "M", "ঘ": "N" };
+
+interface LabelSeg {
+  /** w:t-জয়েন্ট স্পেসে শুরু/শেষ */
+  jStart: number;
+  jEnd: number;
+  run: Element | null;
+  /** রানের ফন্ট (rFonts ascii/hAnsi; না থাকলে "") */
+  font: string;
+}
+
+/** রানের ফন্ট-নাম (rFonts ascii → hAnsi) */
+function runFontOf(run: Element | null): string {
+  if (!run) return "";
+  const rfs = run.getElementsByTagNameNS(W_NS, "rFonts");
+  if (!rfs.length) return "";
+  const rf = rfs[0];
+  return rf.getAttributeNS(W_NS, "ascii") || rf.getAttributeNS(W_NS, "hAnsi") || rf.getAttribute("w:ascii") || "";
+}
 
 /**
  * options-কাইন্ড প্যারা (cloneNode-করা এলিমেন্ট) রিলেবেল করে —
  * রিটার্ন: বদলে যাওয়া লেবেল-সংখ্যা (টেস্ট/টেলিমেট্রির জন্য)।
  * লেবেল টোকেন একাধিক w:t-তে ভাগ হয়ে থাকলেও স্প্যান-এডিট ঠিক জায়গায় বসে।
+ * ম্যাচিং ট্যাব-দৃশ্য টেক্সটে (w:tab-এলিমেন্ট → \t): সারির মাঝের লেবেল
+ * ("\tB. …" — w:t-জয়েন্টে ট্যাব অদৃশ্য বলে "…gB." হয়ে বাউন্ডারি-চেকে
+ * বাদ পড়ত) ধরা পড়ে; অফসেট w:t-জয়েন্ট স্পেসে ম্যাপ করে এডিট হয়।
  */
 export function relabelOptionPara(p: Element, s: OptionLabelSettings): number {
   if (!s?.enabled) return 0;
+  // ---- w:t-সেগমেন্ট + ট্যাব-পজিশন (ডকুমেন্ট-অর্ডার) ----
+  const segs: LabelSeg[] = [];
+  const tabbedParts: string[] = [];
+  const tabs: number[] = [];
+  let jointPos = 0;
+  let tabbedPos = 0;
+  const walk = (node: Element): void => {
+    for (const child of Array.from(node.children)) {
+      if (child.localName === "t" && child.namespaceURI === W_NS) {
+        const text = child.textContent ?? "";
+        let run: Element | null = null;
+        let n: Node | null = child.parentNode;
+        while (n && n.nodeType === 1) {
+          if ((n as Element).localName === "r") {
+            run = n as Element;
+            break;
+          }
+          n = n.parentNode;
+        }
+        segs.push({ jStart: jointPos, jEnd: jointPos + text.length, run, font: runFontOf(run) });
+        tabbedParts.push(text);
+        jointPos += text.length;
+        tabbedPos += text.length;
+      } else if (
+        child.localName === "tab" &&
+        child.namespaceURI === W_NS &&
+        node.localName === "r" &&
+        child.attributes.length === 0
+      ) {
+        // রান-লেভেল খালি ট্যাব (pPr-এর ট্যাব-স্টপ নয় — ওতে অ্যাট্রিবিউট থাকে)
+        tabs.push(tabbedPos);
+        tabbedParts.push("\t");
+        tabbedPos += 1;
+      } else if (child.localName === "oMath" || child.localName === "oMathPara") {
+        continue;
+      } else if (child.children.length) {
+        walk(child);
+      }
+    }
+  };
+  walk(p);
+  const tabbed = tabbedParts.join("");
+  if (!tabbed) return 0;
   const stream: Element[] = [];
   collectTs(p, stream);
   if (!stream.length) return 0;
-  const joined = stream.map((t) => t.textContent ?? "").join("");
+  /** ট্যাব-স্পেস অফসেট → w:t-জয়েন্ট অফসেট (ট্যাব বাদে দুই স্ট্রিং অভিন্ন) */
+  const toJoint = (x: number): number => {
+    let c = 0;
+    for (const t of tabs) {
+      if (t < x) c++;
+      else break;
+    }
+    return x - c;
+  };
+  const segAt = (js: number): LabelSeg | undefined =>
+    segs.find((g) => g.jStart <= js && js < g.jEnd) ?? segs.find((g) => g.jEnd > js);
 
   const edits: Array<{ start: number; end: number; text: string }> = [];
-  for (const m of joined.matchAll(OPTION_TOK_RE)) {
-    const letter = m[1] ?? m[2] ?? m[3] ?? m[5];
+  for (const m of tabbed.matchAll(OPTION_TOK_RE)) {
+    const letter = m[1] ?? m[2] ?? m[3] ?? m[5] ?? m[7];
     if (!letter) continue;
-    const bare = m[3] !== undefined || m[5] !== undefined;
-    if (bare) {
-      // বাউন্ডারি-চেক: bare লেবেলের আগে শুধু লাইন-শুরু/হোয়াইটস্পেস থাকতে পারে —
-      // শব্দের ভিতরের অক্ষর ("Md."-এর d, "U.S.A."-এর A) লেবেল নয়
-      const prev = m.index > 0 ? joined[m.index - 1] : "";
+    const isDotless = m[7] !== undefined;
+    let spanStart = m.index;
+    let spanEnd = m.index + m[0].length;
+    if (isDotless) {
+      // শুধু অক্ষরটুকু (m[0] = প্রিফিক্স-ট্যাব/স্পেস + অক্ষর + স্পেস;
+      // অক্ষর শেষ থেকে ২য়: শেষে স্পেস, তার আগে ১-অক্ষর লেবেল)
+      spanStart = m.index + m[0].length - 1 - letter.length;
+      spanEnd = spanStart + letter.length;
+    } else if (m[3] !== undefined || m[5] !== undefined) {
+      // বাউন্ডারি-চেক (ট্যাব-দৃশ্য): bare লেবেলের আগে শুধু লাইন-শুরু/
+      // হোয়াইটস্পেস থাকতে পারে — শব্দের ভিতরের অক্ষর ("Md."-এর d,
+      // "U.S.A."-এর A) লেবেল নয়
+      const prev = spanStart > 0 ? tabbed[spanStart - 1] : "";
       if (prev && !/\s/.test(prev)) continue;
     }
     const idx = SOURCE_IDX[letter.toLowerCase()];
     if (idx === undefined) continue;
+    let outLabel = OPTION_LABEL_SEQ[s.style][idx];
+    // Bijoy-ফন্ট রানে Bangla-লেবেল Bijoy-ASCII-তে — Unicode ক SutonnyMJ-তে গার্বেজ হতো
+    if (s.style === "ka") {
+      const seg = segAt(toJoint(spanStart));
+      if (seg && LEGACY_BIJOY_FONT_VALUE_RE.test(seg.font)) {
+        outLabel = BIJOY_LABEL[outLabel] ?? outLabel;
+      }
+    }
     edits.push({
-      start: m.index,
-      end: m.index + m[0].length,
-      text: `${OPTION_LABEL_SEQ[s.style][idx]}${s.separator}`,
+      start: toJoint(spanStart),
+      end: toJoint(spanEnd),
+      text: `${outLabel}${s.separator}`,
     });
   }
   if (!edits.length) return 0;
