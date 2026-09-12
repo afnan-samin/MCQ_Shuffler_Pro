@@ -1754,14 +1754,12 @@ export default function Home() {
                   }))}
                 />
 
-                {/* লেবেল-টাইপো ওয়ার্নিং কার্ড — টাইপো থাকলেই লাল কার্ড, টগল ডিফল্ট OFF */}
-                {rdLabelTypos.length > 0 && (
-                  <LabelTyposCard
-                    typos={rdLabelTypos}
-                    checked={rdFixLabels}
-                    onCheckedChange={setRdFixLabels}
-                  />
-                )}
+                {/* লেবেল-টাইপো কার্ড — সবসময় দেখায় (টাইপো থাকলে লাল, না থাকলে সবুজ "none found") */}
+                <LabelTyposCard
+                  typos={rdLabelTypos}
+                  checked={rdFixLabels}
+                  onCheckedChange={setRdFixLabels}
+                />
 
                 <OptionLabelsCard settings={optionLabels} onChange={updateOptionLabels} />
 
