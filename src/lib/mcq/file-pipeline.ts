@@ -21,7 +21,8 @@ import {
 } from "./color-serial";
 import { MAX_FILE_BYTES } from "./limits";
 
-export const FILE_TOO_BIG_MSG = "File is too large (50MB+ not supported)";
+// মেসেজটাও MAX_FILE_BYTES-থেকে ডেরাইভ — লিমিট বদলালে টেক্সট-নস্ট আর বদলায় না
+export const FILE_TOO_BIG_MSG = `File is too large (${MAX_FILE_BYTES / 1_000_000}MB+ not supported)`;
 export const DOCX_EXT_RE = /\.docx$/i;
 
 /**
