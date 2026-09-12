@@ -284,12 +284,81 @@ const ANSWER_DANGLING_RE =
 export const BEKKHA_LINE_RE =
   /^\s*(?:e¨vL¨v|ব্যাখ্যা|সমাধান|explanation)\s*[:.\-—]?/i;
 
-const OPTION_FAMILIES: string[][] = [
+/**
+ * স্লট-ক্রমের DP (K→L→M→N / ক→খ→গ→ঘ / A→B→C→D) — অপশন-লেবেল টোকেনের
+ * সেরা রান। প্রতিটা টোকেন নিজের লেবেল-স্লট অথবা টাইপো-রিপিটে ঠিক পরের
+ * স্লট (K,L,L,M তে ২য় L=M, ৩য় M=N) পূরণ করে; dp[p] = p-তম স্লটে শেষ
+ * হওয়া সেরা রান। fams-এর প্রতিটা ফ্যামিলি চেষ্টা হয়, minLen-এর চেয়ে
+ * বড় রানগুলোর মধ্যে দৈর্ঘ্যে সেরাটা (টাই হলে আগের ফ্যামিলি) ফেরে।
+ * key অবশ্যই document-ক্রমে monotonic (scan: region-অফসেট,
+ * redownload: token-ইনডেক্স)। scanOptions আর redownload-এর লেবেল-টাইপো
+ * ডিটেকশন দুইজনাই এই helper — দুই জায়গায় নিয়ম বিচ্যুত হওয়ার সুযোগ নেই।
+ */
+export interface DpSlotRun<T> {
+  fam: readonly string[];
+  labels: string[];
+  picks: T[];
+}
+
+export const LABEL_FAMS: readonly (readonly string[])[] = [
   ["K", "L", "M", "N"], // Bijoy (SutonnyMJ): ক খ গ ঘ
   ["ক", "খ", "গ", "ঘ"], // Unicode
-  ["a", "b", "c", "d"],
-  ["A", "B", "C", "D"],
+  ["A", "B", "C", "D"], // English
 ];
+
+export function dpSlotRun<T extends { key: number; ch: string; slot: string }>(
+  toks: readonly T[],
+  fams: readonly (readonly string[])[],
+  minLen: number
+): DpSlotRun<T> | null {
+  let best: DpSlotRun<T> | null = null;
+  for (const fam of fams) {
+    const dp: Array<{ labels: string[]; picks: T[] } | null> = [null, null, null, null];
+    for (const t of toks) {
+      const s = fam.indexOf(t.slot); // টোকেনের নিজের স্লট
+      if (s < 0) continue;
+      if (s === 0 && !dp[0]) dp[0] = { labels: [t.ch], picks: [t] };
+      // ① নিজের স্লট: dp[s-1] → dp[s]
+      if (s > 0 && dp[s - 1]) {
+        const prev = dp[s - 1]!;
+        if (t.key > prev.picks[prev.picks.length - 1].key) {
+          const cand = { labels: [...prev.labels, t.ch], picks: [...prev.picks, t] };
+          if (!dp[s] || cand.labels.length > dp[s]!.labels.length) dp[s] = cand;
+        }
+      }
+      // ② টাইপো-রিপিট: dp[s] → dp[s+1] (একই লেবেল আবার → পরের অপশন)
+      if (s < 3 && dp[s]) {
+        const prev = dp[s]!;
+        if (t.key > prev.picks[prev.picks.length - 1].key) {
+          const cand = { labels: [...prev.labels, t.ch], picks: [...prev.picks, t] };
+          if (!dp[s + 1] || cand.labels.length > dp[s + 1]!.labels.length) {
+            dp[s + 1] = cand;
+          }
+        }
+      }
+    }
+    for (const run of dp) {
+      if (run && run.labels.length >= minLen && (!best || run.labels.length > best.labels.length)) {
+        best = { fam, labels: run.labels, picks: run.picks };
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * কেস-মিক্স ফ্যামিলি-ম্যাচ (বাস্তব টাইপো: "K. … L. … M. … N." নয়,
+ * "K. … L. … L. … N." বা "K. … L. … M. …\td. …" — m-ছোটহাতের/missing-dot
+ * অবস্থায় ফ্যামিলিগুলো একীভূত হয়ে মিলতে হবে। familyKeys-এর বাইরের
+ * অক্ষর (D. — dotless "N 50 g" নয়) আলাদা ফ্যামিলি হিসেবে গোনা হয় না।
+ */
+/** স্লট-ফোল্ড: কেস-মিক্স টাইপো এক ফ্যামিলিতে মেলে (k/K→K, d/D→D) */
+export const CASE_FOLD: Record<string, string> = {
+  K: "K", L: "L", M: "M", N: "N",
+  k: "K", l: "L", m: "M", n: "N",
+  ক: "ক", খ: "খ", গ: "গ", ঘ: "ঘ",
+  a: "A", A: "A", b: "B", B: "B", c: "C", C: "C", d: "D", D: "D",
+};
 
 /**
  * `*`-উত্তর-অক্ষর (B-টাইমার ফরম্যাট): লেবেলের আগে ("*C. টেক্সট", "*A.B.")
@@ -403,83 +472,52 @@ export function scanOptions(blockText: string, serialRaw: string): { options: Op
   const region = regionLines.join("\n");
 
   // ---- ③ ফ্যামিলি-স্ক্যান ----
-  // লেবেলগুলোর অবস্থান সব সেপারেটর-সহ সংগ্রহ করে ক্রম-ক্রমিক
-  // রান খোঁজা হয়: ফ্যামিলির পূর্ণ ক্রম (K→L→M→N) যেখানে মেলে সেখান
-  // থেকে অপশন কাটা হয়। টাইপো-টলারেন্ট: ক্রমে পরে থাকা লেবেলের
-  // repeat (যেমন "L. … L. …" — ২য় L) থাকলে ওই স্লটে আসল অক্ষরসহই
-  // বসে (Physics Q27-কেস: K, L, L(typo), N → ৪ অপশন) — লেবেল-ম্যাচিং
-  // তাই occurrence-ভিত্তিক (indexOf-স্ট্রিক্ট নয়)।
-  const SEPS = [".", "।", ")", ":"] as const;
-  /** লেবেলের সব occurrence-পজিশন (ক্রমবর্ধমান) */
-  const findAllLabels = (label: string): number[] => {
-    const out: number[] = [];
-    for (const sep of SEPS) {
-      let from = 0;
-      for (;;) {
-        const at = region.indexOf(label + sep, from);
-        if (at < 0) break;
-        out.push(at);
-        from = at + label.length + 1;
-      }
+  // অপশন-লেবেল occurrence-ভিত্তিক: region-এর প্রতিটা "[A-Zকখগঘa-d][.।):]"
+  // টোকেনকে স্লট-কীতে fold করা হয় (k/K→"K", a/A→"A" — কেস-মিক্স টাইপো
+  // "K. … L. … M. …\td. …" এক ফ্যামিলিতেই মেলে; "N 50 g" ডটলেস টোকেন
+  // নয়, তাই "D." ফ্যামিলি-ম্যাচে ভুয়া-৪র্থ হয় না)।
+  // তারপর স্লট-ক্রমে (K→L→M→N) longest increasing run — এটাই অপশন-সেট।
+  // টাইপো-টলারেন্ট: ক্রমে repeat-স্লট (যেমন "L. … L. …" — ২য় L) থাকলে
+  // ওই স্লটে আসল অক্ষরসহই বসে (Physics Q27: K, L, L(typo), N → ৪ অপশন)।
+  const SEPS = new Set([".", "।", ")", ":"]);
+  interface Tok { at: number; ch: string; slot: string }
+  const toks: Tok[] = [];
+  for (let i = 0; i < region.length; i++) {
+    const ch = region[i];
+    const slot = (CASE_FOLD as Record<string, string>)[ch];
+    if (!slot) continue;
+    // বাউন্ডারি: আগে লাইন-শুরু/স্পেস/ট্যাব/ব্র্যাকেট/`*`
+    const prev = i > 0 ? region[i - 1] : "\n";
+    if (prev !== "\n" && !/[\s\t([*]/.test(prev)) continue;
+    const sep = region[i + 1];
+    if (!sep) continue;
+    if (SEPS.has(sep)) {
+      toks.push({ at: i, ch, slot });
+      continue;
     }
-    return out.sort((a, b) => a - b);
-  };
-  let best: { labels: string[]; idxs: number[] } | null = null;
-  for (const family of OPTION_FAMILIES) {
-    const occs = family.map(findAllLabels);
-    // ক্রমবর্ধমান রান: প্রতিটা স্লটে আগের পজিশনের পরের occurrence;
-    // লেবেল-ঘাটতি হলে আগের লেবেলের repeat ওই স্লটে বসে (টাইপো)
-    const labels: string[] = [];
-    const idxs: number[] = [];
-    let pos = -1;
-    for (let li = 0; li < family.length; li++) {
-      let pick = -1;
-      for (const at of occs[li]) {
-        if (at > pos) {
-          pick = at;
-          break;
-        }
-      }
-      if (pick === -1 && li + 1 < family.length) {
-        // প্রত্যাশিত লেবেলের আর occurrence নেই — আগের লেবেলগুলোর
-        // repeat (pos-এর পরের) কি এই স্লটের টাইপো?
-        for (let pi = li - 1; pi >= 0; pi--) {
-          for (const at of occs[pi]) {
-            if (at > pos) {
-              pick = at;
-              break;
-            }
-          }
-          if (pick !== -1) break;
-        }
-        // repeat-এর পরেও বাকি ক্রমের অন্তত একটা লেবেল থাকতে হবে
-        // (নাহলে trailing-নয়েজ — স্লট নয়, ক্রম শেষ)
-        if (pick !== -1) {
-          let restOk = false;
-          for (let rj = li + 1; rj < family.length; rj++) {
-            if (occs[rj].some((at) => at > pick)) {
-              restOk = true;
-              break;
-            }
-          }
-          if (!restOk) pick = -1;
-        }
-        if (pick === -1) break;
-      }
-      if (pick === -1) break;
-      labels.push(family[li]);
-      idxs.push(pick);
-      pos = pick;
-    }
-    if (labels.length >= 2 && (!best || labels.length > best.labels.length)) {
-      best = { labels, idxs };
+    // ডটলেস-লেবেল (টাইপো-সহনশীল): ট্যাব-লেড/লাইন-শুরুতে "A ivB"/"K text"
+    // — অক্ষরের পরে স্পেস/ট্যাব/নিউলাইন। শব্দের ভিতরের অক্ষর নয়
+    // (সেপারেটর-হীন "Credit" ইত্যাদি বাদ থাকে), মিড-লাইন "5000 A"ও নয়।
+    if ((prev === "\t" || prev === "\n" || prev === "*") && /[\s\t\n]/.test(sep)) {
+      toks.push({ at: i, ch, slot });
     }
   }
+  if (process.env.MCQ_DEBUG_SCAN) {
+    console.log("SCAN-TOKS=" + JSON.stringify(toks));
+  }
+  // স্লট-ক্রমের DP — dpSlotRun helper (redownload-এর লেবেল-টাইপো ডিটেকশনও
+  // একই helper; দুই জায়গায় নিয়ম বিচ্যুত হওয়ার সুযোগ নেই)
+  const best = dpSlotRun(
+    toks.map((t) => ({ key: t.at, ch: t.ch, slot: t.slot })),
+    LABEL_FAMS,
+    2
+  );
 
   const options: OptionPreview[] = [];
   let qText = region.trim();
   if (best) {
-    const { labels, idxs } = best;
+    const { labels, picks } = best;
+    const idxs = picks.map((t) => t.key);
     qText = region.slice(0, idxs[0]).trim();
     for (let i = 0; i < labels.length; i++) {
       // occurrence-পজিশনের আসল অক্ষরই লেবেল (repeat-টাইপোতে প্রত্যাশিত

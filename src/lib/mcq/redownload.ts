@@ -21,10 +21,13 @@ import { relabelOptionPara, type OptionLabelSettings } from "./option-labels";
 import { findRefTokens } from "./reference";
 import {
   ANSWER_TAIL_RE,
+  CASE_FOLD,
+  LABEL_FAMS,
   W_NS,
   countOptionMarkers,
   countRunTabs,
   detectSerialPrefix,
+  dpSlotRun,
   extractParaText,
   isSectionSeparator,
   numberToDigits,
@@ -136,6 +139,10 @@ export function isAnswerLine(t: string): boolean {
 /** অপশন-লেড লাইন (উত্তর বাদে) */
 export function isOptionLine(t: string): boolean {
   if (isAnswerLine(t)) return false;
+  // শুরুতে ব্যাখ্যা/রেফারেন্স-মার্কার থাকলে অপশন নয় — ট্যাব-লেড হলেও
+  // ("\te¨vL¨v: …" ব্যাখ্যাই; নাহলে ট্যাব-চেক আগে চলে গিয়ে options হয়ে
+  // যেত → UI-তে ৭ ব্যাখ্যা দেখায়, ডাউনলোডে ৫টাই আসত — Copy-ফাইল-কেস)
+  if (BEKKHA_PREFIX_RE.test(t) || REFERENCE_PREFIX_RE.test(t)) return false;
   if (/^\t/.test(t)) return true;
   return OPTION_LEAD_RE.test(t);
 }
@@ -229,6 +236,28 @@ export interface RdParseResult {
   splits: RdSplit[];
   /** অপশন-প্যারা থেকে `*`-উত্তর-মার্কার সরানোর স্প্যান */
   starStrips: Array<{ para: number; start: number; end: number }>;
+  /** অপশন-লেবেল টাইপো (K,L,L,N → ৩য়টি M হওয়ার কথা) — প্রতি প্রশ্নে */
+  labelTypos: LabelTypo[];
+}
+
+/**
+ * অপশন-লেবেল টাইপো রেকর্ড — ৪ অপশনের রানে (K→L→M→N ক্রম) এক/একাধিক
+ * লেবেল ভুল অক্ষরে (রিপিট) থাকলে actual↔expected পাশাপাশি; fixes = w:t-জয়েন্ট
+ * টেক্সটে ১-অক্ষর রিপ্লেস-স্প্যান (ডাউনলোডে অটো-ফিক্সে প্রয়োগ হয়)।
+ */
+export interface LabelTypo {
+  id: number;
+  serial: number;
+  /** ফ্যামিলি-ক্রম ("K/L/M/N" বা "ক/খ/গ/ঘ" বা "A/B/C/D") */
+  family: string;
+  /** ফাইলে যেমন আছে (["K","L","L","N"]) */
+  actual: string[];
+  /** যেমন হওয়ার কথা (["K","L","M","N"]) */
+  expected: string[];
+  /** কোন অবস্থানগুলো ভুল (0-based স্লট-ইনডেক্স) */
+  wrongSlots: number[];
+  /** ঠিক করার স্প্যান — para-র w:t-জয়েন্ট টেক্সটে ১-অক্ষর রিপ্লেস */
+  fixes: Array<{ para: number; start: number; end: number; text: string }>;
 }
 
 interface CurBlock {
@@ -560,6 +589,74 @@ export function parseRedownloadXml(xml: string): RdParseResult {
   }
   for (const b of merged) pushBlock(b);
 
+  // ---- লেবেল-টাইপো ডিটেকশন (repeat-লেবেল: "K. L. L. N." → ৩য়টি M হওয়ার কথা) ----
+  // অপশন-প্যারাগুলোর লেবেল-টোকেনে docx-xml-এর dpSlotRun (scanOptions-ও একই
+  // helper — নিয়ম এক জায়গায়) চালিয়ে ৪-অপশন রান বের করা হয়; রানের অক্ষর
+  // fold-মিলিয়ে ফ্যামিলি-ক্রমের সাথে না মিললে সেটাই টাইপো (কেস-মাত্র পার্থক্য
+  // টাইপো নয়) — fixes-এ ১-অক্ষর রিপ্লেস-স্প্যান (ডাউনলোডে "Fix label typos"
+  // অন থাকলে প্রয়োগ হয়; ফিক্সের কেস ফাইলের নিজের লেবেলের মতোই বসে)।
+  const labelTypos: LabelTypo[] = [];
+  {
+    const fold = (ch: string): string | null => (CASE_FOLD as Record<string, string>)[ch] ?? null;
+    for (const q of questions) {
+      // শুধু options-কাইন্ড প্যারা থেকে টোকেন (গ্লুড-উত্তর-টেইল বাদ দিয়ে)
+      const toks: Array<{ key: number; para: number; at: number; ch: string; slot: string }> = [];
+      let key = 0;
+      for (let j = q.blockStart; j <= q.blockEnd; j++) {
+        if (kinds[j] !== "options") continue;
+        let text = paraStreamText(kids[j]);
+        const ta = findTailAnswer(text);
+        if (ta !== null) text = text.slice(0, ta);
+        for (let i = 0; i < text.length; i++) {
+          const ch = text[i];
+          const slot = fold(ch);
+          if (!slot) continue;
+          const prev = i > 0 ? text[i - 1] : "\n";
+          if (prev !== "\n" && !/[\s\t([*]/.test(prev)) continue;
+          const sep = text[i + 1];
+          if (!sep) continue;
+          const isSep = sep === "." || sep === "।" || sep === ")" || sep === ":";
+          if (!isSep && !((prev === "\t" || prev === "\n" || prev === "*") && /[\s\t\n]/.test(sep))) {
+            continue;
+          }
+          toks.push({ key: key++, para: j, at: i, ch, slot });
+        }
+      }
+      if (toks.length < 4) continue;
+      // DP — ৩ ফ্যামিলিতে দৈর্ঘ্য-৪ রান (helper: নিজের-স্লট বা রিপিট-ট্রানজিশন)
+      const best = dpSlotRun(toks, LABEL_FAMS, 4);
+      if (!best) continue;
+      // fold-তুলনা: কেস-মাত্র পার্থক্য (K,L,m,N) টাইপো নয়; রিপিট-অক্ষরই (K,L,M,M) ভুল
+      const wrongSlots: number[] = [];
+      for (let p2 = 0; p2 < 4; p2++) {
+        if (fold(best.labels[p2]) !== best.fam[p2]) wrongSlots.push(p2);
+      }
+      if (!wrongSlots.length) continue;
+      // ফিক্সের কেস ফাইলের নিজের মতো — সঠিক লেবেলগুলো ছোটহাতের হলে ছোটহাতেরই
+      const lowerFile = best.picks.some(
+        (tp, idx) => !wrongSlots.includes(idx) && /[a-z]/.test(tp.ch)
+      );
+      const fixes = wrongSlots.map((p2) => {
+        const t = best.picks[p2];
+        return {
+          para: t.para,
+          start: t.at,
+          end: t.at + 1,
+          text: lowerFile ? best.fam[p2].toLowerCase() : best.fam[p2],
+        };
+      });
+      labelTypos.push({
+        id: q.id,
+        serial: q.serial,
+        family: best.fam.join("/"),
+        actual: [...best.labels],
+        expected: [...best.fam],
+        wrongSlots,
+        fixes,
+      });
+    }
+  }
+
   // ---- কাউন্ট ----
   const kindCounts: Record<PartKind, number> = {
     serial: 0,
@@ -581,6 +678,7 @@ export function parseRedownloadXml(xml: string): RdParseResult {
     hasUnicode: questions.some((q) => q.hasUnicode),
     splits,
     starStrips,
+    labelTypos,
   };
 }
 
@@ -622,6 +720,8 @@ export interface RedownloadOptions {
   expandAnswer: boolean;
   /** অপশন-লেবেল কাস্টমাইজ (ক. খ. → A. B.) — শুধু options-অংশের লেবেল বদলায় */
   optionLabels?: OptionLabelSettings | null;
+  /** অপশন-লেবেল টাইপো অটো-ফিক্স (K,L,L,N → K,L,M,N) — ডিফল্ট OFF */
+  fixLabels?: boolean;
 }
 
 /**
@@ -661,6 +761,17 @@ export function buildRedownloadXml(
     const arr = starStripByPara.get(s.para) ?? [];
     arr.push({ start: s.start, end: s.end });
     starStripByPara.set(s.para, arr);
+  }
+  // অপশন-লেবেল টাইপো-ফিক্স (opts.fixLabels অন থাকলে) — para-ভিত্তিক রিপ্লেস-স্প্যান
+  const labelFixByPara = new Map<number, Array<{ start: number; end: number; text: string }>>();
+  if (opts.fixLabels) {
+    for (const lt of parse.labelTypos ?? []) {
+      for (const f of lt.fixes) {
+        const arr = labelFixByPara.get(f.para) ?? [];
+        arr.push({ start: f.start, end: f.end, text: f.text });
+        labelFixByPara.set(f.para, arr);
+      }
+    }
   }
   const lastOptPara = new Map<number, number>();
   for (const q of parse.questions) {
@@ -711,20 +822,29 @@ export function buildRedownloadXml(
     // স্প্লিট আগে — renumber/strip হেডের লেখা বদলায়, অফসেট সরে যেত
     const tail = split ? splitParaAtOffset(clone, split.start) : null;
 
+    // `*`-মার্কার + লেবেল-ফিক্স — এক replaceSpansLocal-এ; দুই স্প্যান-সেটই
+    // প্যারার অরিজিনাল w:t-জয়েন্ট অফসেটে (আলাদা কলে প্রথম এডিটেই অফসেট
+    // সরে যেত — B-টাইমার `*` + টাইপো-কম্বোতে ফিক্স ভুল জায়গায় বসত)।
+    // renumber-এর আগেও — রিনাম্বারের ডিজিট-লেন্থ বদলালেও এই স্প্যানগুলো
+    // প্যারা-ইনডেক্স i-এর নিজস্ব (options-প্যারা) নয়, তাই অফসেট নিরাপদ।
+    const stars = starStripByPara.get(i);
+    const labFix = labelFixByPara.get(i);
+    const fixSpans = [
+      ...(stars ?? []).map((s) => ({ ...s, text: "" })),
+      ...(labFix ?? []),
+    ];
+    if (fixSpans.length) {
+      const stream: Element[] = [];
+      collectTsLocal(clone, stream);
+      replaceSpansLocal(stream, fixSpans);
+    }
+
     if (i === q.blockStart) {
       if (opts.partSel.serial && opts.renumber) {
         renumberSerialParaTo(clone, outPos.get(bid) ?? q.pos, q.serialSeparator || ".");
       } else if (!opts.partSel.serial) {
         stripSerialPrefix(clone);
       }
-    }
-
-    // `*`-উত্তর-মার্কার সরানো (অপশন-প্যারা — মার্কারটা কনটেন্ট নয়)
-    const stars = starStripByPara.get(i);
-    if (stars?.length) {
-      const stream: Element[] = [];
-      collectTsLocal(clone, stream);
-      replaceSpansLocal(stream, stars.map((s) => ({ ...s, text: "" })));
     }
 
     // উত্তর-বিস্তার: অপশন বাদ + উত্তর আছে + অক্ষর-উত্তর ("উঃ ক")

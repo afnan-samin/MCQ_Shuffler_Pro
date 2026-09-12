@@ -1097,3 +1097,28 @@ Work Log:
 
 Stage Summary:
 - পূর্ণ অডিট সবুজ; tmp-e2e প্রোবগুলো gitignored — প্রোডাকশন কোডে কোনো পরিবর্তন নেই
+---
+Task ID: 59
+Agent: Cline
+Task: রিডাউনলোডে অপশন-লেবেল টাইপো ডিটেকশন + "Fix label typos" টগল (ডাউনলোডে অটো-ফিক্স, K.L.L.N→K.L.M.N) + tab-led ব্যাখ্যা-লাইন মিসক্লাসিফিকেশন ফিক্স + রিভিউ-ক্লিনআপ
+
+Work Log:
+- redownload.ts parseRedownloadXml: options-প্যারার লেবেল-টোকেনে ৪-অপশন রান (dpSlotRun) — প্রশ্নপ্রতি LabelTypo {serial, family, actual, expected, wrongSlots, fixes(w:t-জয়েন্ট ১-অক্ষর রিপ্লেস-স্প্যান)}; RdParseResult.labelTypos; ৩ ফ্যামিলি (K/L/M/N, ক/খ/গ/ঘ, A/B/C/D)
+- isOptionLine গার্ড: BEKKHA_PREFIX_RE/REFERENCE_PREFIX_RE মিললে false — tab-led "\te¨vL¨v: …" ব্যাখ্যা-লাইন আর options ভাবে না (Chemistry 1st Chapter Copy.docx-এ হারানো ২ ব্যাখ্যা ফিরেছে — ৭/৭)
+- buildRedownloadXml: নতুন opts.fixLabels (ডিফল্ট OFF) — ON হলে fixes-স্প্যান প্রয়োগ; OFF = আউটপুট হুবহু
+- label-typos-card.tsx (নতুন): লাল expandable কার্ড — প্রশ্ন ধরে actual→expected তালিকা (মাল্টি-ফাইলে ফাইল-নামসহ); header Switch persisted "mcq-rd-fix-labels", ডিফল্ট OFF; page.tsx-এ rdDocs.flatMap(labelTypos) → কার্ড + buildRdItems-এ fixLabels পাস
+- রিভিউ-ক্লিনআপ (৭ পয়েন্ট):
+  1. পার্স-টাইমের ডেড labelFixByPara ম্যাপ বাদ (build-এর নিজস্বটাই থাকে)
+  2. DP সিলেকশন কনফিউজিং কনস্ট্যান্ট বাদ — dpSlotRun helper-এ `run.labels.length > best.labels.length`
+  3. docx-xml-এর ডেড OPTION_FAMILIES বাদ (নতুন কোড ORDER.slice ব্যবহার করত)
+  4. DP ডিউপ শেষ — docx-xml.ts-এ export dpSlotRun + LABEL_FAMS; scanOptions (minLen 2) আর redownload টাইপো-ডিটেকশন (minLen 4) দুইজনাই এক helper — এক জায়গায় ফিক্স, দুই জায়গায় প্রযোজ্য
+  5. B-টাইমার `*` + রিপিট-টাইপো একই অপশন-প্যারায় অফসেট-শিফট ফিক্স — স্টার-স্ট্রিপ + লেবেল-ফিক্স এক replaceSpansLocal-এ (দুই স্প্যান-সেটই অরিজিনাল অফসেটে) + renumber-এর আগে; টেস্ট ১০-এ regression (স্টার+টাইপো কম্বো: ফিক্স সঠিক জায়গায়, পরের অপশন অক্ষত)
+  6. কেস-ফোল্ড ডিসিশন: fold-তুলনা — কেস-মাত্র পার্থক্য (K,L,m,N) আর টাইপো ফ্ল্যাগ হয় না (false-positive বাদ); রিপিট-অক্ষরই (K,L,M,M) ভুল; রিপিট-ফিক্সের কেস ফাইলের নিজের মতো (ছোটহাতের ফাইলে k,l,l,n → m, বড়হাতের ফাইলে K,L,M,M → N); টেস্ট ১০-এ দুই ডক লক
+  7. worklog line-ending — এই ফাইল CRLF (1099/0 যাচাই); আগের সেশনের whole-file-normalize বাদ দিয়ে HEAD রিস্টোর + CRLF অ্যাপেন্ড — diff শুধু যোগ-হওয়া লাইন
+- docx-xml scanOptions: CASE_FOLD-এ uppercase K/L/M/N (মূল বাগ) + dotless-লেবেল টোলারেন্স + DP slot-run; MCQ_DEBUG_SCAN গেটেড ডিবাগ ট্রেস রাখা হয়েছে
+- টেস্ট: test-redownload.ts ৯ম (টাইপো + fixLabels OFF/ON + রিপার্স) ও ১০ম (কেস-ডিসিশন + স্টার-কম্বো) সেকশন → ৬২/৬২; test-docx ৬৩/৬৩ (scan-DP রিফ্যাক্টর অক্ষত)
+- ভেরিফাই: tsc 0; bun run test:all ১২ স্যুট সবুজ (exit 0); probe-bekkha ৭/৭; probe-typos — Physics 1st Ch-02 (K/L/M/N) ও Chemistry Organic (A/B/C/D) PROBE-PASS (OFF=টাইপো থাকে, ON=রিপার্সে ০); Format/ ৪২ ফাইলে ৮ টাইপো (সব genuine রিপিট)
+
+Stage Summary:
+- রিডাউনলোড এখন লেবেল-টাইপো লাল কার্ডে দেখায় এবং টগল অন থাকলে ডাউনলোডে ১-অক্ষর ফিক্স বসায় (ডিফল্ট OFF = হুবহু); ব্যাখ্যা-লাইন ডিটেকশন ফিক্স; DP এক জায়গায় (dpSlotRun); কেস-মাত্র পার্থক্য টাইপো নয়; স্টার+টাইপো কম্বো নিরাপদ — ১২ স্যুট সবুজ, কোনো রিগ্রেশন নেই
+- নোট: `bun run lint` (eslint .) আগে থেকেই .next-static/ বিল্ড-আর্টিফ্যাক্টে ফেল — টাচ-করা ফাইলগুলো ক্লিন

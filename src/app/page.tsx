@@ -76,6 +76,7 @@ import {
   DEFAULT_PART_SELECTION,
   extractWatermark,
   parseRedownloadXml,
+  type LabelTypo,
   type PartKind,
   type PartSel,
   type RdParseResult,
@@ -90,6 +91,7 @@ import {
 } from "@/lib/mcq/option-labels";
 import { FontSettingsCard } from "@/components/mcq/font-settings-card";
 import { OptionLabelsCard } from "@/components/mcq/option-labels-card";
+import { LabelTyposCard, type LabelTypoRow } from "@/components/mcq/label-typos-card";
 import {
   FILE_TOO_BIG_MSG,
   prepareShuffleXml,
@@ -107,6 +109,8 @@ const MODE_KEY = "mcq-shuffler-mode";
 const FONT_SETTINGS_KEY = "mcq-font-settings";
 /** রিডাউনলোডের অপশন-লেবেল কাস্টমাইজ সেটিংস (persisted) */
 const OPTION_LABELS_KEY = "mcq-option-labels";
+/** অপশন-লেবেল টাইপো অটো-ফিক্স (ডিফল্ট OFF — ডাউনলোড হুবহু) */
+const RD_FIX_LABELS_KEY = "mcq-rd-fix-labels";
 
 /**
  * Persisted ফন্ট-সেটিংস হাইড্রেশন-গার্ড — FONT_CHOICES-এ নেই এমন ভ্যালু
@@ -286,6 +290,8 @@ export default function Home() {
     DEFAULT_OPTION_LABEL_SETTINGS,
     sanitizeOptionLabelSettings
   );
+  // লেবেল-টাইপো ফিক্স টগল — ডিফল্ট OFF (ডাউনলোডে লেবেল হুবহু)
+  const [rdFixLabels, setRdFixLabels] = usePersistedJson<boolean>(RD_FIX_LABELS_KEY, false);
   const [rdMergedBusy, setRdMergedBusy] = useState(false);
   const [rdZipBusy, setRdZipBusy] = useState(false);
 
@@ -314,6 +320,11 @@ export default function Home() {
       return acc;
     },
     { withReference: 0, withOptions: 0, optionsTotal: 0, withAnswer: 0, withBekkha: 0 }
+  );
+  // লেবেল-টাইপো — সব ফাইল মিলিয়ে (কার্ডে ফাইল-নামসহ দেখানো হয়)
+  const rdLabelTypos = useMemo<LabelTypoRow[]>(
+    () => rdDocs.flatMap((d) => d.parse.labelTypos.map((t) => ({ ...t, fileName: d.file.name }))),
+    [rdDocs]
   );
 
   // ---- রেফারেন্স-ট্যাগ রিপোর্ট (শাফল মোডের ডাউনলোড-কার্ডে সেকশন) ----
@@ -1252,6 +1263,7 @@ export default function Home() {
           renumber: rdRenumber,
           expandAnswer: true,
           optionLabels,
+          fixLabels: rdFixLabels,
         });
         return { xml, file: d.file as Blob, baseName: d.baseName };
       })
@@ -1741,6 +1753,15 @@ export default function Home() {
                     dominant: null,
                   }))}
                 />
+
+                {/* লেবেল-টাইপো ওয়ার্নিং কার্ড — টাইপো থাকলেই লাল কার্ড, টগল ডিফল্ট OFF */}
+                {rdLabelTypos.length > 0 && (
+                  <LabelTyposCard
+                    typos={rdLabelTypos}
+                    checked={rdFixLabels}
+                    onCheckedChange={setRdFixLabels}
+                  />
+                )}
 
                 <OptionLabelsCard settings={optionLabels} onChange={updateOptionLabels} />
 

@@ -199,5 +199,96 @@ ok(wm?.color === "#7f7f7f", `ওয়াটারমার্ক রং সঠ�
 const noWm = await extractWatermark(new Uint8Array(buf));
 ok(noWm === null, "ওয়াটারমার্কহীন ফাইলে null");
 
+console.log("\n== ৯) লেবেল-টাইপো ডিটেকশন + fixLabels ডাউনলোড ==");
+// অপশনে ৩য় লেবেল ভুলে "খ" রিপিট (ক, খ, খ, ঘ → ৩য়টি গ হওয়ার কথা)
+const TYPO_DOC = [
+  W_DOC_OPEN,
+  p("টেস্ট প্রশ্নপত্র"),
+  p("১. সিনথেটিক প্রশ্নের লেখা যথেষ্ট?"),
+  p("ক) এক"),
+  p("খ) দুই"),
+  p("খ) তিন"),
+  p("ঘ) চার"),
+  p("উত্তর: ক"),
+  W_DOC_CLOSE,
+].join("");
+const typoParse = parseRedownloadXml(TYPO_DOC);
+ok(typoParse.labelTypos.length === 1, `রিপিট-লেবেল টাইপো ১ ধরা পড়ে (আসলে ${typoParse.labelTypos.length})`);
+const t0 = typoParse.labelTypos[0];
+ok(!!t0 && t0.actual.join("") === "কখখঘ", `actual কখখঘ (আসলে ${t0?.actual.join("")})`);
+ok(!!t0 && t0.expected.join("") === "কখগঘ", `expected কখগঘ (আসলে ${t0?.expected.join("")})`);
+ok(!!t0 && t0.fixes.length === 1, `fixes ১ (আসলে ${t0?.fixes.length})`);
+const typoAllParts = {
+  partSel: { serial: true, question: true, reference: true, options: true, answer: true, bekkha: true },
+  renumber: false,
+  expandAnswer: false,
+};
+const outTypoOff = buildRedownloadXml(TYPO_DOC, typoParse, [0], typoAllParts);
+ok(outTypoOff.includes("খ) তিন"), "fixLabels OFF → লেবেল হুবহু (খ) তিন থাকে)");
+ok(parseRedownloadXml(outTypoOff).labelTypos.length === 1, "OFF আউটপুট রিপার্স → টাইপো থাকে");
+const outTypoOn = buildRedownloadXml(TYPO_DOC, typoParse, [0], { ...typoAllParts, fixLabels: true });
+ok(/গ\) তিন/.test(outTypoOn), "fixLabels ON → খ) তিন গ) তিন হয়");
+ok(!outTypoOn.includes("খ) তিন"), "ON আউটপুটে ভুল লেবেল নেই");
+ok(parseRedownloadXml(outTypoOn).labelTypos.length === 0, "ON আউটপুট রিপার্স → টাইপো ০");
+
+console.log("\n== ১০) কেস-ফোল্ড ডিসিশন + B-টাইমার `*` + টাইপো-কম্বো (এক প্যারায়) ==");
+// কেস-মাত্র পার্থক্য টাইপো নয়: K, L, m, N → fold-তুলনায় ০ টাইপো
+const CASE_DOC = [
+  W_DOC_OPEN,
+  p("টেস্ট প্রশ্নপত্র"),
+  p("১. সিনথেটিক প্রশ্নের লেখা যথেষ্ট?"),
+  p("K) এক"),
+  p("L) দুই"),
+  p("m) তিন"),
+  p("N) চার"),
+  p("উত্তর: K"),
+  W_DOC_CLOSE,
+].join("");
+ok(parseRedownloadXml(CASE_DOC).labelTypos.length === 0, "কেস-মাত্র পার্থক্য (m vs M) টাইপো ফ্ল্যাগ হয় না");
+
+// ছোটহাতের ফাইলে রিপিট (k,l,l,n) — ফিক্সও ছোটহাতের (m)
+const LOWER_DOC = [
+  W_DOC_OPEN,
+  p("টেস্ট প্রশ্নপত্র"),
+  p("১. সিনথেটিক প্রশ্নের লেখা যথেষ্ট?"),
+  p("k) এক"),
+  p("l) দুই"),
+  p("l) তিন"),
+  p("n) চার"),
+  p("উত্তর: k"),
+  W_DOC_CLOSE,
+].join("");
+const lowerParse = parseRedownloadXml(LOWER_DOC);
+ok(lowerParse.labelTypos.length === 1, `ছোটহাতের রিপিট-টাইপো ১ (আসলে ${lowerParse.labelTypos.length})`);
+ok(lowerParse.labelTypos[0]?.fixes[0]?.text === "m", `ফিক্স ছোটহাতের m (আসলে ${lowerParse.labelTypos[0]?.fixes[0]?.text})`);
+const outLowerOn = buildRedownloadXml(LOWER_DOC, lowerParse, [0], { ...typoAllParts, fixLabels: true });
+ok(/m\) তিন/.test(outLowerOn), "fixLabels ON → l) তিন m) তিন হয় (ছোটহাতেরই)");
+ok(!/l\) তিন/.test(outLowerOn), "ভুল ছোটহাতের লেবেল নেই");
+
+// B-টাইমার `*` + রিপিট-টাইপো একই অপশন-প্যারায় — স্টার-রিমুভে অফসেট সরলে
+// ফিক্স ভুল জায়গায় বসত; এক replaceSpansLocal-এ দুটোই অরিজিনাল অফসেটে
+const STAR_DOC = [
+  W_DOC_OPEN,
+  p("টেস্ট প্রশ্নপত্র"),
+  p("৯. সিনথেটিক প্রশ্নের লেখা যথেষ্ট?"),
+  p("ক. এক\t*খ. দুই\tখ. তিন\tঘ. চার"),
+  p("উত্তর: খ"),
+  W_DOC_CLOSE,
+].join("");
+const starParse = parseRedownloadXml(STAR_DOC);
+ok(starParse.labelTypos.length === 1, `স্টার+টাইপো একসাথে ধরা পড়ে (আসলে ${starParse.labelTypos.length})`);
+const outStarOn = buildRedownloadXml(STAR_DOC, starParse, [0], {
+  ...typoAllParts,
+  renumber: true,
+  fixLabels: true,
+});
+const starOpt = parasOf(outStarOn).find((t) => t.includes("দুই")) ?? "";
+ok(starOpt.length > 0, "অপশন-প্যারা আউটপুটে আছে");
+ok(!starOpt.includes("*"), "স্টার-মার্কার সরানো হয়েছে");
+ok(starOpt.includes("গ. তিন"), "স্টার থাকলেও ফিক্স সঠিক জায়গায় (খ. তিন → গ. তিন)");
+ok(!starOpt.includes("খ. তিন"), "ভুল লেবেল আর নেই (অফসেট-শিফট নেই)");
+ok(starOpt.includes("ঘ. চার"), "পরের অপশন অক্ষত");
+ok(parseRedownloadXml(outStarOn).labelTypos.length === 0, "স্টার-আউটপুট রিপার্স → টাইপো ০");
+
 console.log(`\n=== ফলাফল: ${passed} পাস, ${failed} ফেল ===`);
 process.exit(failed ? 1 : 0);
