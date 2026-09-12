@@ -719,11 +719,25 @@ export function parseDocxXml(xml: string): DocxParseResult {
 
 // ---------- ফাইল লোড ----------
 
-export async function loadDocxXml(file: Blob): Promise<string> {
+/** JSZip load/generate-এর determinate প্রগ্রেস (0..1) */
+export type ZipProgress = (frac: number) => void;
+
+/** JSZip onUpdate-মেটাডেটা ({ percent: 0..100 }) → 0..1 কলব্যাকে বাঁধা */
+export function zipMetaToProgress(onProgress?: ZipProgress): ((meta: { percent?: number }) => void) | undefined {
+  if (!onProgress) return undefined;
+  return (meta) => {
+    const p = typeof meta.percent === "number" ? meta.percent / 100 : 0;
+    onProgress(Math.min(1, Math.max(0, p)));
+  };
+}
+
+export async function loadDocxXml(file: Blob, onProgress?: ZipProgress): Promise<string> {
+  // NOTE: JSZip loadAsync-এর options-এ onUpdate হুক নেই (শুধু entry.async/generateAsync-এ
+  // ২য় আর্গুমেন্টে) — তাই প্রগ্রেস document.xml-রিডে বাঁধা
   const zip = await JSZip.loadAsync(file);
   const entry = zip.file("word/document.xml");
   if (!entry) throw new Error("Not a valid .docx file (word/document.xml missing)");
-  return entry.async("string");
+  return entry.async("string", zipMetaToProgress(onProgress));
 }
 
 // ---------- রেফারেন্স-মডিউলের জন্য এক্সপোজড হেল্পার ----------

@@ -44,6 +44,7 @@ import JSZip from "jszip";
 
 import { type FontSettings } from "./font-remap";
 import { DOCX_MIME, repackDocxRemapped } from "./repack-docx";
+import { zipMetaToProgress, type ZipProgress } from "./docx-xml";
 
 export { DOCX_MIME };
 
@@ -266,11 +267,12 @@ export function buildMergedDocumentXml(baseXml: string, extraInnerXmls: string[]
  * (repack-docx.ts-এর শেয়ার্ড কোর — color-serial/docx-exporter-ও এটাই ব্যবহার করে)
  */
 export async function replaceDocumentXml(
-  file: Blob,
+  file: Blob | JSZip,
   newXml: string,
   fontSettings?: FontSettings,
+  onProgress?: ZipProgress,
 ): Promise<Blob> {
-  return repackDocxRemapped(file, newXml, fontSettings);
+  return repackDocxRemapped(file, newXml, fontSettings, {}, [], DOCX_MIME, onProgress);
 }
 
 // ---------- ৬) একাধিক docx → এক মার্জড docx (রিল-ইন্টিগ্রেশনসহ) ----------
@@ -414,6 +416,7 @@ function ensureCtCover(ct: string, partPath: string): string {
 export async function buildMergedDocxBlob(
   items: Array<{ xml: string; file: Blob }>,
   fontSettings?: FontSettings,
+  onProgress?: ZipProgress,
 ): Promise<Blob> {
   if (items.length < 2) throw new Error("items is empty — the merge needs at least 2 docx (base + extra)");
   const baseZip = await JSZip.loadAsync(items[0].file);
@@ -544,6 +547,8 @@ export async function buildMergedDocxBlob(
       ...(ctOut ? { [CT_PATH]: ctOut } : {}),
     },
     newParts,
+    DOCX_MIME,
+    onProgress,
   );
 }
 
@@ -553,7 +558,10 @@ export async function buildMergedDocxBlob(
  * একাধিক blob → এক .zip blob। একই নাম একাধিকবার এলে extension-এর আগে
  * " (2)", " (3)" বসে (যেমন "set.docx", "set (2).docx") — zip-এ নাম-সংঘর্ষ যেন না হয়।
  */
-export async function buildZipBlob(files: Array<{ name: string; blob: Blob }>): Promise<Blob> {
+export async function buildZipBlob(
+  files: Array<{ name: string; blob: Blob }>,
+  onProgress?: ZipProgress,
+): Promise<Blob> {
   if (!files.length) throw new Error("file list is empty");
   const zip = new JSZip();
   const used = new Set<string>();
@@ -570,7 +578,10 @@ export async function buildZipBlob(files: Array<{ name: string; blob: Blob }>): 
     used.add(name);
     zip.file(name, f.blob);
   }
-  return zip.generateAsync({ type: "blob", mimeType: "application/zip", compression: "DEFLATE" });
+  return zip.generateAsync(
+    { type: "blob", mimeType: "application/zip", compression: "DEFLATE" },
+    zipMetaToProgress(onProgress),
+  );
 }
 
 // ---------- ৮) সিরিয়াল-প্ল্যানে অফসেট ----------

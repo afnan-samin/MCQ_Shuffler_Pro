@@ -10,6 +10,7 @@ import {
   Check,
   ClipboardCopy,
   FileDown,
+  Files,
   Hash,
   Loader2,
   MousePointerClick,
@@ -33,6 +34,8 @@ interface DocxSetsResultProps {
   copiedSet: number | null;
   /** renumber=true → ১,২,৩…; false → আসল নম্বরসহ */
   onDownload: (renumber: boolean) => void;
+  /** set-by-set ডাউনলোড — ১ সেট হলে সরাসরি, বেশি হলে ZIP */
+  onDownloadSets: () => void;
   onCopySet: (si: number) => void;
   dominant: Enc | null;
   /** "Download as" ফরম্যাট (DOCX ডিফল্ট) — onFormatChange দিলেই টগল রেন্ডার হয় */
@@ -48,6 +51,7 @@ export function DocxSetsResult({
   busy,
   copiedSet,
   onDownload,
+  onDownloadSets,
   onCopySet,
   dominant,
   format = "docx",
@@ -100,6 +104,10 @@ export function DocxSetsResult({
           <Button variant="outline" className="gap-2" onClick={() => onDownload(false)} disabled={busy !== null}>
             {busy === "docx-o" ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlignLeft className="h-4 w-4" />}
             ⬇️ {fmtLabel} — original numbers
+          </Button>
+          <Button variant="outline" className="gap-2" onClick={onDownloadSets} disabled={busy !== null}>
+            {busy === "docx-sets" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Files className="h-4 w-4" />}
+            ⬇️ Sets separately{sets.length > 1 ? " (ZIP)" : ""}
           </Button>
         </div>
 

@@ -11,7 +11,7 @@
 // ============================================================
 
 import JSZip from "jszip";
-import { loadDocxXml, parseDocxXml, type DocxParseResult } from "./docx-xml";
+import { loadDocxXml, parseDocxXml, zipMetaToProgress, type DocxParseResult, type ZipProgress } from "./docx-xml";
 import {
   analyzeColorDocx,
   stripShadedParasXml,
@@ -31,7 +31,7 @@ export const DOCX_EXT_RE = /\.docx$/i;
  * to run at staging time, before files are accepted into the app).
  * A renamed .zip/.txt/.pdf with a .docx extension fails here.
  */
-export async function isValidDocxZip(file: Blob): Promise<boolean> {
+export async function isValidDocxZip(file: Blob, onProgress?: ZipProgress): Promise<boolean> {
   try {
     const zip = await JSZip.loadAsync(file);
     return !!zip.file("word/document.xml");
@@ -67,17 +67,36 @@ export interface PipelineRun<T> {
   notDocx: File[];
 }
 
+/** প্রসেস-ওভারলের জন্য প্রতি-ফেজ প্রগ্রেস রিপোর্ট */
+export interface PipelineProgress {
+  stage: string;
+  /** 0..1 determinate, null = indeterminate */
+  pct: number | null;
+  fileNo: number;
+  fileTotal: number;
+  name: string;
+}
+export type PipelineReporter = (p: PipelineProgress) => void;
+/** ডাউনলোড-পথের (repack/merge/zip) ভিতরের determinate প্রগ্রেস — পাইপলাইন-রিপোর্টে বাঁধা */
+export type DownloadProgress = (frac: number) => void;
+
 /**
  * একাধিক ফাইল → ভ্যালিডেশন + পড়া + পার্স। প্রতিটা ফাইল স্বাধীন —
  * একটার ব্যর্থতা বাকিদের আটকায় না (আগের লোডারগুলোর হুবহু আচরণ)।
+ * report/yieldToUI দিলে ফেজ-মাঝে UI-থ্রেড শ্বাস নেয় — বড় ফাইলে
+ * ওভারলে/প্রগ্রেস-বার রিপেইন্ট হয়ে যায় (পেজ "hang"-এর চেহারা নেয় না)।
  */
 export async function runFilePipeline<T>(
   files: File[],
   opts: {
     /** প্রতি-মোডের ইঞ্জিন-স্টেপ — loadDocxXml-এর পরে চলে */
     parse: (xml: string, file: File) => Promise<T> | T;
-    /** ডিফল্ট MAX_FILE_BYTES (৫০MB) */
+    /** ডিফল্ট MAX_FILE_BYTES */
     maxBytes?: number;
+    /** প্রতি-ফেজ প্রগ্রেস রিপোর্ট — কলার ProcessOverlay চালায় */
+    report?: PipelineReporter;
+    /** প্রতিটা ফেজের মাঝে UI-থ্রেডে শ্বাস-নেওয়ার জায়গা */
+    yieldToUI?: () => Promise<void>;
   },
 ): Promise<PipelineRun<T>> {
   const maxBytes = opts.maxBytes ?? MAX_FILE_BYTES;
@@ -85,7 +104,23 @@ export async function runFilePipeline<T>(
   const failures: PipelineFailure[] = [];
   const tooBig: File[] = [];
   const notDocx: File[] = [];
-  for (const f of files) {
+  const hasUi = opts.report !== undefined || opts.yieldToUI !== undefined;
+  const rep = (stage: string, pct: number | null, f: File, i: number, n: number) => {
+    if (opts.report) opts.report({ stage, pct, fileNo: i + 1, fileTotal: n, name: f.name });
+  };
+  const step = async () => {
+    if (opts.yieldToUI) await opts.yieldToUI();
+  };
+  // রিয়েল % — i-তম ফাইলের রিড-ফেজ হলো সামগ্রিক (i + frac) / n
+  const fileFrac = (i: number, n: number, frac: number): number =>
+    Math.min(1, Math.max(0, (i + frac) / Math.max(1, n)));
+  const n = files.length;
+  for (let i = 0; i < n; i++) {
+    const f = files[i];
+    if (hasUi) {
+      rep(`Reading ${f.name}...`, n > 0 ? i / n : null, f, i, n);
+      await step();
+    }
     if (f.size > maxBytes) {
       tooBig.push(f);
       continue;
@@ -95,8 +130,19 @@ export async function runFilePipeline<T>(
       continue;
     }
     try {
-      const xml = await loadDocxXml(f);
-      items.push({ file: f, baseName: docxBaseName(f.name), xml, value: await opts.parse(xml, f) });
+      // JSZip unzip-এর ভিতরের % → সামগ্রিক determinate-এ ম্যাপ করে রিপোর্ট
+      const xml = await loadDocxXml(f, hasUi ? (frac) => rep(`Reading ${f.name}...`, fileFrac(i, n, frac * 0.7), f, i, n) : undefined);
+      if (hasUi) {
+        rep(`Parsing ${f.name}...`, fileFrac(i, n, 0.75), f, i, n);
+        await step();
+      }
+      const value = await opts.parse(xml, f);
+      if (hasUi) {
+        rep(`Preparing ${f.name}...`, fileFrac(i, n, 0.95), f, i, n);
+        await step();
+      }
+      items.push({ file: f, baseName: docxBaseName(f.name), xml, value });
+      if (hasUi) rep(`Reading ${f.name}...`, fileFrac(i, n, 1), f, i, n);
     } catch (e) {
       failures.push({ file: f, name: f.name, message: e instanceof Error ? e.message : String(e) });
     }

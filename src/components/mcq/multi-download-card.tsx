@@ -24,6 +24,9 @@ export interface MultiDownloadCardProps {
   onDownloadZip: () => void;
   mergedBusy?: boolean;
   zipBusy?: boolean;
+  /** সব সেট এক ZIP-এ (প্রতি ফাইলের সেট-ZIP + একক-সেট .docx একসাথে) — দিলেই তৃতীয় বাটন */
+  onDownloadSetsZip?: () => void;
+  setsZipBusy?: boolean;
   disabled?: boolean;
   /** ফাইল সংখ্যা — ঠিক ১ হলে ZIP বাটন লুকায়, একটাই ডাউনলোড বাটন দেখায় */
   fileCount?: number;
@@ -44,12 +47,16 @@ export function MultiDownloadCard({
   onDownloadZip,
   mergedBusy = false,
   zipBusy = false,
+  onDownloadSetsZip,
+  setsZipBusy = false,
   disabled = false,
   fileCount,
   format = "docx",
   onFormatChange,
 }: MultiDownloadCardProps) {
   const single = fileCount === 1;
+  // সেট-ZIP বাটন: দেওয়া থাকলে + একাধিক ফাইলেই (১ ফাইলে per-file বাটনই যথেষ্ট)
+  const hasSetsZip = !single && !!onDownloadSetsZip;
   const isPdf = format === "pdf";
   return (
     <Card>
@@ -108,8 +115,8 @@ export function MultiDownloadCard({
           />
         )}
 
-        {/* ডাউনলোড বাটন — এক ফাইল হলে একটাই, একাধিক হলে .docx + ZIP দুটোই */}
-        <div className={single ? "grid gap-3" : "grid gap-3 sm:grid-cols-2"}>
+        {/* ডাউনলোড বাটন — এক ফাইল হলে একটাই, একাধিক হলে .docx + ZIP (+ সেট-ZIP থাকলে তিনটা) */}
+        <div className={single ? "grid gap-3" : hasSetsZip ? "grid gap-3 sm:grid-cols-3" : "grid gap-3 sm:grid-cols-2"}>
           {/* এক ফাইল ডাউনলোড — প্রাইমারি সবুজ (ফরম্যাট-টগল অনুযায়ী .docx/.pdf) */}
           <Button
             type="button"
@@ -156,6 +163,28 @@ export function MultiDownloadCard({
                 </span>
               )}
               <span className="text-xs text-muted-foreground opacity-80">One click ZIP — all files inside, separate</span>
+            </Button>
+          )}
+
+          {/* সেট-ZIP — প্রতি ফাইলের সেট-ZIP + একক-সেট .docx, সব এক মাস্টার-ZIP-এ */}
+          {hasSetsZip && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onDownloadSetsZip}
+              disabled={disabled || setsZipBusy}
+              className="h-auto flex-col items-center gap-1 rounded-xl p-4"
+            >
+              {setsZipBusy ? (
+                <span className="flex items-center gap-2 text-sm font-semibold">
+                  <Loader2 className="animate-spin" /> Zipping sets...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2 text-sm font-semibold">
+                  <Archive /> All sets (one ZIP)
+                </span>
+              )}
+              <span className="text-xs text-muted-foreground opacity-80">Each file&apos;s sets zipped per file — all in one ZIP</span>
             </Button>
           )}
         </div>

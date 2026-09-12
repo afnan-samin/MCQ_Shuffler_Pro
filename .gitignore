@@ -67,3 +67,18 @@ scripts/fixtures/bcs-english-bijoy-46.docx
 scripts/document.xml
 scripts/test-export.docx
 /tmp/
+
+# local editor
+.vscode/
+
+# ইউজারের raw ফাইল (বড় + প্রাইভেসি — রিপোতে যাবে না)
+Format/
+
+# dev-server artifacts (*.log আগেই ignored, .err বাকি ছিল)
+*.err
+
+# agent session log
+session-*.md
+
+# master prompt — local only, github e jabe na
+prompt.md

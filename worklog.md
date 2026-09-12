@@ -1122,3 +1122,55 @@ Work Log:
 Stage Summary:
 - রিডাউনলোড এখন লেবেল-টাইপো লাল কার্ডে দেখায় এবং টগল অন থাকলে ডাউনলোডে ১-অক্ষর ফিক্স বসায় (ডিফল্ট OFF = হুবহু); ব্যাখ্যা-লাইন ডিটেকশন ফিক্স; DP এক জায়গায় (dpSlotRun); কেস-মাত্র পার্থক্য টাইপো নয়; স্টার+টাইপো কম্বো নিরাপদ — ১২ স্যুট সবুজ, কোনো রিগ্রেশন নেই
 - নোট: `bun run lint` (eslint .) আগে থেকেই .next-static/ বিল্ড-আর্টিফ্যাক্টে ফেল — টাচ-করা ফাইলগুলো ক্লিন
+
+---
+Task ID: 60
+Agent: Opencode (Muse Spark 1.3, second session in this tree)
+Task: option-label STYLE relabel fix (tab-aware matching, dotless row-start, Bijoy-encoding insert)
+
+Work Log:
+- src/lib/mcq/option-labels.ts: relabelOptionPara now matches on tab-visible text (w:tab elements mapped to joint offsets for span edits). Mid-row labels after run-tabs were skipped by the boundary check (1-of-2 per row changed) - now all change.
+- Row-start letter+space without separator (dot-typo like 'A ivB') gets the chosen separator. Only at para-start/after-tab (mid-row English 'a ...' untouched).
+- Target Bangla labels in Bijoy-font runs are inserted as Bijoy ASCII (KLMN, renders as ka-kha-ga-gha in SutonnyMJ) instead of Unicode (garbage in Bijoy font). Other fonts unchanged. A/a/i styles pass through everywhere.
+- Complementary to fixLabels typo-fix (Task 59): typo-fix runs first, style relabel after. No overlap: I own option-labels.ts + test-option-labels.ts only in this task.
+
+Stage Summary:
+- Commit 0fc3300 (2 files). NOTE to Cline session: please do not edit src/lib/mcq/option-labels.ts or scripts/test-option-labels.ts while Task 60 is open; I will not touch page/file-pipeline/docx-xml/color-serial/exporter/multi/repack.
+
+---
+Task ID: 61
+Agent: Opencode (Muse Spark 1.3, second session in this tree)
+Task: shuffle multi-file per-set preview + per-file/master ZIP downloads; default split original
+- Default distribution interleaved -> original (page.tsx:280; radio already lists original first; e2e clicks radios explicitly).
+- New ShuffleMultiSetsCard: per-file collapse/expand sections with set previews (SerialSpan+TokText, renumber-aware) + per-file Sets-separately button (1 set = direct, more = per-file ZIP). First file open by default.
+- MultiDownloadCard: optional 3rd button All-sets-one-ZIP (multi-file only). Master ZIP = per-file set-ZIPs + lone single-set docx; PDF toggle converts docx entries (zips stay zips).
+- page.tsx: buildFileSetFiles shared builder + handleMultiFileSetsDownload + handleMultiAllSetsZip + busy states (setsFileBusy, multiSetsZipBusy) + ModeWorkBar wiring.
+- ALSO: completed the in-progress progress-plumbing compile breaks (missing ZipProgress/DOCX_MIME/zipMetaToProgress imports, dup import, dead JSZip loadAsync onUpdate -> entry.async) so tsc is green. No logic changes to the overlay feature itself.
+
+Stage Summary:
+- Verified: 2 files x 3 original-sets -> per-file zips (3 docx each, counts re-parse OK) -> master ZIP with 2 inner zips; nested open OK. tsc 0, eslint clean, full test:all green.
+- NOTE to Cline session: my files this round are page.tsx (2 handlers + props/wiring only), docx-sets-result.tsx, sets-result.tsx, multi-download-card.tsx (optional props only), shuffle-multi-sets-card.tsx (new). I also completed YOUR progress-plumbing compile breaks (imports + dead onUpdate) in color-serial/docx-exporter/multi-docx/docx-xml/redownload with no logic changes - please pull/rebase before continuing there.
+
+---
+Task ID: 62
+Agent: Opencode (Muse Spark 1.3, second session in this tree)
+Task: shuffle multi-file per-set preview + per-file/master ZIP; default original; ZIP-failure hardening
+Work Log:
+- Default split interleaved->original; new ShuffleMultiSetsCard (collapse/expand per file, renumber-aware preview, per-file sets button); MultiDownloadCard optional All-sets-one-ZIP (master ZIP of per-file set-ZIPs); page handlers + busy states.
+- ZIP hardening: single JSZip load per file + 1 retry, per-file try/catch with partial-ZIP + failed-names toast (old multi-zip too). Completed in-progress progress-plumbing compile breaks (imports + dead loadAsync onUpdate).
+
+Stage Summary:
+- Verified in real Chromium: 10 files x 4 sets -> per-file zips + master nested ZIP, all downloads OK, no errors. test:all green, tsc 0, eslint clean.
+- NOTE to Cline session: touched page.tsx (handlers only), docx-sets-result.tsx, sets-result.tsx, multi-download-card.tsx (optional props), shuffle-multi-sets-card.tsx (new), multi-docx.ts (1-line param widen). No logic changes to your overlay feature.
+
+---
+Task ID: 63
+Agent: Opencode (Muse Spark 1.3, second session in this tree)
+Task: multi-file per-file serial toggle + review + push
+
+Work Log:
+- ShuffleMultiSetsCard: per-file Serial replace toggle (switch + clickable serials), own state map in page (default OFF), preview/download/merged/zip all per-file.
+- Review: backToHome resets map; collapsed header serial badge; global renumber now single-file only. Verified toggle ON (1,2,3) vs OFF (original) in real Chromium with re-parse.
+
+Stage Summary:
+- tsc 0, eslint clean, test:all green. No console/debug leftovers in src.

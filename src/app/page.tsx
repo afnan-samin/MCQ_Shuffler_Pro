@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import JSZip from "jszip";
 import { InputCard } from "@/components/mcq/input-card";
 import { DetectCard } from "@/components/mcq/detect-card";
 import { DocxDetectCard } from "@/components/mcq/docx-detect-card";
@@ -11,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MultiFileList } from "@/components/mcq/multi-file-list";
 import { MultiDownloadCard, type SerialStrategy } from "@/components/mcq/multi-download-card";
+import { ShuffleMultiSetsCard } from "@/components/mcq/shuffle-multi-sets-card";
 import {
   autoFixNumbering,
   parseMcq,
@@ -97,11 +99,12 @@ import {
   prepareShuffleXml,
   runFilePipeline,
   isValidDocxZip,
+  type PipelineProgress,
 } from "@/lib/mcq/file-pipeline";
 import { MAX_FILE_BYTES, SHUFFLE_MAX_FILES } from "@/lib/mcq/limits";
 import { toast } from "@/hooks/use-toast";
 import { usePersistedJson, usePersistedString } from "@/hooks/use-persisted-state";
-import { Dices, ShieldCheck, Zap } from "lucide-react";
+import { Dices, Loader2, ShieldCheck, Zap } from "lucide-react";
 
 const STORAGE_KEY = "mcq-shuffler-text";
 const MODE_KEY = "mcq-shuffler-mode";
@@ -111,6 +114,62 @@ const FONT_SETTINGS_KEY = "mcq-font-settings";
 const OPTION_LABELS_KEY = "mcq-option-labels";
 /** অপশন-লেবেল টাইপো অটো-ফিক্স (ডিফল্ট OFF — ডাউনলোড হুবহু) */
 const RD_FIX_LABELS_KEY = "mcq-rd-fix-labels";
+
+// ---------- প্রসেস-ওভারলে (বড় ফাইলের লোড/ডাউনলোডে "hang"-চেহারা আটকায়) ----------
+
+/** ওভারলে আপডেটের সর্বনিম্ন ব্যবধান (ms) — JSZip কলব্যাক প্রতি-চাংকে আসে,
+ *  প্রতিবার setState করলে 80MB ফাইলে হাজার-হাজার রি-রেন্ডার হত */
+const PROC_REPORT_MIN_MS = 120;
+
+export interface ProcState {
+  active: boolean;
+  stage: string;
+  /** 0..1 determinate; null = indeterminate animated pulse */
+  pct: number | null;
+  fileNo?: number;
+  fileTotal?: number;
+  name?: string;
+}
+
+export const PROC_IDLE: ProcState = { active: false, stage: "", pct: null };
+
+/** ফুল-স্ক্রিন "processing" ওভারলে — প্রগতি-বারসহ। determinate % জানা থাকলে
+ * (মাল্টি-ফাইল "File 2/5"), না থাকলে অ্যানিমেটেড pulse। সব মোডের লোড পথ ব্যবহার করে। */
+function ProcessOverlay({ proc }: { proc: ProcState }) {
+  if (!proc.active) return null;
+  const files = proc.fileTotal && proc.fileTotal > 1;
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-background/80 backdrop-blur-sm dark:bg-background/85"
+    >
+      <div className="w-full max-w-md rounded-xl border bg-card p-6 text-center shadow-xl dark:bg-card">
+        <Loader2 className="mx-auto h-8 w-8 animate-spin text-brand-600" />
+        <div className="mt-3 text-base font-semibold">{proc.stage}</div>
+        {files && (
+          <div className="mt-0.5 text-xs text-muted-foreground">
+            File {proc.fileNo} of {proc.fileTotal}
+            {proc.name ? <span className="pl-1 truncate">{proc.name}</span> : null}
+          </div>
+        )}
+        <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-muted">
+          {proc.pct == null ? (
+            <div className="h-full w-full animate-pulse bg-brand-500" />
+          ) : (
+            <div className="h-full bg-brand-500" style={{ width: `${Math.round(proc.pct * 100)}%` }} />
+          )}
+        </div>
+        <div className="mt-1 text-right text-xs font-medium text-muted-foreground">
+          {proc.pct == null ? "Working..." : `${Math.round(proc.pct * 100)}%`}
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Processing in your browser - please wait, don&apos;t close the tab.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Persisted ফন্ট-সেটিংস হাইড্রেশন-গার্ড — FONT_CHOICES-এ নেই এমন ভ্যালু
@@ -220,7 +279,7 @@ export default function Home() {
 
   // ---- শাফল কনফিগ ----
   const [setCount, setSetCount] = useState(4);
-  const [distribution, setDistribution] = useState<Distribution>("interleaved");
+  const [distribution, setDistribution] = useState<Distribution>("original");
   const [shuffleWithin, setShuffleWithin] = useState(true);
   const [shuffling, setShuffling] = useState(false);
   // রেফারেন্স-ট্যাগ ([CU-A: 22-23] স্টাইল) কী করা হবে — ডিফল্ট রাখা
@@ -276,6 +335,18 @@ export default function Home() {
   const [multiShuffling, setMultiShuffling] = useState(false);
   const [multiMergedBusy, setMultiMergedBusy] = useState(false);
   const [multiZipBusy, setMultiZipBusy] = useState(false);
+  /** কোন ফাইলের sets-separately ডাউনলোড চলছে (per-file spinner) */
+  const [setsFileBusy, setSetsFileBusy] = useState<string | null>(null);
+  /** সব ফাইলের সেট এক মাস্টার-ZIP-এ (nested: per-file ZIP + একক-সেট .docx) */
+  const [multiSetsZipBusy, setMultiSetsZipBusy] = useState(false);
+  /**
+   * মাল্টি-শাফলে প্রতি ফাইলের serial-replace (ডিফল্ট OFF — আসল নম্বর)।
+   * সিঙ্গেল-ফাইলের গ্লোবাল টগল থেকে আলাদা — expand করা section-এ নিজের টগল।
+   */
+  const [multiRenumber, setMultiRenumber] = useState<Record<string, boolean>>({});
+  const fileRenumber = (id: string): boolean => multiRenumber[id] ?? false;
+  const toggleFileRenumber = (id: string, v: boolean) =>
+    setMultiRenumber((prev) => ({ ...prev, [id]: v }));
 
   // ---- রিডাউনলোড মোডের সম্পূর্ণ আলাদা স্টেট (একাধিক .docx + অংশ-বাছাই) ----
   const [rdDocs, setRdDocs] = useState<RdDocState[]>([]);
@@ -379,6 +450,27 @@ export default function Home() {
   /** লোডার রি-এন্ট্রান্সি গার্ড — state নয়, ref (stale-closure এড়াতে); চলমান লোড থাকলে নতুন কল নীরবে বাদ */
   const loadersBusyRef = useRef(false);
 
+  // ---- প্রসেস-ওভারলে — বড় ফাইলের লোডে "hang"-চেহারা আটকায় (সব মোডে) ----
+  const [proc, setProc] = useState<ProcState>({ active: false, stage: "", pct: null });
+  /** UI-থ্রেডে শ্বাস-নেওয়ার জায়গা — ওভারলে/বার রিপেইন্ট হয় */
+  const yieldToUI = () => new Promise<void>((r) => setTimeout(r, 1));
+  const setProcStage = (stage: string, pct: number | null, fileNo?: number, fileTotal?: number, name?: string) =>
+    setProc({ active: true, stage, pct, fileNo: fileNo || undefined, fileTotal: fileTotal || undefined, name });
+  const clearProc = () => {
+    procReportLastRef.current = 0;
+    setProc(PROC_IDLE);
+  };
+  /** ওভারলে-থ্রটলড রিপোর্ট — একই stage-এ 120ms-এর ভিতরে repeat setState বাদ
+   *  (JSZip-এর per-chunk কলব্যাক + parse-লুপ মিলিয়ে সেকেন্ডে শত-শত কল আসে) */
+  const procReportLastRef = useRef(0);
+  const pipelineReport = (p: PipelineProgress) => {
+    const now = Date.now();
+    const done = p.pct != null && p.pct >= 1;
+    if (!done && now - procReportLastRef.current < PROC_REPORT_MIN_MS) return;
+    procReportLastRef.current = now;
+    setProcStage(p.stage, p.pct, p.fileNo, p.fileTotal, p.name);
+  };
+
   // মোড / ফন্ট-সেটিংস / অপশন-লেবেল / ডাউনলোড-ফরম্যাট — use-persisted-state হুকে
   // হাইড্রেট + কমিট হয় (updateFontSettings / updateOptionLabels /
   // updateDownloadFormat এখন হুকের setter — JSX-এ কোনো পরিবর্তন নেই)।
@@ -422,6 +514,7 @@ export default function Home() {
     setParsed(null);
     setShuffleItems(null);
     setShuffleMultiSets(null);
+    setMultiRenumber({});
     setSelected(new Set());
     setAllowBroken(false);
     setSerialDocs([]);
@@ -645,7 +738,11 @@ export default function Home() {
     try {
       // শেয়ার্ড পাইপলাইন: পড়া (loadDocxXml) → রঙ-বিশ্লেষণ + হেডার/নন-MCQ স্ট্রিপ + পার্স
       // (ইউজারের নিয়ম: শাফল মোডে হেডার থাকলে হেডার বাদ দিয়ে সবগুলো প্রশ্ন এক সিরিয়ালে শাফল)
-      const run = await runFilePipeline([f], { parse: (xml) => prepareShuffleXml(xml) });
+      const run = await runFilePipeline([f], {
+        report: pipelineReport,
+        yieldToUI,
+        parse: (xml) => prepareShuffleXml(xml),
+      });
       const item = run.items[0];
       if (!item) {
         toast({
@@ -712,6 +809,7 @@ export default function Home() {
         variant: "destructive",
       });
     } finally {
+      clearProc();
       setDocxLoading(false);
     }
   }, []);
@@ -726,8 +824,13 @@ export default function Home() {
     if (loadersBusyRef.current) return;
     loadersBusyRef.current = true;
     setSerialLoading(true);
+    await yieldToUI();
     try {
-      const run = await runFilePipeline(files, { parse: (xml) => analyzeColorDocx(xml) });
+      const run = await runFilePipeline(files, {
+        report: pipelineReport,
+        yieldToUI,
+        parse: (xml) => analyzeColorDocx(xml),
+      });
       // সাইজ-গার্ড — পাইপলাইন রিপোর্ট করে, টোস্ট এখানেই (আগের হুবহু মেসেজ)
       for (const f of run.tooBig) toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
       // এক্সটেনশন-গার্ডে বাদ পড়া ফাইলের ফিডব্যাক — আগে নীরবে বাদ যেত
@@ -768,6 +871,7 @@ export default function Home() {
       }
     } finally {
       loadersBusyRef.current = false;
+      clearProc();
     }
   };
 
@@ -1046,6 +1150,50 @@ export default function Home() {
     }
   };
 
+  /**
+   * Set-by-set ডাউনলোড — প্রতি সেট আলাদা .docx: ১টা সেট হলে সরাসরি
+   * ডাউনলোড, বেশি হলে এক ZIP-এ (ZIP-এর ভিতরে "Set A.docx" স্টাইল নাম)।
+   * Serial-replace টগলের বর্তমান অবস্থা + ফরম্যাট-টগল (DOCX/PDF) মেনে চলে।
+   */
+  const handleDocxDownloadSets = async () => {
+    if (!docx?.parse || !setsDocx?.length) return;
+    setBusy("docx-sets");
+    try {
+      const files: Array<{ name: string; blob: Blob }> = [];
+      for (let si = 0; si < setsDocx.length; si++) {
+        const out = await buildShuffledDocxBlob({
+          originalFile: docx.file,
+          xml: docx.xml,
+          questions: docx.parse.questions,
+          sets: [setsDocx[si]],
+          baseName: docx.baseName,
+          suffix: ` (${englishSetName(si)}${renumber ? "" : ", original serial"})`,
+          opts: { renumber, includeSetHeader: true, refMode },
+          fontSettings,
+        });
+        files.push({ name: out.fileName, blob: out.blob });
+      }
+      if (files.length === 1) {
+        await finalizeDownload({ blob: files[0].blob, fileName: files[0].name });
+        toast({
+          title: downloadFormat === "pdf" ? "PDF file downloaded" : "Word file downloaded",
+          description: "The single set as its own file — formatting exactly intact.",
+        });
+      } else {
+        const zip = await buildZipBlob(await finalizeZipEntries(files));
+        downloadBlob(zip, `${docx.baseName} (sets).zip`);
+        toast({
+          title: "ZIP downloaded",
+          description: `${files.length} separate set file(s) inside — one file per set.`,
+        });
+      }
+    } catch (e) {
+      toast({ title: "Download failed", description: String(e), variant: "destructive" });
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const handleDocxSerialFix = async () => {
     if (!docx?.parse) return;
     setFixing(true);
@@ -1164,8 +1312,11 @@ export default function Home() {
     if (loadersBusyRef.current) return;
     loadersBusyRef.current = true;
     setRdLoading(true);
+    await yieldToUI();
     try {
       const run = await runFilePipeline(files, {
+        report: pipelineReport,
+        yieldToUI,
         parse: async (xml, file) => ({ parse: parseRedownloadXml(xml), watermark: await extractWatermark(file) }),
       });
       // সাইজ-গার্ড — পাইপলাইন রিপোর্ট করে, টোস্ট এখানেই (আগের হুবহু মেসেজ)
@@ -1202,6 +1353,7 @@ export default function Home() {
       }
     } finally {
       loadersBusyRef.current = false;
+      clearProc();
     }
     setRdLoading(false);
   };
@@ -1399,7 +1551,11 @@ export default function Home() {
         return;
       }
       setShuffleLoading(true);
-      const run = await runFilePipeline(list, { parse: (xml) => prepareShuffleXml(xml) });
+      const run = await runFilePipeline(list, {
+        report: pipelineReport,
+        yieldToUI,
+        parse: (xml) => prepareShuffleXml(xml),
+      });
       // সাইজ-গার্ডের টোস্ট পাইপলাইন-রিপোর্ট থেকে — ডাবল-টোস্ট এড়াতে এরর-লিস্টে নেই
       for (const f of run.tooBig) toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
       // এক্সটেনশন-গার্ডে বাদ পড়া ফাইলের ফিডব্যাক — আগে নীরবে বাদ যেত
@@ -1455,6 +1611,7 @@ export default function Home() {
       }
     } finally {
       loadersBusyRef.current = false;
+      clearProc();
     }
   };
 
@@ -1511,7 +1668,7 @@ export default function Home() {
         const it = shuffleItems[i];
         if (it.parse.questions.length === 0) continue;
         const xml = buildShuffledXml(it.xml, it.parse.questions, shuffleMultiSets[i] ?? [], {
-          renumber,
+          renumber: fileRenumber(it.id),
           includeSetHeader: true,
           refMode,
         });
@@ -1532,33 +1689,173 @@ export default function Home() {
     }
   };
 
-  /** প্রতিটা ফাইলের শাফল্ড .docx এক ZIP-এ */
+  /** প্রতিটা ফাইলের শাফল্ড .docx এক ZIP-এ — একটা ফাইল আটকালেও বাকিগুলো যায় (partial ZIP + তালিকা) */
   const handleMultiZipDownload = async () => {
     if (!shuffleItems || !shuffleMultiSets) return;
     setMultiZipBusy(true);
     try {
       const out: Array<{ name: string; blob: Blob }> = [];
+      const failed: string[] = [];
       for (let i = 0; i < shuffleItems.length; i++) {
         const it = shuffleItems[i];
         if (it.parse.questions.length === 0) continue;
-        const xml = buildShuffledXml(it.xml, it.parse.questions, shuffleMultiSets[i] ?? [], {
-          renumber,
-          includeSetHeader: true,
-          refMode,
-        });
-        out.push({ name: `${it.baseName} (shuffled).docx`, blob: await replaceDocumentXml(it.file, xml, fontSettings) });
+        try {
+          const xml = buildShuffledXml(it.xml, it.parse.questions, shuffleMultiSets[i] ?? [], {
+            renumber: fileRenumber(it.id),
+            includeSetHeader: true,
+            refMode,
+          });
+          const srcZip = await loadSourceZip(it.file, it.file.name);
+          out.push({ name: `${it.baseName} (shuffled).docx`, blob: await replaceDocumentXml(srcZip, xml, fontSettings) });
+        } catch (e) {
+          failed.push(`${it.file.name}: ${e instanceof Error ? e.message : String(e)}`);
+        }
       }
-      if (!out.length) throw new Error("No files to download");
+      if (!out.length) throw new Error(failed.join("; ") || "No files to download");
       const zip = await buildZipBlob(await finalizeZipEntries(out));
       downloadBlob(zip, "MCQ-shuffled-files.zip");
       toast({
-        title: "ZIP downloaded",
-        description: `${out.length} separate shuffled file(s) inside.`, 
+        title: failed.length ? "ZIP downloaded with skips" : "ZIP downloaded",
+        description: failed.length
+          ? `${out.length} file(s) inside. Skipped ${failed.length}: ${failed.join("; ")}`
+          : `${out.length} separate shuffled file(s) inside.`,
+        variant: failed.length ? "destructive" : undefined,
       });
     } catch (e) {
       toast({ title: "ZIP failed", description: String(e), variant: "destructive" });
     } finally {
       setMultiZipBusy(false);
+    }
+  };
+
+  /**
+   * একটা ফাইলের প্রতিটা সেট আলাদা .docx-ব্লবে — per-file ZIP-এর বিল্ডিং-ব্লক।
+   * Serial-replace টগল + ফরম্যাট-টগল (DOCX/PDF) মেনে চলে; ফন্ট-সেটিংসও
+   * প্রয়োগ হয় (ডিফল্ট OFF = বাইট-অভিন্ন আচরণ)।
+   * সোর্স-ফাইল একবারই পড়া হয় (১০ ফাইল × ৪ সেটে ৪০-বার রিড নয়) + transient
+   * লক-এ ১ বার রিট্রাই — বড় ব্যাচে NotReadableError-শ্রেণির ব্যর্থতা কমে।
+   */
+  const loadSourceZip = async (file: File, tag: string): Promise<JSZip> => {
+    let lastErr: unknown = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await JSZip.loadAsync(file);
+      } catch (e) {
+        lastErr = e;
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    }
+    throw new Error(`${tag}: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`);
+  };
+
+  const buildFileSetFiles = async (
+    it: ShuffleItemState,
+    setIds: number[][],
+    doRenumber: boolean
+  ): Promise<Array<{ name: string; blob: Blob }>> => {
+    const srcZip = await loadSourceZip(it.file, it.file.name);
+    const files: Array<{ name: string; blob: Blob }> = [];
+    for (let si = 0; si < setIds.length; si++) {
+      const xml = buildShuffledXml(it.xml, it.parse.questions, [setIds[si] ?? []], {
+        renumber: doRenumber,
+        includeSetHeader: true,
+        refMode,
+      });
+      const out = await replaceDocumentXml(srcZip, xml, fontSettings);
+      files.push({
+        name: `${it.baseName} (${englishSetName(si)}${doRenumber ? "" : ", original serial"}).docx`,
+        blob: out,
+      });
+    }
+    return finalizeZipEntries(files);
+  };
+
+  /** এক ফাইলের sets-separately ডাউনলোড — ১ সেট হলে সরাসরি, বেশি হলে ওই ফাইলের ZIP */
+  const handleMultiFileSetsDownload = async (id: string) => {
+    if (!shuffleItems || !shuffleMultiSets) return;
+    const idx = shuffleItems.findIndex((it) => it.id === id);
+    if (idx < 0) return;
+    const it = shuffleItems[idx];
+    const setIds = shuffleMultiSets[idx] ?? [];
+    if (!it.parse.questions.length || !setIds.length) {
+      toast({ title: "Nothing to download", description: "This file has no shuffled sets yet.", variant: "destructive" });
+      return;
+    }
+    setSetsFileBusy(id);
+    try {
+      const files = await buildFileSetFiles(it, setIds, fileRenumber(id));
+      if (files.length === 1) {
+        // finalizeZipEntries-এ ফরম্যাট-কনভার্সন হয়েই গেছে — সরাসরি ডাউনলোড (আবার কনভার্ট নয়)
+        downloadBlob(files[0].blob, files[0].name);
+        toast({
+          title: downloadFormat === "pdf" ? "PDF file downloaded" : "Word file downloaded",
+          description: `The single set of ${it.file.name} as its own file.`,
+        });
+      } else {
+        const zip = await buildZipBlob(files);
+        downloadBlob(zip, `${it.baseName} (sets).zip`);
+        toast({
+          title: "ZIP downloaded",
+          description: `${files.length} set file(s) of ${it.file.name} inside one ZIP.`,
+        });
+      }
+    } catch (e) {
+      toast({ title: "Download failed", description: String(e), variant: "destructive" });
+    } finally {
+      setSetsFileBusy(null);
+    }
+  };
+
+  /**
+   * সব ফাইলের সেট এক মাস্টার-ZIP-এ (nested): প্রতি ফাইলের সেটগুলো নিজের
+   * per-file ZIP-এ (১-সেট ফাইলের একক .docx সরাসরি), আর সেই ZIP/.docx-গুলো
+   * সব এক মাস্টার-ZIP-এ — যেমন ১০ ফাইল × ৩ সেট = ১০টা ZIP এক ZIP-এ।
+   * একটা ফাইল আটকালেও বাকিগুলো যায় (partial ZIP + কোনটা বাদ গেল toast-এ)।
+   */
+  const handleMultiAllSetsZip = async () => {
+    if (!shuffleItems || !shuffleMultiSets) return;
+    setMultiSetsZipBusy(true);
+    try {
+      const inner: Array<{ name: string; blob: Blob }> = [];
+      const failed: string[] = [];
+      for (let i = 0; i < shuffleItems.length; i++) {
+        const it = shuffleItems[i];
+        if (!it.parse.questions.length) continue;
+        const setIds = shuffleMultiSets[i] ?? [];
+        if (!setIds.length) continue;
+        try {
+          const files = await buildFileSetFiles(it, setIds, fileRenumber(it.id));
+          if (files.length === 1) {
+            inner.push({ name: files[0].name, blob: files[0].blob });
+          } else {
+            const z = await buildZipBlob(files);
+            inner.push({ name: `${it.baseName} (sets).zip`, blob: z });
+          }
+        } catch (e) {
+          failed.push(`${it.file.name}: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+      if (!inner.length) throw new Error(failed.join("; ") || "No files to download");
+      // ১ ফাইল হলে per-file পথের হুবহু ফল (ডাবল-ZIP নয়; কনভার্সন আগেই হয়েছে)
+      if (shuffleItems.length === 1 && inner.length === 1) {
+        const only = inner[0];
+        downloadBlob(only.blob, only.name);
+        toast({ title: "Download ready", description: "The file's set(s) downloaded." });
+        return;
+      }
+      const master = await buildZipBlob(inner);
+      downloadBlob(master, "MCQ-shuffled-sets.zip");
+      toast({
+        title: failed.length ? "ZIP downloaded with skips" : "ZIP downloaded",
+        description: failed.length
+          ? `${inner.length} file(s) inside one master ZIP. Skipped ${failed.length}: ${failed.join("; ")}`
+          : `${inner.length} file(s) inside one master ZIP — each file's sets zipped per file.`,
+        variant: failed.length ? "destructive" : undefined,
+      });
+    } catch (e) {
+      toast({ title: "ZIP failed", description: String(e), variant: "destructive" });
+    } finally {
+      setMultiSetsZipBusy(false);
     }
   };
 
@@ -1601,6 +1898,44 @@ export default function Home() {
         title: downloadFormat === "pdf" ? "PDF file downloaded" : "Word file downloaded",
         description: "Each set is on its own page.",
       });
+    } catch (e) {
+      toast({ title: "Download failed", description: String(e), variant: "destructive" });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /**
+   * TEXT-mode set-by-set ডাউনলোড — প্রতি সেট আলাদা .docx: ১টা সেট হলে
+   * সরাসরি ডাউনলোড, বেশি হলে এক ZIP-এ। ফন্ট/হেডার সেটিংস + ফরম্যাট-টগল মেনে চলে।
+   */
+  const handleExportSetsZip = async () => {
+    if (!sets?.length) return;
+    setBusy("sets-zip");
+    try {
+      const files: Array<{ name: string; blob: Blob }> = [];
+      for (let si = 0; si < sets.length; si++) {
+        const out = await buildSetsDocxBlob(
+          [sets[si]],
+          { ...exportOpts, fileName: `MCQ-${englishSetName(si)}.docx` },
+          fontSettings
+        );
+        files.push({ name: out.fileName, blob: out.blob });
+      }
+      if (files.length === 1) {
+        await finalizeDownload({ blob: files[0].blob, fileName: files[0].name });
+        toast({
+          title: downloadFormat === "pdf" ? "PDF file downloaded" : "Word file downloaded",
+          description: "The single set as its own file.",
+        });
+      } else {
+        const zip = await buildZipBlob(await finalizeZipEntries(files));
+        downloadBlob(zip, "MCQ-sets.zip");
+        toast({
+          title: "ZIP downloaded",
+          description: `${files.length} separate set file(s) inside — one file per set.`,
+        });
+      }
     } catch (e) {
       toast({ title: "Download failed", description: String(e), variant: "destructive" });
     } finally {
@@ -1656,6 +1991,8 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-brand-50/60 via-background to-background">
+      {/* প্রসেস-ওভারলে — বড় ফাইলের লোড/পার্সে hang-চেহারা আটকায় (সব মোডে) */}
+      <ProcessOverlay proc={proc} />
       {/* হেডার */}
       <header className="border-b bg-white/80 backdrop-blur dark:bg-background/80">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-4">
@@ -1707,7 +2044,7 @@ export default function Home() {
               onBack={backToHome}
               onModeChange={changeMode}
               onAddFiles={handleAddMoreFiles}
-              busy={shuffleLoading || docxLoading || serialLoading || rdLoading || detecting || shuffling || multiShuffling || multiMergedBusy || multiZipBusy || serialBusy || serialMergedBusy || serialZipBusy || serialPasteBusy || serialPasteFixing || serialPasteDlBusy || rdMergedBusy || rdZipBusy || fixing}
+              busy={shuffleLoading || docxLoading || serialLoading || rdLoading || detecting || shuffling || multiShuffling || multiMergedBusy || multiZipBusy || setsFileBusy !== null || multiSetsZipBusy || serialBusy || serialMergedBusy || serialZipBusy || serialPasteBusy || serialPasteFixing || serialPasteDlBusy || rdMergedBusy || rdZipBusy || fixing}
               filesCount={mode === "shuffle" ? shuffleFileCount : mode === "serial" ? serialFileCount : rdFileCount}
               maxFiles={mode === "shuffle" ? SHUFFLE_MAX_FILES : undefined}
             />
@@ -1943,18 +2280,37 @@ export default function Home() {
 
                 <div ref={resultsRef} className="scroll-mt-4">
                   {shuffleMultiSets && (
-                    <MultiDownloadCard
-                      title="Shuffle complete — download now"
-                      description="Each file's sets on separate pages, serials 1,2,3…."
-                      stats={`${shuffleItems.length} file(s) • ${multiEffectiveSets} set(s) per file`}
-                      onDownloadMerged={handleMultiMergedDownload}
-                      onDownloadZip={handleMultiZipDownload}
-                      mergedBusy={multiMergedBusy}
-                      zipBusy={multiZipBusy}
-                      fileCount={shuffleItems.length}
-                      format={downloadFormat}
-                      onFormatChange={updateDownloadFormat}
-                    />
+                    <>
+                      <ShuffleMultiSetsCard
+                        files={shuffleItems.map((it, i) => ({
+                          id: it.id,
+                          fileName: it.file.name,
+                          setIds: shuffleMultiSets[i] ?? [],
+                          questions: it.parse.questions,
+                          renumber: fileRenumber(it.id),
+                        }))}
+                        busyFileId={setsFileBusy}
+                        disabled={multiMergedBusy || multiZipBusy || multiSetsZipBusy || multiShuffling}
+                        onDownloadFileSets={handleMultiFileSetsDownload}
+                        onRenumberChange={toggleFileRenumber}
+                      />
+                      <div className="mt-5">
+                        <MultiDownloadCard
+                          title="Shuffle complete — download now"
+                          description="Each file's sets on separate pages, serials 1,2,3…."
+                          stats={`${shuffleItems.length} file(s) • ${multiEffectiveSets} set(s) per file`}
+                          onDownloadMerged={handleMultiMergedDownload}
+                          onDownloadZip={handleMultiZipDownload}
+                          mergedBusy={multiMergedBusy}
+                          zipBusy={multiZipBusy}
+                          onDownloadSetsZip={handleMultiAllSetsZip}
+                          setsZipBusy={multiSetsZipBusy}
+                          fileCount={shuffleItems.length}
+                          format={downloadFormat}
+                          onFormatChange={updateDownloadFormat}
+                        />
+                      </div>
+                    </>
                   )}
                 </div>
 
@@ -2021,6 +2377,7 @@ export default function Home() {
                       busy={busy}
                       copiedSet={copiedSet}
                       onDownload={handleDocxDownload}
+                      onDownloadSets={handleDocxDownloadSets}
                       onCopySet={handleDocxCopySet}
                       dominant={encData.dominant}
                       format={downloadFormat}
@@ -2078,6 +2435,7 @@ export default function Home() {
                       exportOpts={exportOpts}
                       onExportOptsChange={setExportOpts}
                       onExportDocx={handleExportDocx}
+                      onExportSets={handleExportSetsZip}
                       onExportDoc={handleExportDoc}
                       onPrint={handlePrint}
                       onCopySet={handleCopySet}

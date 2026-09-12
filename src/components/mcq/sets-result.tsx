@@ -37,6 +37,8 @@ interface SetsResultProps {
   exportOpts: ExportOptions;
   onExportOptsChange: (o: ExportOptions) => void;
   onExportDocx: () => void;
+  /** set-by-set ডাউনলোড — ১ সেট হলে সরাসরি, বেশি হলে ZIP */
+  onExportSets: () => void;
   onExportDoc: () => void;
   onPrint: () => void;
   onCopySet: (si: number) => void;
@@ -63,6 +65,7 @@ export function SetsResult({
   exportOpts,
   onExportOptsChange,
   onExportDocx,
+  onExportSets,
   onExportDoc,
   onPrint,
   onCopySet,
@@ -229,6 +232,10 @@ export function SetsResult({
           <Button className="gap-2 bg-brand-600 hover:bg-brand-700" onClick={onExportDocx} disabled={busy !== null}>
             {busy === "docx" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
             ⬇️ {format === "pdf" ? "PDF (.pdf)" : "Word (.docx)"} — one set per page
+          </Button>
+          <Button variant="outline" className="gap-2" onClick={onExportSets} disabled={busy !== null}>
+            {busy === "sets-zip" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+            ⬇️ Sets separately{sets.length > 1 ? " (ZIP)" : ""}
           </Button>
           <Button variant="outline" className="gap-2" onClick={onExportDoc} disabled={busy !== null}>
             <ArrowDownToLine className="h-4 w-4" />

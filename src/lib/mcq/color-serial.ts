@@ -24,8 +24,9 @@ import {
   numberToDigits,
   type DigitEnc,
 } from "./docx-xml";
-import { repackDocxRemapped } from "./repack-docx";
+import { repackDocxRemapped, DOCX_MIME } from "./repack-docx";
 import type { FontSettings } from "./font-remap";
+import type { ZipProgress } from "./docx-xml";
 
 // ---------- রঙের প্যালেট (ইউজারের "color shading palatte.docx" থেকে) ----------
 // Word-এর Paragraph → Shading গ্রিড: কলাম A–J, রো ১–৭ → ৭০টা রঙ
@@ -724,9 +725,10 @@ export async function buildColorSerialDocxBlob(params: {
   baseName: string;
   schemeLabel: string;
   fontSettings?: FontSettings;
+  onProgress?: ZipProgress;
 }): Promise<{ blob: Blob; fileName: string }> {
   const newXml = applyColorSerialXml(params.xml, params.plan);
-  const blob = await repackDocxRemapped(params.originalFile, newXml, params.fontSettings);
+  const blob = await repackDocxRemapped(params.originalFile, newXml, params.fontSettings, {}, [], DOCX_MIME, params.onProgress);
   return { blob, fileName: `${params.baseName} (color serial - ${params.schemeLabel}).docx` };
 }
 

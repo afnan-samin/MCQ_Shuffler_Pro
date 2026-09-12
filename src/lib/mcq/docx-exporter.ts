@@ -19,7 +19,8 @@ import {
   type RefMode,
 } from "./reference";
 import type { FontSettings } from "./font-remap";
-import { repackDocxRemapped } from "./repack-docx";
+import { repackDocxRemapped, DOCX_MIME } from "./repack-docx";
+import type { ZipProgress } from "./docx-xml";
 
 /** ডকুমেন্টের প্রথম ফন্ট-অ্যাট্রিবিউট সেট (সেট-হেডারে ডকুমেন্টের নিজের ফন্ট বসাতে) */
 interface BodyFontAttrs {
@@ -235,8 +236,8 @@ export function buildShuffledXml(
 
 /** অরিজিনাল zip-এর বাকি সব এন্ট্রি অক্ষত রেখে document.xml বদলানো (শেয়ার্ড repack কোর);
  * fontSettings দিলে নতুন document.xml (+ সোর্সের styles.xml থাকলে সেটাও) font-remap হয় */
-async function zipWithXml(originalFile: Blob, newXml: string, fontSettings?: FontSettings): Promise<Blob> {
-  return repackDocxRemapped(originalFile, newXml, fontSettings);
+async function zipWithXml(originalFile: Blob, newXml: string, fontSettings?: FontSettings, onProgress?: ZipProgress): Promise<Blob> {
+  return repackDocxRemapped(originalFile, newXml, fontSettings, {}, [], DOCX_MIME, onProgress);
 }
 
 /** শাফল্ড সেটগুলোর .docx blob (ডাউনলোড নয়) — PDF-কনভার্সন পাথও এটাই ব্যবহার করে.
@@ -250,9 +251,10 @@ export async function buildShuffledDocxBlob(params: {
   suffix: string;
   opts: ShuffleExportOptions;
   fontSettings?: FontSettings;
+  onProgress?: ZipProgress;
 }): Promise<{ blob: Blob; fileName: string }> {
   const newXml = buildShuffledXml(params.xml, params.questions, params.sets, params.opts);
-  const blob = await zipWithXml(params.originalFile, newXml, params.fontSettings);
+  const blob = await zipWithXml(params.originalFile, newXml, params.fontSettings, params.onProgress);
   return { blob, fileName: `${params.baseName}${params.suffix}.docx` };
 }
 
@@ -268,6 +270,7 @@ export async function buildSerialFixedDocxBlob(params: {
   baseName: string;
   refMode?: RefMode;
   fontSettings?: FontSettings;
+  onProgress?: ZipProgress;
 }): Promise<{ blob: Blob; fileName: string }> {
   const allIds = params.questions.map((q) => q.id);
   const newXml = buildShuffledXml(params.xml, params.questions, [allIds], {
@@ -275,6 +278,6 @@ export async function buildSerialFixedDocxBlob(params: {
     includeSetHeader: false,
     refMode: params.refMode,
   });
-  const blob = await zipWithXml(params.originalFile, newXml, params.fontSettings);
+  const blob = await zipWithXml(params.originalFile, newXml, params.fontSettings, params.onProgress);
   return { blob, fileName: `${params.baseName} (serial fixed).docx` };
 }

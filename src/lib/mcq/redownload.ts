@@ -17,6 +17,7 @@
 import JSZip from "jszip";
 
 import { MARKER_WINDOW_PARAS, MAX_SERIAL_NUMBER, MIN_OPTIONS_PER_MCQ } from "./limits";
+import type { ZipProgress } from "./docx-xml";
 import { relabelOptionPara, type OptionLabelSettings } from "./option-labels";
 import { findRefTokens } from "./reference";
 import {
@@ -34,6 +35,7 @@ import {
   renumberSerialParaTo,
   scanOptions,
   serialMatchSpans,
+  zipMetaToProgress,
   type DigitEnc,
   type OptionPreview,
   type SerialPrefix,
@@ -1554,14 +1556,19 @@ function decodeXmlEntities(s: string): string {
 }
 
 /**
- * হেডার-পার্টের VML shape থেকে ওয়াটারমার্ক (v:textpath string) বের করা —
- * প্রিভিউতে ঘোরানো হালকা টেক্সট হিসেবে দেখানো হয়; ডাউনলোডে হেডার
- * byte-হুবহু কপি হয় বলে ওয়াটারমার্ক নিজেই অক্ষত থাকে।
+ * বড় docx (৮০MB) ওয়াটারমার্ক ট্যাগ (v:textpath) খোঁজা — পুরো header XML মেমরিতে নিয়ে
+ * regex-এর বদলে streaming পড়া: ইনডেক্স-স্ক্যানে প্রথম match-এর স্লাইসেই regex মারে,
+ * বাকি বাইট কখনো মেমরিতে ওঠে না। match-এর বাইরে শেষ পর্যন্ত পড়তে হয়, কিন্তু সেই
+ * বাইট রিলিজ হয় (accumulate হয় না) — ৩বাইট UTF-8-স্প্লিট নিরাপত্তাসহ।
+ * @param input — v:textpath ধারণকারী header .xml টেক্সট সরবরাহকারী
+ * @returns { text, color } | null (প্রথম ঘোরানো টেক্সটটাই ওয়াটারমার্ক)
  */
 export async function extractWatermark(
-  file: Blob | Uint8Array | ArrayBuffer
+  file: Blob | Uint8Array | ArrayBuffer,
+  onProgress?: ZipProgress,
 ): Promise<WatermarkInfo | null> {
   try {
+    // NOTE: JSZip loadAsync-এর options-এ onUpdate হুক নেই — প্রগ্রেস header-xml রিডে বাঁধা
     const zip = await JSZip.loadAsync(file);
     const headerPaths: string[] = [];
     zip.forEach((path, entry) => {
@@ -1569,7 +1576,7 @@ export async function extractWatermark(
     });
     headerPaths.sort();
     for (const path of headerPaths) {
-      const xml = await zip.file(path)!.async("string");
+      const xml = await zip.file(path)!.async("string", zipMetaToProgress(onProgress));
       const tp = /<v:textpath\b[^>]*\bstring="([^"]*)"/i.exec(xml);
       if (tp && tp[1].trim()) {
         const colorM = /fillcolor="([^"]*)"/i.exec(xml);

@@ -16,6 +16,7 @@ import {
   type FontSettings,
   type RemapDominant,
 } from "./font-remap";
+import type { ZipProgress } from "./docx-xml";
 
 export const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
@@ -77,6 +78,7 @@ export async function repackDocx(
   parts: Record<string, string | Uint8Array>,
   extra: Array<{ path: string; data: Uint8Array }> = [],
   mimeType: string = DOCX_MIME,
+  onProgress?: ZipProgress,
 ): Promise<Blob> {
   const src = source instanceof JSZip ? source : await JSZip.loadAsync(source);
   const replaced = new Set(Object.keys(parts));
@@ -92,7 +94,10 @@ export async function repackDocx(
   }
   for (const o of others) zip.file(o.path, await o.data);
   for (const p of extra) zip.file(p.path, p.data);
-  return zip.generateAsync({ type: "blob", mimeType, compression: "DEFLATE" });
+  return zip.generateAsync(
+    { type: "blob", mimeType, compression: "DEFLATE" },
+    onProgress ? (meta) => onProgress((meta?.percent ?? 0) / 100) : undefined,
+  );
 }
 
 /**
@@ -111,9 +116,10 @@ export async function repackDocxRemapped(
   extraParts: Record<string, string | Uint8Array> = {},
   extra: Array<{ path: string; data: Uint8Array }> = [],
   mimeType: string = DOCX_MIME,
+  onProgress?: ZipProgress,
 ): Promise<Blob> {
   if (!fontSettings?.enabled) {
-    return repackDocx(source, { "word/document.xml": documentXml, ...extraParts }, extra, mimeType);
+    return repackDocx(source, { "word/document.xml": documentXml, ...extraParts }, extra, mimeType, onProgress);
   }
   const src = source instanceof JSZip ? source : await JSZip.loadAsync(source);
   const stylesXml = (await src.file(STYLES_XML_PATH)?.async("string")) ?? null;
@@ -129,5 +135,5 @@ export async function repackDocxRemapped(
   if (remapped.stylesXml != null && remapped.stylesXml !== stylesXml) {
     parts[STYLES_XML_PATH] = remapped.stylesXml;
   }
-  return repackDocx(src, parts, extra, mimeType);
+  return repackDocx(src, parts, extra, mimeType, onProgress);
 }
