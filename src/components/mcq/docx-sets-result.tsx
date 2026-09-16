@@ -21,7 +21,7 @@ import { englishSetName } from "@/lib/mcq/docx-exporter";
 import { lineDominantOf, type Enc } from "@/lib/mcq/encoding";
 import type { DownloadFormat } from "@/lib/mcq/pdf-export";
 import { DownloadFormatToggle } from "@/components/mcq/download-format-toggle";
-import { TokText, TablePreview } from "@/components/mcq/tok-text";
+import { TokText, RunText, TablePreview } from "@/components/mcq/tok-text";
 import { SerialSpan } from "@/components/mcq/docx-detect-card";
 
 interface DocxSetsResultProps {
@@ -149,7 +149,11 @@ export function DocxSetsResult({
                         <SerialSpan q={q} text={shownSerial} />
                       </button>
                       <span className="text-foreground/90">
-                        <TokText line={q.qText} dominant={lineDominantOf(q.text) ?? dominant} colored={false} />
+                        {q.qTextRuns ? (
+                          <RunText runs={q.qTextRuns} dominant={lineDominantOf(q.text) ?? dominant} />
+                        ) : (
+                          <TokText line={q.qText} dominant={lineDominantOf(q.text) ?? dominant} colored={false} />
+                        )}
                       </span>
                       {q.tables.length > 0 && (
                         <TablePreview tables={q.tables} dominant={lineDominantOf(q.text) ?? dominant} />

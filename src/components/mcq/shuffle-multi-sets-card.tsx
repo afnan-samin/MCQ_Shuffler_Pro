@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChevronDown, FileText, Files, Hash, Loader2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { TokText, TablePreview } from "@/components/mcq/tok-text";
+import { TokText, RunText, TablePreview } from "@/components/mcq/tok-text";
 import { SerialSpan } from "@/components/mcq/docx-detect-card";
 import { englishSetName } from "@/lib/mcq/docx-exporter";
 import { lineDominantOf } from "@/lib/mcq/encoding";
@@ -173,7 +173,11 @@ export function ShuffleMultiSetsCard({
                                 <SerialSpan q={q} text={shownSerial} />
                               </button>
                               <span className="text-foreground/90">
-                                <TokText line={q.qText} dominant={lineDominantOf(q.text)} colored={false} />
+                                {q.qTextRuns ? (
+                                  <RunText runs={q.qTextRuns} dominant={lineDominantOf(q.text)} />
+                                ) : (
+                                  <TokText line={q.qText} dominant={lineDominantOf(q.text)} colored={false} />
+                                )}
                               </span>
                               {q.tables.length > 0 && (
                                 <TablePreview tables={q.tables} dominant={lineDominantOf(q.text)} />

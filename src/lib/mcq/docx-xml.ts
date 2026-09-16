@@ -127,6 +127,123 @@ export function extractParaText(el: Element): string {
   return out;
 }
 
+// ---------- রান-লেভেল রিচ টোকেন (প্রিভিউ) ----------
+
+/** একটা w:r (বা m:oMath)-এর রেন্ডার-তথ্য — প্রিভিউতে Word-এর মতো দেখাতে */
+export interface ParaRun {
+  text: string;
+  /** vertAlign="superscript" */
+  sup?: 1;
+  /** vertAlign="subscript" */
+  sub?: 1;
+  /** m:oMath — ইটালিক math-স্টাইলে */
+  math?: 1;
+}
+
+/**
+ * প্যারা থেকে রান-টোকেন — extractParaText-এর একই ওয়াক, কিন্তু প্রতিটা w:r-এর
+ * vertAlign আর oMath আলাদা করে ধরে। রান-টেক্সট জোড়া দিলে extractParaText-এর
+ * আউটপুটের সমান (tab=\t, br=" ") — অফসেট-স্লাইসিং এই সমীকরণের উপর দাঁড়িয়ে।
+ */
+export function extractParaRuns(el: Element): ParaRun[] {
+  const runs: ParaRun[] = [];
+  const push = (text: string, extra?: Partial<ParaRun>) => {
+    if (!text) return;
+    const last = runs[runs.length - 1];
+    if (last && extra && !!last.sup === !!extra.sup && !!last.sub === !!extra.sub && !!last.math === !!extra.math) {
+      last.text += text;
+    } else {
+      runs.push({ text, ...extra });
+    }
+  };
+  const walk = (node: Element, fmt?: Partial<ParaRun>) => {
+    for (const child of Array.from(node.children)) {
+      const ln = child.localName;
+      if (ln === "pPr" || ln === "tblPr" || ln === "trPr" || ln === "tcPr" || ln === "sectPr") continue;
+      if (ln === "rPr") {
+        // রান-প্রপার্টি — vertAlign পরের রানের ফরম্যাট
+        const va = child.getElementsByTagNameNS(W_NS, "vertAlign")[0];
+        const nf: Partial<ParaRun> = {};
+        if (va) {
+          const v = attrOf(va, "val");
+          if (v === "superscript") nf.sup = 1;
+          else if (v === "subscript") nf.sub = 1;
+        }
+        walk(child, nf); // rPr-এর ভেতরে টেক্সট নেই, কিন্তু সেফ
+        continue;
+      }
+      if (ln === "t") {
+        if (child.namespaceURI === W_NS) push(child.textContent ?? "", fmt);
+      } else if (ln === "tab") {
+        const parent = child.parentNode;
+        if (parent && parent.nodeType === 1 && (parent as Element).localName === "r") push("\t", fmt);
+      } else if (ln === "br") {
+        push(" ", fmt);
+      } else if (ln === "sym") {
+        push(symChar(child), fmt);
+      } else if (ln === "oMath" || ln === "oMathPara") {
+        push(linearizeMath(child), { math: 1 });
+      } else if (ln === "delText" || ln === "instrText") {
+        // ট্র্যাকড-চেঞ্জ/ফিল্ড কোড — টেক্সটে দেখাব না
+      } else if (child.children.length) {
+        walk(child, fmt);
+      }
+    }
+  };
+  walk(el);
+  return runs;
+}
+
+/** রান-টেক্সট জোড়া */
+export function runsText(runs: readonly ParaRun[]): string {
+  return runs.map((r) => r.text).join("");
+}
+
+/** প্যারা-রানগুলোর মাঝে "\n" সেপারেটর বসিয়ে ফ্ল্যাট করা — texts.join("\n")-এর সমান */
+export function flattenParaRuns(paraRuns: readonly ParaRun[][]): ParaRun[] {
+  const out: ParaRun[] = [];
+  paraRuns.forEach((pr, i) => {
+    if (i > 0) out.push({ text: "\n" });
+    out.push(...pr);
+  });
+  return out;
+}
+
+/** ফ্ল্যাট রান থেকে ক্যারেক্টার-অফসেট স্লাইস (রান মাঝখানে ভেঙে) — না পেলে null */
+export function sliceRuns(flat: readonly ParaRun[], start: number, end: number): ParaRun[] | null {
+  if (start < 0 || end <= start) return null;
+  const out: ParaRun[] = [];
+  let pos = 0;
+  for (const r of flat) {
+    const rEnd = pos + r.text.length;
+    if (rEnd > start && pos < end) {
+      const s = Math.max(start, pos) - pos;
+      const e = Math.min(end, rEnd) - pos;
+      out.push({ ...r, text: r.text.slice(s, e) });
+    }
+    pos = rEnd;
+    if (pos >= end) break;
+  }
+  return out.length ? out : null;
+}
+
+/**
+ * ব্লকের প্যারা-রান থেকে সাব-স্ট্রিং রান — joined text-এ indexOf দিয়ে
+ * ক্রমান্বয়িক সার্চ (ডুপ্লিকেট টেক্সটে আগের ম্যাচে আটকে যাওয়া রোখে)।
+ */
+export function runsForSubstring(
+  flat: readonly ParaRun[],
+  flatStr: string,
+  needle: string,
+  from: number
+): { runs: ParaRun[]; next: number } | null {
+  if (!needle) return null;
+  const off = flatStr.indexOf(needle, from);
+  if (off < 0) return null;
+  const runs = sliceRuns(flat, off, off + needle.length);
+  return runs ? { runs, next: off + needle.length } : null;
+}
+
 /** রান-লেভেল ট্যাব (<w:tab/>) সংখ্যা — ট্যাব-স্টপ নয় */
 export function countRunTabs(el: Element): number {
   const tabs = el.getElementsByTagNameNS(W_NS, "tab");
@@ -260,6 +377,8 @@ export interface OptionPreview {
   /** ফাইলে যেমন আছে সেরকম লেবেল ("K" বা "ক" বা "a") */
   label: string;
   text: string;
+  /** রান-লেভেল রিচ টোকেন (sup/sub/math + প্রতি-রান ফন্ট) — প্রিভিউয়ে */
+  runs?: ParaRun[];
 }
 
 /**
@@ -556,8 +675,12 @@ export interface DocxQuestion {
   blockEnd: number;
   /** ব্লকের প্যারা টেক্সটগুলো (tab = \t) */
   paras: string[];
+  /** paras-এর সাথে aligned — প্রতি প্যারার রান-টোকেন (sup/sub/math) */
+  parasRuns: ParaRun[][];
   text: string;
   qText: string;
+  /** qText-এর রান-টোকেন — প্রিভিউতে Word-এর মতো superscript/subscript/equation */
+  qTextRuns?: ParaRun[];
   options: OptionPreview[];
   answer: string | null;
   /** ব্লকের ব্যাখ্যা-অংশের টেক্সট ("e¨vL¨v:"/"ব্যাখ্যা:" মার্কার বাদে) — না থাকলে null */
@@ -660,6 +783,24 @@ export function parseDocxXml(xml: string): DocxParseResult {
   const pushQuestion = (c: Cur) => {
     const text = c.texts.join("\n");
     const { options, answer, qText, bekkha } = scanOptions(text, c.si.raw);
+    // রিচ রান-টোকেন — extractParaRuns-এর জোড়া extractParaText-এর সমান হলে
+    // অফসেট-স্লাইসিং নির্ভুল; না মিললে (বিরল এজ-কেস) runs বাদ, প্লেইন টেক্সটই
+    const paraEls: Element[] = [];
+    for (let i = c.start; i <= c.end; i++) if (kids[i].localName === "p") paraEls.push(kids[i]);
+    const parasRuns = paraEls.map(extractParaRuns);
+    const flat = flattenParaRuns(parasRuns);
+    const flatStr = runsText(flat);
+    const richOk = flatStr === text;
+    const qRuns = richOk ? runsForSubstring(flat, flatStr, qText, 0) : null;
+    if (richOk) {
+      let from = 0;
+      for (const o of options) {
+        const hit = runsForSubstring(flat, flatStr, o.text, from);
+        if (!hit) break;
+        o.runs = hit.runs;
+        from = hit.next;
+      }
+    }
     const q: DocxQuestion = {
       id: questions.length,
       serial: c.si.num,
@@ -670,8 +811,10 @@ export function parseDocxXml(xml: string): DocxParseResult {
       blockStart: c.start,
       blockEnd: c.end,
       paras: c.texts,
+      parasRuns,
       text,
       qText,
+      qTextRuns: qRuns?.runs ?? undefined,
       options,
       answer,
       bekkha,

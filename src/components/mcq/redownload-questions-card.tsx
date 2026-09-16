@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ChevronDown, Droplets, FileText, ListChecks, Search, X } from "lucide-react";
 import { lineDominantOf, type Enc } from "@/lib/mcq/encoding";
-import { TokText, TablePreview } from "@/components/mcq/tok-text";
+import { TokText, RunText, TablePreview } from "@/components/mcq/tok-text";
 import { type RdQuestion, type WatermarkInfo } from "@/lib/mcq/redownload";
 import { digitsToNumber } from "@/lib/mcq/docx-xml";
 
@@ -207,7 +207,11 @@ function RdFileBody({ section }: { section: RdFileSectionProps }) {
                       {q.serialSeparator}
                     </span>
                     <span className="text-foreground/90">
-                      <TabbedText text={q.qText} dominant={qDom} />
+                      {q.qTextRuns ? (
+                        <RunText runs={q.qTextRuns} dominant={qDom} />
+                      ) : (
+                        <TabbedText text={q.qText} dominant={qDom} />
+                      )}
                     </span>
                   </span>
                   {/* অপশন — নিচের লাইনে */}
@@ -218,7 +222,7 @@ function RdFileBody({ section }: { section: RdFileSectionProps }) {
                           <span className={`font-semibold ${q.serialFontBijoy && /[KLMN]/.test(o.label) ? "tokfont-bijoy" : ""}`}>
                             {o.label})
                           </span>{" "}
-                          <TabbedText text={o.text} dominant={qDom} />
+                          {o.runs ? <RunText runs={o.runs} dominant={qDom} /> : <TabbedText text={o.text} dominant={qDom} />}
                         </span>
                       ))}
                     </span>

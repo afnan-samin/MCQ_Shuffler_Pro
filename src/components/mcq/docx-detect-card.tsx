@@ -12,7 +12,7 @@ import { AlertTriangle, CheckCircle2, ChevronDown, Download, ListChecks, ScanTex
 import type { DocxParseResult, DocxQuestion } from "@/lib/mcq/docx-xml";
 import { DIGIT_ENC_LABEL, digitsToNumber } from "@/lib/mcq/docx-xml";
 import { lineDominantOf, type Enc, type EncodingStats } from "@/lib/mcq/encoding";
-import { TokText, TablePreview } from "@/components/mcq/tok-text";
+import { TokText, RunText, TablePreview } from "@/components/mcq/tok-text";
 
 interface DocxDetectCardProps {
   parse: DocxParseResult;
@@ -350,7 +350,11 @@ export function DocxDetectCard({
                   className="mr-1.5 inline-block min-w-[2.2rem] text-right font-semibold text-brand-700 dark:text-brand-400"
                 />
                 <span className="text-foreground/90">
-                  <TokText line={q.qText} dominant={lineDominantOf(q.text) ?? dominant} colored={false} />
+                  {q.qTextRuns ? (
+                    <RunText runs={q.qTextRuns} dominant={lineDominantOf(q.text) ?? dominant} />
+                  ) : (
+                    <TokText line={q.qText} dominant={lineDominantOf(q.text) ?? dominant} colored={false} />
+                  )}
                 </span>
                 {q.options.length > 0 && (
                   <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-[10px]">

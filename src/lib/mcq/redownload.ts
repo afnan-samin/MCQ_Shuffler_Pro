@@ -40,6 +40,11 @@ import {
   type DigitEnc,
   type OptionPreview,
   type SerialPrefix,
+  type ParaRun,
+  extractParaRuns,
+  flattenParaRuns,
+  runsForSubstring,
+  runsText,
 } from "./docx-xml";
 
 // ---------- অংশ-কাইন্ড ----------
@@ -217,6 +222,10 @@ export interface RdQuestion {
   /** texts-এর সাথে aligned — প্রতি প্যারার অংশ-কাইন্ড */
   kinds: PartKind[];
   qText: string;
+  /** রান-লেভেল রিচ টোকেন (sup/sub/math + প্রতি-রান ফন্ট) — প্রিভিউতে Word-এর মতো দেখাতে */
+  qTextRuns?: ParaRun[];
+  /** ব্যাখ্যা-অংশের রিচ টোকেন (qTextRuns-এর মতো) */
+  bekkhaRuns?: ParaRun[];
   options: OptionPreview[];
   answer: string | null;
   /** উত্তর `*`-মার্কার থেকে এসেছে (B-টাইমার ফরম্যাট — সোর্সে আলাদা উত্তর-লাইন নেই) */
@@ -540,6 +549,31 @@ export function parseRedownloadXml(xml: string): RdParseResult {
       break;
     }
     const slicedKinds = kinds.slice(c.start, c.end + 1);
+    // রিচ রান — extractParaRuns-এর জোড়া extractParaText-এর সমান হলে (বিরল
+    // এজ-কেস বাদে সবসময়) অফসেট-স্লাইসিং নির্ভুল; না মিললে runs বাদ, প্লেইন টেক্সটই
+    const paraEls: Element[] = [];
+    for (let i = c.start; i <= c.end; i++) if (kids[i].localName === "p") paraEls.push(kids[i]);
+    const parasRuns = paraEls.map(extractParaRuns);
+    const flat = flattenParaRuns(parasRuns);
+    const flatStr = runsText(flat);
+    const richOk = flatStr === blockText;
+    let qRuns: ReturnType<typeof runsForSubstring> | null = null;
+    if (richOk) {
+      qRuns = runsForSubstring(flat, flatStr, qText, 0);
+    }
+    // অপশন রান — প্রিভিউ-টেক্সটের সাথে হুবহু মেলাতে `*`-স্ট্রিপ-এর পরেই স্লাইস
+    const previewOptions = options.map((o) => ({ ...o, text: o.text.replace(/\*/g, "") })); // প্রিভিউ থেকে * সরানো
+    if (richOk) {
+      let from = 0;
+      for (const o of previewOptions) {
+        const hit = runsForSubstring(flat, flatStr, o.text, from);
+        if (!hit) break;
+        o.runs = hit.runs;
+        from = hit.next;
+      }
+    }
+    const bekRuns =
+      richOk && bekkha ? runsForSubstring(flat, flatStr, bekkha, qRuns?.next ?? 0) : null;
     const q: RdQuestion = {
       id,
       pos: id + 1,
@@ -553,11 +587,13 @@ export function parseRedownloadXml(xml: string): RdParseResult {
       texts: c.texts,
       kinds: slicedKinds,
       qText,
-      options: options.map((o) => ({ ...o, text: o.text.replace(/\*/g, "") })), // প্রিভিউ থেকে * সরানো
+      qTextRuns: qRuns?.runs,
+      options: previewOptions,
       answer: effAnswer,
       answerFromStar,
       answerConflict,
       bekkha,
+      bekkhaRuns: bekRuns?.runs,
       hasUnicode: /[\u0980-\u09FF]/.test(blockText),
       tables: collectBlockTables(kids, c.start, c.end),
     };

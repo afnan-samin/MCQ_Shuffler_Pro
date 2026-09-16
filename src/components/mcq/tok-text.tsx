@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { tokenizeWithContext, type Enc } from "@/lib/mcq/encoding";
-import type { DocxTable } from "@/lib/mcq/docx-xml";
+import type { DocxTable, ParaRun } from "@/lib/mcq/docx-xml";
 
 interface TokTextProps {
   line: string;
@@ -72,6 +72,54 @@ export function TokText({ line, dominant, colored = true }: TokTextProps) {
             {t.text}
           </span>
         );
+      })}
+    </>
+  );
+}
+
+// ---------- রান-লেভেল রিচ রেন্ডারার (Word-এর মতো প্রিভিউ) ----------
+/**
+ * ParaRun[] রেন্ডার — প্রতিটা রানের ভিতরে শব্দ-ধরে ফন্ট (Bijoy→SutonnyMJ,
+ * ইউনিকোড-বাংলা/English→সাইট-ফন্ট), সাথে Word-এর vertAlign (sup/sub) আর
+ * m:oMath-এর math-ইটালিক। ট্যাব (\t) → tab-gap, নিউলাইন (\n) → লাইন-ব্রেক।
+ * রান-টেক্সট জোড়া দিলে মূল প্যারা-টেক্সটের সমান — তাই ফলব্যাকে TokText-ই চলে।
+ */
+export function RunText({ runs, dominant }: { runs: readonly ParaRun[]; dominant: Enc | null }) {
+  return (
+    <>
+      {runs.map((r, i) => {
+        const chunks: React.ReactNode[] = [];
+        // ট্যাব/নিউলাইন ভাগ — রান-টেক্সটে \t বা \n থাকলে ভিজ্যুয়াল গ্যাপ/ব্রেক
+        const segs = r.text.split(/([\t\n])/);
+        segs.forEach((seg, si) => {
+          if (seg === "\t") {
+            chunks.push(<span key={`${i}-${si}`} className="tab-gap" aria-hidden="true" />);
+            return;
+          }
+          if (seg === "\n") {
+            chunks.push(<br key={`${i}-${si}`} />);
+            return;
+          }
+          if (!seg) return;
+          const toks = tokenizeWithContext(seg, dominant);
+          chunks.push(
+            <span key={`${i}-${si}`} className="contents">
+              {toks.map((t, ti) => {
+                if (!t.text) return null;
+                if (t.enc === "neutral") return <span key={ti}>{t.text}</span>;
+                return t.enc === "bijoy" ? (
+                  <span key={ti} className="tokfont-bijoy">{t.text}</span>
+                ) : (
+                  <span key={ti}>{t.text}</span>
+                );
+              })}
+            </span>
+          );
+        });
+        if (r.sup) return <sup key={i} className="text-[0.7em]">{chunks}</sup>;
+        if (r.sub) return <sub key={i} className="text-[0.7em]">{chunks}</sub>;
+        if (r.math) return <span key={i} className="math-run">{chunks}</span>;
+        return <span key={i}>{chunks}</span>;
       })}
     </>
   );
