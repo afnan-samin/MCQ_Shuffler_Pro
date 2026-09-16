@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MCQ Shuffler Pro — Project Guide: Every Card, Button &amp; Code Location</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Noto+Sans+Bengali:wght@400;600&display=swap" rel="stylesheet">
+<style>
+@page { size: 720px 1020px; margin: 0; }
+:root {
+  --c-bg: #f8fafc;
+  --c-paper: #ffffff;
+  --c-ink: #0f172a;
+  --c-body: #334155;
+  --c-muted: #64748b;
+  --c-brand: #059669;
+  --c-brand-dark: #047857;
+  --c-brand-deep: #065f46;
+  --c-soft: #ecfdf5;
+  --c-soft-line: #a7f3d0;
+  --c-border: #e2e8f0;
+  --c-code-bg: #f1f5f9;
+  --c-warn-bg: #fffbeb;
+  --c-warn-line: #fcd34d;
+  --c-warn-ink: #92400e;
+  --mono: "JetBrains Mono", "DejaVu Sans Mono", Consolas, monospace;
+}
+html, body {
+  margin: 0; padding: 0; width: 720px;
+  background: var(--c-bg);
+  color: var(--c-ink);
+  font-family: 'Inter', 'Noto Sans Bengali', sans-serif;
+  font-size: 13px; line-height: 1.62;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+@media screen {
+  html { height: auto; display: flex; justify-content: center; background: #e2e8f0; }
+  body { margin: 20px auto; box-shadow: 0 4px 30px rgba(15,23,42,.18); }
+}
+p, td, li { overflow-wrap: break-word; word-break: break-word; }
+code, .path, .btn-label {
+  font-family: var(--mono), monospace;
+  font-size: .92em;
+  background: var(--c-code-bg);
+  border: 1px solid var(--c-border);
+  border-radius: 4px;
+  padding: 0 4px;
+  overflow-wrap: break-word;
+}
+.path { background: var(--c-soft); border-color: var(--c-soft-line); color: var(--c-brand-deep); font-weight: 600; }
+
+/* ---------- COVER ---------- */
+.cover {
+  width: 720px; height: 1020px; box-sizing: border-box;
+  break-after: page; overflow: hidden; position: relative;
+  background: linear-gradient(160deg, #f8fafc 0%, #ecfdf5 78%, #d1fae5 100%);
+  padding: 64px 60px; display: flex; flex-direction: column; justify-content: center;
+}
+.cover .rule-top { position: absolute; top: 42px; left: 60px; right: 60px; height: 6px; background: var(--c-brand); border-radius: 3px; }
+.cover .kicker { font-size: 12px; font-weight: 800; letter-spacing: .22em; text-transform: uppercase; color: var(--c-brand-dark); margin-bottom: 18px; }
+.cover .h1line { font-size: 58px; line-height: 1.08; font-weight: 900; letter-spacing: -0.02em; }
+.cover .h1line.green { margin-bottom: 16px; }
+.cover h1 .green { color: var(--c-brand); }
+.cover .subtitle { font-size: 16.5px; color: var(--c-body); max-width: 540px; margin-bottom: 30px; }
+.cover .chips { display: flex; flex-wrap: wrap; gap: 8px; max-width: 560px; margin-bottom: 34px; }
+.cover .chip { border: 1.5px solid var(--c-brand); color: var(--c-brand-deep); border-radius: 999px; padding: 5px 14px; font-size: 11.5px; font-weight: 700; background: rgba(255,255,255,.75); }
+.cover .stat-row { display: flex; flex-wrap: wrap; gap: 12px; }
+.cover .stat { background: var(--c-paper); border: 1px solid var(--c-border); border-radius: 12px; padding: 12px 16px; min-width: 118px; }
+.cover .stat .n { font-size: 26px; font-weight: 900; color: var(--c-brand-dark); line-height: 1.1; }
+.cover .stat .l { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--c-muted); }
+.cover .foot { position: absolute; bottom: 46px; left: 60px; right: 60px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--c-muted); border-top: 1px solid var(--c-soft-line); padding-top: 14px; }
+.cover .foot b { color: var(--c-brand-deep); }
+
+/* ---------- MAIN CONTENT FLOW ---------- */
+.main-content { padding: 52px 56px 40px 56px; }
+.chapter-header { break-after: avoid; break-inside: avoid; margin-top: 26px; }
+.chapter-header:first-child { margin-top: 0; }
+.part-tag { display: inline-block; background: var(--c-brand); color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; border-radius: 5px; padding: 3px 10px; margin-bottom: 8px; }
+.section-title { display: inline-block; padding-bottom: 8px; border-bottom: 3px solid var(--c-brand); margin-bottom: 14px; }
+h3.sub { font-size: 15px; font-weight: 800; margin: 20px 0 6px 0; break-after: avoid; color: var(--c-ink); }
+.body-text { margin: 0 0 10px 0; color: var(--c-body); }
+.lead { font-size: 13.5px; color: var(--c-body); }
+.callout { background: var(--c-soft); border: 1px solid var(--c-soft-line); border-left: 4px solid var(--c-brand); border-radius: 10px; padding: 12px 16px; margin: 12px 0; break-inside: avoid; }
+.callout.warn { background: var(--c-warn-bg); border-color: var(--c-warn-line); border-left-color: #d97706; color: var(--c-warn-ink); }
+.callout b.tag { color: var(--c-brand-deep); }
+.callout.warn b.tag { color: #b45309; }
+
+pre.flow {
+  font-family: var(--mono), monospace; font-size: 9.6px; line-height: 1.42;
+  background: #0f172a; color: #d1fae5; border-radius: 12px;
+  padding: 16px 18px; overflow: hidden; white-space: pre;
+  break-inside: avoid; margin: 12px 0;
+}
+
+/* ---------- CARD DOC BLOCKS ---------- */
+.card-doc {
+  break-inside: avoid; margin: 0 0 14px 0;
+  border: 1px solid var(--c-border); border-radius: 12px;
+  background: var(--c-paper); overflow: hidden;
+}
+.card-doc.compact { break-inside: auto; }
+.cd-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: linear-gradient(90deg, var(--c-soft), #ffffff 70%); border-bottom: 1px solid var(--c-soft-line); padding: 10px 16px; }
+.cd-head .nm { font-weight: 800; font-size: 14px; color: var(--c-ink); }
+.badge { display: inline-block; font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; border-radius: 4px; padding: 2px 8px; }
+.badge.m { background: var(--c-brand); color: #fff; }
+.badge.c { background: #e2e8f0; color: #475569; }
+.cd-body { padding: 10px 16px 12px 16px; }
+.cd-meta { font-size: 11px; color: var(--c-muted); margin: 0 0 8px 0; }
+.cd-meta b { color: var(--c-body); }
+table.btns { width: 100%; border-collapse: collapse; font-size: 10.8px; table-layout: fixed; }
+table.btns th { text-align: left; background: var(--c-code-bg); color: var(--c-brand-deep); font-size: 9.8px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; padding: 5px 8px; border: 1px solid var(--c-border); }
+table.btns td { border: 1px solid var(--c-border); padding: 5px 8px; vertical-align: top; line-height: 1.45; }
+table.btns td.lbl { font-family: var(--mono), monospace; font-size: 10px; font-weight: 600; color: var(--c-ink); }
+table.btns td.wire { font-family: var(--mono), monospace; font-size: 9.8px; color: var(--c-brand-deep); }
+table.btns col.c1 { width: 27%; } table.btns col.c2 { width: 34%; } table.btns col.c3 { width: 39%; }
+
+/* ---------- GENERIC TABLES ---------- */
+table.ref { width: 100%; border-collapse: collapse; font-size: 10.8px; table-layout: fixed; margin: 10px 0 4px 0; }
+table.ref th { text-align: left; background: var(--c-code-bg); color: var(--c-brand-deep); font-size: 9.8px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; padding: 5px 8px; border: 1px solid var(--c-border); }
+table.ref td { border: 1px solid var(--c-border); padding: 5px 8px; vertical-align: top; line-height: 1.5; }
+ol.steps { margin: 6px 0 10px 0; padding-left: 20px; color: var(--c-body); }
+ol.steps li { margin-bottom: 6px; }
+ol.steps li b { color: var(--c-ink); }
+
+/* ---------- ENDING ---------- */
+.ending {
+  width: 720px; height: 1020px; box-sizing: border-box;
+  break-before: page; overflow: hidden; position: relative;
+  background: linear-gradient(200deg, #f8fafc 0%, #ecfdf5 80%, #d1fae5 100%);
+  padding: 70px 60px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
+}
+.ending .big { font-size: 34px; font-weight: 900; line-height: 1.2; letter-spacing: -0.01em; }
+.ending .big .green { color: var(--c-brand); }
+.ending p { color: var(--c-body); max-width: 520px; }
+.ending .foot { position: absolute; bottom: 50px; left: 60px; right: 60px; border-top: 1px solid var(--c-soft-line); padding-top: 14px; font-size: 11px; color: var(--c-muted); }
+</style>
+</head>
+<body>
+
+<!-- ============ COVER ============ -->
+<div class="cover">
+  <div class="rule-top"></div>
+  <div class="kicker">Project Reference Guide</div>
+  <div class="h1line">MCQ Shuffler Pro</div>
+  <div class="h1line green">Card &amp; Code Map</div>
+  <div class="subtitle">Every card, every button, every mother &amp; child in the codebase — with exact file paths, line numbers and step-by-step edit recipes. Say "edit card X" and change only that piece.</div>
+  <div class="chips">
+    <span class="chip">23 UI components</span>
+    <span class="chip">8 shared mothers</span>
+    <span class="chip">6 edit playbooks</span>
+    <span class="chip">One-place theme control</span>
+  </div>
+  <div class="stat-row">
+    <div class="stat"><div class="n">3</div><div class="l">Work modes</div></div>
+    <div class="stat"><div class="n">2</div><div class="l">Download formats</div></div>
+    <div class="stat"><div class="n">530+</div><div class="l">Unit tests</div></div>
+    <div class="stat"><div class="n">10</div><div class="l">E2E suites</div></div>
+  </div>
+  <div class="foot">
+    <span><b>mcq-shuffler-pro</b> · client-side Next.js 16 · GitHub Pages</span>
+    <span>Edition 1 · September 2026</span>
+  </div>
+</div>
+
+<!-- ============ MAIN CONTENT ============ -->
+<div class="main-content">
+
+<!-- HOW TO USE -->
+<div class="chapter-header">
+  <div class="part-tag">How to use this guide</div>
+  <div class="section-title">"Edit one card" — the fast path</div>
+  </div>
+<p class="body-text lead">This guide is an <b>edit-locator</b>: it maps every visible card and button on <b>mcq-shuffler-pro</b> (https://afnan-samin.github.io/MCQ_Shuffler_Pro/) to the exact file and line where it lives. The project was deliberately re-shaped around a <b>mother / child</b> architecture, so a small, targeted edit almost never touches the whole project.</p>
+<div class="callout"><b class="tag">Golden rule —</b> find the card in <b>Part 3</b>, open its file, change only that card's markup or text. Buttons push events up to <code>src/app/page.tsx</code>, which is the single wiring layer: UI lives in <code>src/components/mcq/</code>, all logic lives in <code>src/lib/mcq/</code>. If your edit changes a visible label, sync the E2E selectors listed in the Appendix in the same commit.</div>
+<p class="body-text"><b>Conventions used:</b> <span class="badge m">M</span> = <b>mother</b> (shared component used by several modes — edit it and every consumer changes); <span class="badge c">C</span> = <b>child</b> (belongs to one mode only). Line numbers were verified against the current codebase (commit series ending <code>0d8188e</code>). All button labels are quoted byte-exact from code so you can <code>rg</code>-search for them.</p>
+
+<!-- PART 1 -->
+<div class="chapter-header">
+  <div class="part-tag">Part 1</div>
+  <div class="section-title">Site flow at a glance</div>
+  </div>
+<p class="body-text">The user journey has four beats: <b>upload → mode selection → work view → download</b>. After staging files, exactly three mode buttons appear; each mode owns its own input, option and result cards; and every download card carries the same two shared widgets — the font settings card and the DOCX/PDF format toggle.</p>
+<pre class="flow">                    ┌──────────────────────────────────────────────┐
+                    │  UploadFirstCard   "Upload a file first"     │
+                    │  upload .docx │ .txt │ paste text            │
+                    └───────────────┬──────────────────────────────┘
+                                    │ stageFiles() validates the zip
+                    ┌───────────────▼──────────────────────────────┐
+                    │  StagedFilesCard "📁 N files ready"          │
+                    │  ModeTabs — 3 mode buttons:                  │
+                    │  [🔀 MCQ Shuffle] [🔢 MCQ Serial] [📥 MCQ Redownload]
+                    └───┬──────────────────┬───────────────┬───────┘
+                        │                  │               │
+          ┌─────────────▼─────┐  ┌─────────▼────────┐  ┌──▼──────────────────┐
+          │ SHUFFLE MODE      │  │ SERIAL MODE      │  │ REDOWNLOAD MODE     │
+          │ InputCard         │  │ SerialInputCard  │  │ RedownloadInputCard │
+          │  (upload/paste)   │  │  (upload/paste)  │  │ RedownloadPartsCard │
+          │ DetectCard (text) │  │ ColorSerialCard /│  │ RedownloadQuestions │
+          │  or DocxDetectCard│  │ MultiSerialScheme│  │  Card               │
+          │ ShuffleCard       │  │ SerialPasteCard  │  │ FontSettingsCard    │
+          │ FontSettingsCard  │  │ FontSettingsCard │  │ MultiDownloadCard   │
+          │ SetsResult (text) │  │ MultiDownloadCard│  │  ("4. Download…")   │
+          │  or DocxSetsResult│  └────────┬─────────┘  └──────────┬──────────┘
+          │  or MultiDownload │           │                       │
+          └─────────┬─────────┘           │                       │
+                    │  DownloadFormatToggle: [DOCX] [PDF] (every download card)
+                    ▼
+         finalizeDownload(): DOCX → downloadBlob │ PDF → docxBlobToPdfBlob → .pdf</pre>
+<p class="body-text">While inside any mode, a persistent top bar (<b>ModeWorkBar</b>) shows <b>◀ back home</b> · mode title · <b>N/M files</b> · <b>Add files</b>. Under every download card sits <b>NextModesCard</b> ("✅ Keep working with these files") which carries the loaded files into the other modes without re-uploading.</p>
+
+<!-- PART 2 -->
+<div class="chapter-header">
+  <div class="part-tag">Part 2</div>
+  <div class="section-title">The Mothers — shared infrastructure</div>
+  </div>
+<p class="body-text">Mothers are the pieces every mode leans on. Editing a mother changes <b>every consumer at once</b> — that is their purpose. Treat <code>repack-docx.ts</code>, <code>docx-xml.ts</code> and <code>parser.ts</code> as protected mothers: they guarantee the "formatting kept exactly" promise, and any edit there must run the full unit-test suite (<code>scripts/test-*.ts</code>, 530+ assertions).</p>
+
+<div class="card-doc compact">
+  <div class="cd-head"><span class="nm">FileDropzone</span><span class="badge m">M</span><span class="path">src/components/mcq/file-dropzone.tsx</span><span>207 lines</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>Exports:</b> <code>FileDropzone({accept, multiple, disabled, busy, promptText, hintText, icon, variant: "lg"|"md"|"compact", inputTestId, maxSizeBytes, maxFiles, onFiles, triggerRef, chips, children})</code> (line 75) · <code>DropzoneTrigger {open}</code> (19, via useImperativeHandle) · <code>DropzoneRejection {notAccepted, tooBig, overMax}</code> (23).</p>
+    <p class="cd-meta"><b>What:</b> the ONE drag-drop + click-to-browse upload surface. Filters extension → size → count and reports rejects through <code>onFiles(files, rejected)</code>. <b>Consumers (5 components / 6 instances):</b> upload-first-card (110), input-card (116), serial-input-card (91 + 146 "Add more files"), redownload-input-card (48, compact), mode-work-bar (66, children-slot). <b>Edit impact:</b> change upload prompts/limits look here once — every surface updates.</p>
+  </div>
+</div>
+
+<div class="card-doc compact">
+  <div class="cd-head"><span class="nm">runFilePipeline</span><span class="badge m">M</span><span class="path">src/lib/mcq/file-pipeline.ts</span><span>150 lines</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>Exports:</b> <code>runFilePipeline(files, {parse, maxBytes?}) → {items, failures, tooBig, notDocx}</code> (73) — the single loader used by all 3 modes (50 MB guard → extension guard → <code>loadDocxXml</code> → per-mode parse callback). <code>isValidDocxZip(file)</code> (33) — light JSZip check that <code>word/document.xml</code> exists; runs at staging time so fake docx files never enter a mode. <code>FILE_TOO_BIG_MSG</code> (24) · <code>docxBaseName</code> (43) · <code>prepareShuffleXml(originalXml)</code> (125) — strips color headers + non-MCQ lines for shuffle.</p>
+    <p class="cd-meta"><b>Consumers:</b> page.tsx <code>stageFiles</code> (305), <code>handleDocxFile</code> (629), <code>handleShuffleFiles</code> (1360), <code>loadSerialFiles</code> (717), <code>loadRedownloadFiles</code> (1155). <b>Edit impact:</b> validation/loading behavior changes hit every mode at once; toast texts live in page.tsx, not here.</p>
+  </div>
+</div>
+
+<div class="card-doc compact">
+  <div class="cd-head"><span class="nm">MODE_META</span><span class="badge m">M</span><span class="path">src/lib/mcq/mode-meta.ts</span><span>56 lines</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>Exports:</b> <code>McqMode = "shuffle" | "serial" | "redownload"</code> (7) · <code>MODE_META</code> (25) — the single registry: emoji (🔀/🔢/📥), title, tabTitle, description, ariaLabel, Icon · <code>MODE_IDS</code> (56) = render order.</p>
+    <p class="cd-meta"><b>Consumers:</b> mode-tabs (4), next-modes-card (5), mode-work-bar (7), page.tsx. <b>Edit impact:</b> rename a mode or change its emoji here → tabs, work-bar title and next-mode buttons all update together. <b>Do NOT rename the id strings</b> ("shuffle"…) — they are stored in localStorage (<code>mcq-shuffler-mode</code>) and used as switch keys.</p>
+  </div>
+</div>
+
+<div class="card-doc compact">
+  <div class="cd-head"><span class="nm">repackDocx / repackDocxRemapped</span><span class="badge m">M</span><span class="path">src/lib/mcq/repack-docx.ts</span><span>81 lines</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>Exports:</b> <code>repackDocx(source, parts, extra?, mimeType?)</code> (24) — copies every non-directory zip entry byte-identical, replaces only <code>parts</code>. <code>repackDocxRemapped(source, documentXml, fontSettings?, extraParts?, extra?, mimeType?)</code> (56) — same + optional font remap of <code>word/document.xml</code> and <code>word/styles.xml</code>; disabled ⇒ byte-identical. <code>STYLES_XML_PATH</code> (16), <code>DOCX_MIME</code> (13).</p>
+    <p class="cd-meta"><b>Consumers:</b> multi-docx.ts, docx-exporter.ts, color-serial.ts, exporter.ts. <b>Edit impact:</b> THE core of "formatting kept exactly" — every docx output in every mode passes through it. Never edit casually; run all tests.</p>
+  </div>
+</div>
+
+<div class="card-doc compact">
+  <div class="cd-head"><span class="nm">applyFontRemap — font engine</span><span class="badge m">M</span><span class="path">src/lib/mcq/font-remap.ts</span><span>320 lines</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>Exports:</b> <code>applyFontRemap({documentXml, stylesXml?}, settings, options?)</code> (308) · <code>applyFontRemapXml</code> (245) — per-<code>&lt;w:r&gt;</code> font remap, idempotent, text untouched · <code>applyFontRemapStylesXml</code> (286) — legacy Bijoy font values (Sutonny*/Bijoy*/Shibly*) → chosen Bijoy font · <code>classifyRunText</code> (108) → "bijoy" | "unicode-bengali" | "latin" · <code>FontSettings</code> (53) · <code>FONT_CHOICES</code> (63) — the 5+5+5 dropdown options · <code>DEFAULT_FONT_REMAP_SETTINGS</code> (55) = Times New Roman / SutonnyMJ / Noto Serif Bengali, enabled.</p>
+    <p class="cd-meta"><b>Consumers:</b> repack-docx.ts (the wiring), exporter.ts, font-settings-card.tsx, page.tsx (<code>sanitizeFontSettings</code> 107 validates against FONT_CHOICES). <b>Edit impact:</b> add a font by appending to <code>FONT_CHOICES</code> — the dropdown and the sanitizer pick it up automatically.</p>
+  </div>
+</div>
+
+<div class="card-doc compact">
+  <div class="cd-head"><span class="nm">siteTheme — one-place theme control</span><span class="badge m">M</span><span class="path">src/config/theme.ts</span><span>292 lines · + theme-css.ts 106 lines</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>What:</b> the single file that controls <b>all site fonts, colors, popups and corner radius</b>. <code>siteTheme</code> (142): <code>fonts</code> (sans/serif/mono/bengali), <code>colors.light</code> + <code>colors.dark</code> (background, card, primary, muted, destructive + destructiveForeground, border, ring, brand 50–950), <code>radius.base</code> (one knob, sm/md/lg/xl derived), <code>popup</code> (radius/shadow/border/backdropBlur). <code>theme-css.ts</code> turns it into <code>:root {--st-*}</code> + <code>.dark {--st-*}</code> CSS; <code>src/app/layout.tsx</code> (67) injects the tag; <code>globals.css</code> re-points all Tailwind/shadcn tokens at those vars.</p>
+    <p class="cd-meta"><b>Iron rule:</b> edit <code>theme.ts</code> ONLY — never edit theme-css.ts or the var chain. The file's bottom comment carries the three official recipes:</p>
+    <p class="cd-meta">① <b>Site font everywhere</b> — edit <code>fonts.sans</code> (147), e.g. <code>'Verdana, "Noto Sans Bengali", sans-serif'</code>; for a web font add it via <code>next/font</code> in layout.tsx with <code>variable: "--font-myfont"</code>, put it on <code>&lt;html&gt;</code>, then use <code>sans: 'var(--font-myfont), …'</code>. Keep a Bengali-capable font in the stack. ② <b>Brand color</b> — edit <code>colors.light.brand</code> 600 (solid fills) + 700 (hover), tune neighbors; every <code>bg-brand-600</code>/<code>text-brand-700</code> class site-wide follows. ③ <b>Popups</b> — edit <code>popup.radius</code> ("0px" sharp / "12px" round) and <code>popup.shadow</code>; toasts + select dropdowns follow.</p>
+  </div>
+</div>
+
+<div class="card-doc compact">
+  <div class="cd-head"><span class="nm">docxBlobToPdfBlob — PDF export</span><span class="badge m">M</span><span class="path">src/lib/mcq/pdf-export.ts</span><span>238 lines</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>Exports:</b> <code>DownloadFormat = "docx" | "pdf"</code> (35) · <code>PDF_MAX_PAGES = 300</code> (40, memory guard with English abort message) · <code>pdfFileNameOf(name)</code> (50) · <code>docxBlobToPdfBlob(docx, baseName)</code> (80) — 100% in-browser: docx-preview render → html2canvas-pro capture (scale 2 ≤100 pages, 1.5 ≤300) → jsPDF A4; canvases taller than A4 are sliced one-page-per-A4-chunk so continuous documents paginate correctly.</p>
+    <p class="cd-meta"><b>Consumers:</b> page.tsx <code>finalizeDownload</code> (376) + <code>finalizeZipEntries</code> (387) only. <b>Edit impact:</b> all PDF quality/limit behavior lives here; the DOCX path never touches this file.</p>
+  </div>
+</div>
+
+<h3 class="sub">The other lib files — mothers vs mode helpers at one glance</h3>
+<table class="ref">
+  <colgroup><col style="width:31%"><col style="width:69%"></colgroup>
+  <tr><th>File (lines)</th><th>Role — mother = shared, child = single-mode helper</th></tr>
+  <tr><td class="path">exporter.ts (372)</td><td><b>Mother (text pipelines).</b> Fresh .docx via the <code>docx</code> lib for text-flow sets &amp; serial-paste: <code>buildSetsDocxBlob</code> (202), <code>maybeRemapPackedDocx</code> (192), <code>exportDocHtml</code> (299, .doc), <code>printSets</code> (306), <code>downloadBlob</code> (356), <code>DEFAULT_EXPORT_OPTIONS</code> (37).</td></tr>
+  <tr><td class="path">multi-docx.ts (587)</td><td><b>Mother (multi-file).</b> <code>replaceDocumentXml</code> (268) swaps document.xml inside the original zip; <code>buildMergedDocxBlob</code> (414) merges files with page breaks (one container-level font remap); <code>buildZipBlob</code> (556); <code>offsetSerialPlan</code> (583).</td></tr>
+  <tr><td class="path">docx-xml.ts (696)</td><td><b>Mother (docx engine).</b> <code>loadDocxXml</code> (537), <code>parseDocxXml</code> (426 — questions/serial/options/answers/explanations), Bengali/Bijoy digit maps, <code>renumberSerialPara</code> (645). Contains functional Bengali keywords — edit carefully, tests guard it.</td></tr>
+  <tr><td class="path">parser.ts (243)</td><td><b>Mother (text engine).</b> <code>parseMcq</code> (141), <code>analyzeSerial</code> (196), <code>autoFixNumbering</code> (223) for paste/.txt flows. Question-start regex is functional Bengali — change only with unit tests.</td></tr>
+  <tr><td class="path">set-engine.ts (132)</td><td><b>Mother (shuffle sets).</b> <code>buildSets</code> (46; interleaved / chunk / random / original), <code>getSetName</code> (93 — writes <b>সেট A / সেট ক / সেট ১ / Set 1</b> into output files), <code>shuffled</code> (17).</td></tr>
+  <tr><td class="path">docx-exporter.ts (206)</td><td><b>Child (shuffle, also serial-fix).</b> <code>buildShuffledXml</code> (90 — DOM-level XML surgery: sets, page breaks, headers, renumber, reference tags), <code>buildShuffledDocxBlob</code> (170), <code>buildSerialFixedDocxBlob</code> (190).</td></tr>
+  <tr><td class="path">color-serial.ts (733)</td><td><b>Child (serial mode; used by shuffle prep).</b> <code>analyzeColorDocx</code> (231), <code>planSerialByColor</code> (472), <code>applyColorSerialXml</code> (648), <code>buildColorSerialDocxBlob</code> (720), <code>stripShadedParasXml</code> (315), <code>stripNonMcqLinesXml</code> (383).</td></tr>
+  <tr><td class="path">redownload.ts (793)</td><td><b>Child (redownload).</b> <code>parseRedownloadXml</code> (259 — six-part detection), <code>PART_LABELS</code> (49), <code>buildRedownloadXml</code> (511), <code>extractWatermark</code> (761).</td></tr>
+  <tr><td class="path">reference.ts (455)</td><td><b>Child (shuffle).</b> Detects <code>[CU-A: 22-23]</code> source tags; <code>analyzeRefReport</code> (304), <code>buildRefEditedMap</code> (442) for keep / strip / end-line modes.</td></tr>
+  <tr><td class="path">encoding.ts (211)</td><td><b>Mother-ish (rendering).</b> Word-level Bijoy/Unicode/English classifier behind TokText preview: <code>classifyWord</code> (61), <code>tokenizeWithContext</code> (100).</td></tr>
+  <tr><td class="path">serial-paste.ts (28)</td><td><b>Child (serial paste).</b> <code>renumberQuestionsByPosition</code> (17).</td></tr>
+  <tr><td class="path">limits.ts (30)</td><td><b>Mother (limits).</b> <code>MAX_SERIAL_NUMBER = 9999</code> (18) · <code>MAX_FILE_BYTES = 50 MB</code> (24) · <code>SHUFFLE_MAX_FILES = 50</code> (30).</td></tr>
+</table>
+
+<!-- PART 3 (first half) -->
+<div class="chapter-header">
+  <div class="part-tag">Part 3</div>
+  <div class="section-title">Card-by-card reference</div>
+  </div>
+<p class="body-text">Every UI card in the project, alphabetically by file. <b>"UI name"</b> is the exact English title the user sees; the tables quote every button label byte-exactly from code, and the <b>Code path</b> column traces handler → logic so an edit can be traced end-to-end in seconds.</p>
+
+<div class="card-doc">
+  <div class="cd-head"><span class="nm">ColorSerialCard</span><span class="badge c">C</span><span class="path">src/components/mcq/color-serial-card.tsx</span><span>160 ln</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>UI name:</b> "Color-based serial (structured file)" (62) · <b>Where:</b> serial mode, exactly 1 file with colored headers (page 1796) · <b>Testids:</b> none. Color chips 83–126, action button 153–156.</p>
+    <table class="btns"><colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+      <tr><th>Button / control (exact)</th><th>What it does</th><th>Code path</th></tr>
+      <tr><td class="lbl">color chip "&lt;name&gt; · N sections"</td><td>selects that color's serial scheme</td><td class="wire">local sel state (setSel)</td></tr>
+      <tr><td class="lbl">Continuous across the file</td><td>selects the continuous scheme</td><td class="wire">local setSel({kind:"continuous"})</td></tr>
+      <tr><td class="lbl">Download serial .docx (B1) — or .pdf</td><td>plans serial by color, applies it, downloads</td><td class="wire">onSerial → handleColorSerial (page 786) → planSerialByColor (472) → buildColorSerialDocxBlob (720) → finalizeDownload (376)</td></tr>
+      <tr><td class="lbl">DownloadFormatToggle</td><td>DOCX/PDF choice</td><td class="wire">onFormatChange → updateDownloadFormat (page 363)</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="card-doc">
+  <div class="cd-head"><span class="nm">DetectCard</span><span class="badge c">C</span><span class="path">src/components/mcq/detect-card.tsx</span><span>327 ln</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>UI name:</b> "Detection result &amp; question selection" (98) · <b>Where:</b> shuffle work view, TEXT flow only — pasted text or .txt (page 2004) · <b>Testids:</b> <code>id="step-detect"</code> (94), switch <code>id="allow-broken"</code> (235). Serial status 185–243, toolbar 246–275, list 278–323.</p>
+    <table class="btns"><colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+      <tr><th>Button / control (exact)</th><th>What it does</th><th>Code path</th></tr>
+      <tr><td class="lbl">Select all / Deselect all</td><td>selects / clears every parsed question</td><td class="wire">onSelectAll / onSelectNone → selectAll (1099) / selectNone (1104)</td></tr>
+      <tr><td class="lbl">Select range (From / To inputs)</td><td>selects a position range; accepts Bengali or English digits</td><td class="wire">onSelectRange → selectRange (1106) → digitsToNumber (docx-xml 35)</td></tr>
+      <tr><td class="lbl">🔧 Fix numbering automatically (busy: Fixing…)</td><td>renumbers pasted text 1..N and re-parses</td><td class="wire">onAutoFix → handleAutoFix (580) → autoFixNumbering (parser 223)</td></tr>
+      <tr><td class="lbl">Run as-is — Switch</td><td>allows shuffling with a broken serial</td><td class="wire">onAllowBrokenChange → setAllowBroken (page state)</td></tr>
+      <tr><td class="lbl">checkbox per question</td><td>ticks / unticks that question</td><td class="wire">onToggle → toggleQuestion (599)</td></tr>
+      <tr><td class="lbl">Show more (N remaining)</td><td>paginates the list by 100</td><td class="wire">local setVisible</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="card-doc">
+  <div class="cd-head"><span class="nm">DocxDetectCard (+ SerialSpan)</span><span class="badge c">C</span><span class="path">src/components/mcq/docx-detect-card.tsx</span><span>385 ln</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>UI name:</b> "Detection result — {fileName}" (106) · <b>Where:</b> shuffle work view, single-docx flow (page 1945) · <b>Testids:</b> <code>id="step-detect"</code> (102), switch <code>id="docx-allow-broken"</code> (281). SerialSpan (38) is reused by docx-sets-result. Encoding detector 142–197, serial status 213–290, toolbar 293–322.</p>
+    <table class="btns"><colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+      <tr><th>Button / control (exact)</th><th>What it does</th><th>Code path</th></tr>
+      <tr><td class="lbl">Select all / Deselect all / Select range</td><td>selection helpers (Bengali + English digits in range)</td><td class="wire">page selectAll (1099) / selectNone (1104) / selectRange (1106)</td></tr>
+      <tr><td class="lbl">🔧 Fix serial &amp; download .docx (1..N) (busy: Building…)</td><td>downloads a serial-fixed copy — original order, 1..N</td><td class="wire">onSerialFix → handleDocxSerialFix (1042) → buildSerialFixedDocxBlob (docx-exporter 190) → repackDocxRemapped → finalizeDownload</td></tr>
+      <tr><td class="lbl">Run as-is — Switch</td><td>needed when numbering restarts per section</td><td class="wire">onAllowBrokenChange → setAllowBroken</td></tr>
+      <tr><td class="lbl">checkbox per question · Show more (N remaining)</td><td>tick / untick · paginate by 50</td><td class="wire">toggleQuestion · local setVisible</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="card-doc">
+  <div class="cd-head"><span class="nm">DocxSetsResult</span><span class="badge c">C</span><span class="path">src/components/mcq/docx-sets-result.tsx</span><span>172 ln</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>UI name:</b> "Shuffle complete — N set(s) (M questions)" (66) · <b>Where:</b> shuffle work view after a single-docx shuffle (page 1984) · <b>Testids:</b> <code>id="step-result"</code> (61), switch <code>id="renumber-switch"</code> (86). Export bar 95–104, set cards 107–155.</p>
+    <table class="btns"><colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+      <tr><th>Button / control (exact)</th><th>What it does</th><th>Code path</th></tr>
+      <tr><td class="lbl">Serial replace ON — 1, 2, 3… / OFF — original numbers (Switch)</td><td>toggles renumbering for downloads AND set badges</td><td class="wire">onRenumberChange → toggleSerialByClick (page 712)</td></tr>
+      <tr><td class="lbl">⬇️ Word (.docx) — renumbered serials (1,2,3…) / ⬇️ PDF variant</td><td>builds + downloads the renumbered version</td><td class="wire">onDownload(true) → handleDocxDownload (1013) → buildShuffledDocxBlob (170) → finalizeDownload</td></tr>
+      <tr><td class="lbl">⬇️ Word (.docx) — original numbers / ⬇️ PDF variant</td><td>original serials version</td><td class="wire">onDownload(false) → same handler</td></tr>
+      <tr><td class="lbl">Copy / Copied (per set) · clicking a serial number</td><td>copies that set's text · toggles serial replace</td><td class="wire">onCopySet → handleDocxCopySet (1067) · onRenumberChange(!renumber)</td></tr>
+      <tr><td class="lbl">DownloadFormatToggle</td><td>DOCX/PDF choice</td><td class="wire">updateDownloadFormat (page 363)</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="card-doc">
+  <div class="cd-head"><span class="nm">DownloadFormatToggle</span><span class="badge m">M</span><span class="path">src/components/mcq/download-format-toggle.tsx</span><span>71 ln</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>UI name:</b> "Download as" + pills <b>DOCX</b> / <b>PDF</b> (27/46/61) · <b>Where:</b> inside all 6 download cards — DocxSetsResult (91), SetsResult (224), SerialPasteCard (139), ColorSerialCard (151), NoColorSerialCard (serial-extra-cards 96), MultiDownloadCard (104). State lifted to page.tsx, persisted in localStorage <code>mcq-download-format</code>, DOCX default.</p>
+    <table class="btns"><colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+      <tr><th>Button / control (exact)</th><th>What it does</th><th>Code path</th></tr>
+      <tr><td class="lbl">DOCX pill</td><td>default; buttons show "Word (.docx)" wording</td><td class="wire">onChange("docx") → updateDownloadFormat (363)</td></tr>
+      <tr><td class="lbl">PDF pill</td><td>download buttons swap to ".pdf / PDF" labels; hint "PDF is rendered in your browser (best effort)" appears (66)</td><td class="wire">onChange("pdf") → page 363; conversion in pdf-export.ts (80)</td></tr>
+    </table>
+    <p class="cd-meta"><b>Testids:</b> <code>data-testid="download-format"</code> (24), <code>format-docx</code> (35), <code>format-pdf</code> (50); <code>aria-pressed</code> on both pills.</p>
+  </div>
+</div>
+
+<div class="card-doc">
+  <div class="cd-head"><span class="nm">FontSettingsCard</span><span class="badge m">M</span><span class="path">src/components/mcq/font-settings-card.tsx</span><span>198 ln</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>UI name:</b> "Fonts in the output file" (103) — collapsed by default; description reads "Remap ON — Unicode → X, Bijoy → Y, English → Z" or "Remap is OFF — the output keeps the original fonts" (105–107) · <b>Where:</b> rendered exactly once per view just above the download area: redownload (1734), serial (1791), shuffle-multi (1910), shuffle single-docx (1980), text flow (2037) · <b>Testids:</b> <code>data-testid="font-settings-card"</code> (93), <code>id="font-settings-content"</code> (127).</p>
+    <table class="btns"><colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+      <tr><th>Button / control (exact)</th><th>What it does</th><th>Code path</th></tr>
+      <tr><td class="lbl">header click / chevron</td><td>expand / collapse; syncs the draft to applied settings</td><td class="wire">local toggleOpen (69)</td></tr>
+      <tr><td class="lbl">Remap fonts in the output file — Switch</td><td>draft remap ON/OFF</td><td class="wire">patch({enabled}) → committed by onChange</td></tr>
+      <tr><td class="lbl">English fonts / Bijoy-ANSI fonts / Unicode-Bengali fonts (selects)</td><td>choose from the 5+5+5 FONT_CHOICES lists</td><td class="wire">patch({englishFont|bijoyFont|unicodeFont}); choices from font-remap.ts 63</td></tr>
+      <tr><td class="lbl">Use fonts</td><td>commits + persists localStorage <code>mcq-font-settings</code>; flash "Applied — downloads will use these fonts" (190)</td><td class="wire">confirm() → onChange(draft) → updateFontSettings (page 354)</td></tr>
+      <tr><td class="lbl">Reset</td><td>restores the default fonts</td><td class="wire">onChange(DEFAULT_FONT_REMAP_SETTINGS) (font-remap 55)</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="card-doc">
+  <div class="cd-head"><span class="nm">InputCard</span><span class="badge c">C</span><span class="path">src/components/mcq/input-card.tsx</span><span>179 ln</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>UI name:</b> "Add questions — upload a file or paste" (98) · <b>Where:</b> shuffle work view top (1849) — serial and redownload have their own input cards · <b>Testids:</b> <code>id="step-input"</code> (94).</p>
+    <table class="btns"><colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+      <tr><th>Button / control (exact)</th><th>What it does</th><th>Code path</th></tr>
+      <tr><td class="lbl">Tab Upload file (108) / Tab Paste (111)</td><td>switches input mode</td><td class="wire">local shadcn Tabs</td></tr>
+      <tr><td class="lbl">Click to select a file or drag &amp; drop (122)</td><td>docx → shuffle pipeline; .txt → browser parse</td><td class="wire">onDocxFile (single) / onDocxFiles = handleShuffleFiles (multi) / onTextFileLoaded = loadAndDetect — page 629 / 1360 / 549</td></tr>
+      <tr><td class="lbl">🔍 Detect questions (paste mode) (busy: Detecting…)</td><td>parses pasted text</td><td class="wire">onDetect → handleDetect (568) → parseMcq (parser 141)</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="card-doc">
+  <div class="cd-head"><span class="nm">ModeTabs</span><span class="badge m">M</span><span class="path">src/components/mcq/mode-tabs.tsx</span><span>64 ln</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>UI name:</b> the 3 mode buttons (no card title) — labels come from <code>MODE_META[id].tabTitle</code>: <b>🔀 MCQ Shuffle · 🔢 MCQ Serial · 📥 MCQ Redownload</b> (mode-meta 25–53) · <b>Where:</b> step 2 only (<code>flowStep === "select"</code> with staged input, page 1679); hidden once inside a mode · <b>Anchors:</b> <code>role="tab"</code> with aria-labels "Shuffle mode" etc.</p>
+    <table class="btns"><colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+      <tr><th>Button / control (exact)</th><th>What it does</th><th>Code path</th></tr>
+      <tr><td class="lbl">each mode button</td><td>persists mode, carries staged files into it, enters the work view</td><td class="wire">onChange(id) → changeMode (397) → carryToMode (469) → flowStep:"work"</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="card-doc">
+  <div class="cd-head"><span class="nm">ModeWorkBar</span><span class="badge m">M</span><span class="path">src/components/mcq/mode-work-bar.tsx</span><span>93 ln</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>UI name:</b> thin work bar — center "{emoji} {title}" (48) + hint "— press the arrow to go home" (49), right chip "N/M files" (61) · <b>Where:</b> top of every mode's work view (1684); the file cap shows only in shuffle (SHUFFLE_MAX_FILES = 50) · <b>Testids:</b> <code>data-testid="mode-work-bar"</code> (33), hidden input <code>data-testid="mode-work-bar-input"</code> (68).</p>
+    <table class="btns"><colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+      <tr><th>Button / control (exact)</th><th>What it does</th><th>Code path</th></tr>
+      <tr><td class="lbl">◀ (aria-label "Back — return home")</td><td>wipes all mode state, returns to the upload card</td><td class="wire">onBack → backToHome (408)</td></tr>
+      <tr><td class="lbl">Add files (88)</td><td>opens its own hidden FileDropzone; appends files into the CURRENT mode</td><td class="wire">onFiles → handleAddMoreFiles (427) → loadSerialFiles / loadRedownloadFiles / handleShuffleFiles</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="card-doc">
+  <div class="cd-head"><span class="nm">MultiDownloadCard</span><span class="badge m">M</span><span class="path">src/components/mcq/multi-download-card.tsx</span><span>165 ln</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>UI name:</b> dynamic <code>title</code> prop — "4. Download — new file from picked parts" / "4. Download — picked parts of all files" (redownload, page 1737), "Serial all files together" (serial multi, 1824), "Shuffle complete — download now" (shuffle multi, 1915) · <b>Where:</b> results area of all three multi/single-file download views · <b>Testids:</b> radios <code>id="mf-serial-per-file"</code> / <code>id="mf-serial-global"</code> (81/90).</p>
+    <table class="btns"><colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+      <tr><th>Button / control (exact)</th><th>What it does</th><th>Code path</th></tr>
+      <tr><td class="lbl">How should serials work in the merged file? — Restart from 1 in each file / One continuous serial — start to finish</td><td>per-file vs global serial (serial multi only)</td><td class="wire">onSerialStrategyChange → setSerialStrategy (page 827)</td></tr>
+      <tr><td class="lbl">Download as one file (.docx) / Download (.docx) when single / .pdf variants</td><td>merged single docx/pdf</td><td class="wire">onDownloadMerged → handleMultiMergedDownload (1496) / handleSerialMultiMerged (827) / handleRdMerged (1265)</td></tr>
+      <tr><td class="lbl">Download separately (.zip) — hidden when 1 file</td><td>ZIP of per-file outputs</td><td class="wire">onDownloadZip → handleMultiZipDownload (1527) / handleSerialMultiZip (859) / handleRdZip (1291)</td></tr>
+      <tr><td class="lbl">DownloadFormatToggle</td><td>DOCX/PDF choice</td><td class="wire">updateDownloadFormat (363)</td></tr>
+    </table>
+    <p class="cd-meta"><b>ZIP names</b> are decided in page.tsx: <code>MCQ-shuffled-files.zip</code>, <code>MCQ-serial-files.zip</code>, <code>MCQ-Redownload.zip</code>.</p>
+  </div>
+</div>
+
+<div class="card-doc">
+  <div class="cd-head"><span class="nm">MultiFileList</span><span class="badge m">M</span><span class="path">src/components/mcq/multi-file-list.tsx</span><span>154 ln</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>UI name:</b> file order list (no card; rows with badges "N questions" / "Ready") · <b>Where:</b> inside SerialInputCard (143), RedownloadInputCard (63), and the shuffle-multi files Card rendered inline by page.tsx (1874) · <b>Anchors:</b> aria-labels are the E2E hooks.</p>
+    <table class="btns"><colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+      <tr><th>Button / control (exact)</th><th>What it does</th><th>Code path</th></tr>
+      <tr><td class="lbl">aria-label "Move up" / "Move down"</td><td>reorders files (mobile-friendly arrows)</td><td class="wire">onReorder(i, i∓1) → reorderSerialDocs (767) / reorderRdDocs (1202) / reorderShuffleItems (1452)</td></tr>
+      <tr><td class="lbl">aria-label "Remove from list"</td><td>removes that file</td><td class="wire">onRemove(id) → removeSerialDoc (776) / removeRdDoc (1211) / removeShuffleItem (1464)</td></tr>
+      <tr><td class="lbl">whole row draggable</td><td>drag-drop reorder</td><td class="wire">onReorder(from, to) — same handlers</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- PART 3 (second half) -->
+<div class="card-doc">
+  <div class="cd-head"><span class="nm">NextModesCard</span><span class="badge m">M</span><span class="path">src/components/mcq/next-modes-card.tsx</span><span>58 ln</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>UI name:</b> "✅ Keep working with these files" (27); button labels = the other modes' tabTitle (same as ModeTabs) · <b>Where:</b> under every mode's download card (1753, 1838/1844, 1929, 2000, 2063); renders null when filesCount is 0 (text flow).</p>
+    <table class="btns"><colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+      <tr><th>Button / control (exact)</th><th>What it does</th><th>Code path</th></tr>
+      <tr><td class="lbl">other-mode buttons</td><td>carries the current mode's files into the other mode — no re-upload</td><td class="wire">onOpen(m) → changeMode (397) → carryToMode (469)</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="card-doc">
+  <div class="cd-head"><span class="nm">RedownloadInputCard</span><span class="badge c">C</span><span class="path">src/components/mcq/redownload-input-card.tsx</span><span>67 ln</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>UI name:</b> "1. Upload files — MCQ Redownload" (40) · <b>Where:</b> redownload work view (1694) · <b>Testids:</b> none.</p>
+    <table class="btns"><colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+      <tr><th>Button / control (exact)</th><th>What it does</th><th>Code path</th></tr>
+      <tr><td class="lbl">Click to select a file or drag &amp; drop (compact dropzone)</td><td>loads + parses docx files; toasts for too-big and non-docx</td><td class="wire">onFiles → loadRedownloadFiles (1155) → runFilePipeline + parseRedownloadXml (259) + extractWatermark (761)</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="card-doc">
+  <div class="cd-head"><span class="nm">RedownloadPartsCard</span><span class="badge c">C</span><span class="path">src/components/mcq/redownload-parts-card.tsx</span><span>118 ln</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>UI name:</b> "2. Pick parts — what goes into the new file" (53) · <b>Where:</b> redownload work view after files load (1709) · <b>Anchors:</b> checkboxes carry <code>aria-label={PART_LABELS[k]}</code> (74).</p>
+    <table class="btns"><colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+      <tr><th>Button / control (exact)</th><th>What it does</th><th>Code path</th></tr>
+      <tr><td class="lbl">6 part checkboxes — Serial / Question / Reference / Options / Answer / Explanation (labels from PART_LABELS, redownload.ts 49)</td><td>picks what goes into the new file</td><td class="wire">onChange(kind, v) → setRdParts (1712) → buildRedownloadXml (511) at download time</td></tr>
+      <tr><td class="lbl">Renumber serials 1, 2, 3… — Switch (96)</td><td>1..N vs original numbers</td><td class="wire">onRenumberChange → setRdRenumber</td></tr>
+      <tr><td class="lbl">hint "Answer expansion on:" (110)</td><td>explains answer expansion — auto-shows when Options is off but Answer is on</td><td class="wire">display only</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="card-doc">
+  <div class="cd-head"><span class="nm">RedownloadQuestionsCard</span><span class="badge c">C</span><span class="path">src/components/mcq/redownload-questions-card.tsx</span><span>219 ln</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>UI name:</b> "3. Pick questions — {fileName}" (77) — one card per loaded file · <b>Where:</b> redownload work view (1719); shows a diagonal watermark overlay when the source docx has one (119–134) · <b>Testids:</b> <code>id="step-rd-questions"</code> (75).</p>
+    <table class="btns"><colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+      <tr><th>Button / control (exact)</th><th>What it does</th><th>Code path</th></tr>
+      <tr><td class="lbl">Select all / Deselect all / Select range</td><td>per-file selection helpers (Bengali/English digit range)</td><td class="wire">selectAllRd (1231) / selectNoneRd (1237) / selectRangeRd (1241)</td></tr>
+      <tr><td class="lbl">checkbox per question · Show more (N remaining)</td><td>tick / untick · paginate by 50</td><td class="wire">toggleRdQuestion (1222) · local setVisible</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="card-doc">
+  <div class="cd-head"><span class="nm">serial-extra-cards — 4 cards</span><span class="badge c">C</span><span class="path">src/components/mcq/serial-extra-cards.tsx</span><span>331 ln</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>1. ColorShuffleInfoCard</b> (14–60) — "This file has colored headers — they'll be stripped for shuffling" (34). Where: shuffle single-docx flow when the file has colors (1934). Button <b>Prefer color-based serials? Open in Serial mode</b> (55) → <code>openInSerialMode</code> (961) — moves the file into serial mode.</p>
+    <p class="cd-meta"><b>2. NoColorSerialCard</b> (62–112) — "No colored headers found in this file" (82). Where: serial mode, exactly 1 file without colors (1805). Controls: DownloadFormatToggle (96); button <b>Download continuous 1..N serial .docx/.pdf</b> (100) → <code>handleColorSerial({kind:"continuous"}, "continuous")</code> (786). Shows help text only when questionCount is 0.</p>
+    <p class="cd-meta"><b>3. BlockedLinesCard</b> (123–201) — "Stripped lines — N (not going into the shuffle)" (143). Where: shuffle mode when any file had headers/non-MCQ lines stripped (1889, 1942). Controls: <b>Show N more lines / Show less</b> (193/189) — local expand.</p>
+    <p class="cd-meta"><b>4. MultiSerialSchemeCard</b> (211–331) — "Per-file serial scheme" (247). Where: serial mode with ≥2 files (1818). Controls: per-file <b>Continuous</b> chip (285) + one chip per color → <code>onSchemeChange(id, scheme)</code> → <code>setSerialSchemes</code> (1821).</p>
+  </div>
+</div>
+
+<div class="card-doc">
+  <div class="cd-head"><span class="nm">SerialInputCard</span><span class="badge c">C</span><span class="path">src/components/mcq/serial-input-card.tsx</span><span>176 ln</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>UI name:</b> "MCQ Serial — upload files" (71) · <b>Where:</b> serial work view top (1759) · <b>Testids:</b> hidden main input <code>data-testid="serial-file-input"</code> (100).</p>
+    <table class="btns"><colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+      <tr><th>Button / control (exact)</th><th>What it does</th><th>Code path</th></tr>
+      <tr><td class="lbl">Tab Upload file (83) / Tab Paste (86)</td><td>switches input mode</td><td class="wire">local shadcn Tabs</td></tr>
+      <tr><td class="lbl">Click to select .docx files or drag &amp; drop (97)</td><td>loads + color-analyzes docx files</td><td class="wire">onFiles → loadSerialFiles(fs, false) (717) → analyzeColorDocx (color-serial 231)</td></tr>
+      <tr><td class="lbl">🔍 Detect questions (128)</td><td>parses pasted text; clears the file list (mutually exclusive)</td><td class="wire">onPasteDetect → handleSerialPasteDetect (886) → parseMcq</td></tr>
+      <tr><td class="lbl">Add more files (161) · MultiFileList (143)</td><td>appends to the list · reorder = output order</td><td class="wire">loadSerialFiles(fs, true) · onReorder/onRemove → 767 / 776</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="card-doc">
+  <div class="cd-head"><span class="nm">SerialPasteCard</span><span class="badge c">C</span><span class="path">src/components/mcq/serial-paste-card.tsx</span><span>163 ln</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>UI name:</b> "Detection result (paste)" (51) · <b>Where:</b> serial work view only when files are absent and pasted text was detected (1778) · <b>Testids:</b> <code>id="serial-paste-result"</code> (47).</p>
+    <table class="btns"><colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+      <tr><th>Button / control (exact)</th><th>What it does</th><th>Code path</th></tr>
+      <tr><td class="lbl">🔧 Fix numbering automatically (busy: Fixing…)</td><td>renumbers pasted text 1..N</td><td class="wire">onFix → handleSerialPasteFix (917) → autoFixNumbering (parser 223)</td></tr>
+      <tr><td class="lbl">Download serial .docx (1..N) / .pdf variant</td><td>renumbers by position and exports one set</td><td class="wire">onDownload → handleSerialPasteDownload (935) → renumberQuestionsByPosition (serial-paste 17) → buildSetsDocxBlob (exporter 202) → finalizeDownload</td></tr>
+      <tr><td class="lbl">DownloadFormatToggle (139)</td><td>DOCX/PDF choice</td><td class="wire">updateDownloadFormat (363)</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="card-doc">
+  <div class="cd-head"><span class="nm">SetsResult</span><span class="badge c">C</span><span class="path">src/components/mcq/sets-result.tsx</span><span>318 ln</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>UI name:</b> "Shuffle complete — N set(s) (M questions)" (87) · <b>Where:</b> shuffle work view after a text-flow shuffle (2041) · <b>Testids:</b> <code>id="step-result"</code> (82), switch <code>id="include-header"</code> (199), datalists <code>legacy-fonts / unicode-fonts / english-fonts</code> (132/148/163).</p>
+    <table class="btns"><colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+      <tr><th>Button / control (exact)</th><th>What it does</th><th>Code path</th></tr>
+      <tr><td class="lbl">⚙️ Font &amp; header settings (Bijoy/Unicode) / Hide font/header settings (99)</td><td>opens the export settings panel</td><td class="wire">local setShowSettings; options state = page <code>exportOpts</code></td></tr>
+      <tr><td class="lbl">Font mode select — Auto — font per word / Bijoy / legacy font / Unicode Bengali / English</td><td>export font mode</td><td class="wire">patch({fontMode}) → buildSetsDocxBlob (exporter 202)</td></tr>
+      <tr><td class="lbl">Bijoy font / Unicode Bengali font / English font inputs · Font size (pt)</td><td>fonts + size written into the export</td><td class="wire">patch({legacyFont|unicodeFont|englishFont|fontSize}) → exporter.ts</td></tr>
+      <tr><td class="lbl">Set name style — Bengali label সেট A… / Bengali letters সেট ক… / Bengali digits সেট ১… / English — Set 1…</td><td>set naming (samples are real output strings written into files)</td><td class="wire">patch({nameStyle}) → getSetName (set-engine 93)</td></tr>
+      <tr><td class="lbl">Put a header on each set's page — Switch + Header text… textarea</td><td>per-set page header</td><td class="wire">patch({includeHeader, headerText}) → exporter.ts</td></tr>
+      <tr><td class="lbl">⬇️ Word (.docx) — one set per page / ⬇️ PDF variant</td><td>main export</td><td class="wire">onExportDocx → handleExportDocx (1574) → buildSetsDocxBlob → maybeRemapPackedDocx (192) → finalizeDownload</td></tr>
+      <tr><td class="lbl">.doc (legacy Word) (235) · 🖨️ Print (238) · 📋 Copy all sets (242)</td><td>HTML-based .doc · print window · clipboard text (PDF toggle does NOT affect the .doc button)</td><td class="wire">handleExportDoc (1590) → exportDocHtml (299) · handlePrint (1602) → printSets (306) · handleCopyAll (1623) → allSetsClipboardText (332)</td></tr>
+      <tr><td class="lbl">per set: Sort serial / Shuffle (273) · Copy / Copied (283)</td><td>re-sorts or reshuffles that set · copies it</td><td class="wire">onToggleSort → toggleSort (1557) · onCopySet → handleCopySet (1611)</td></tr>
+      <tr><td class="lbl">DownloadFormatToggle (224)</td><td>DOCX/PDF choice</td><td class="wire">updateDownloadFormat (363)</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="card-doc">
+  <div class="cd-head"><span class="nm">ShuffleCard</span><span class="badge m">M</span><span class="path">src/components/mcq/shuffle-card.tsx</span><span>242 ln</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>UI name:</b> "Shuffle settings &amp; start" (60) · <b>Where:</b> shuffle work view in ALL 3 sub-flows — text, single-docx, multi-file (1892, 1962, 2019) · <b>Testids:</b> <code>id="step-shuffle"</code> (56), input <code>id="set-count"</code> (75), radios <code>dist-original / dist-inter / dist-chunk / dist-random</code> (122–145), switch <code>id="shuffle-within"</code> (164), radios <code>ref-keep / ref-strip / ref-endline</code> (190–204) inside <code>data-testid="ref-mode-group"</code> (187).</p>
+    <table class="btns"><colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+      <tr><th>Button / control (exact)</th><th>What it does</th><th>Code path</th></tr>
+      <tr><td class="lbl">How many sets? — number input + quick chips 3 4 5 10</td><td>set count 1–10</td><td class="wire">onSetCountChange → setSetCount (page state)</td></tr>
+      <tr><td class="lbl">Split style — ⭐ Original Shuffle — all questions in every set / Round-robin (interleaved) / Sequential blocks / Fully random split</td><td>distribution mode</td><td class="wire">onDistributionChange → setDistribution → buildSets (set-engine 46)</td></tr>
+      <tr><td class="lbl">Shuffle questions within each set — Switch (hidden for Original)</td><td>within-set order</td><td class="wire">onShuffleWithinChange → setShuffleWithin → buildSets</td></tr>
+      <tr><td class="lbl">Handle reference tags — Keep as-is / Strip references — clean question paper / Move to a separate line after each question</td><td>reference-tag policy (shown only when tags are detected)</td><td class="wire">onRefModeChange → setRefMode → buildRefEditedMap (reference 442) at export time</td></tr>
+      <tr><td class="lbl">🔀 Shuffle &amp; build sets (busy: Shuffling…, locked icon when disabled)</td><td>builds the sets</td><td class="wire">onShuffle → handleShuffle (1347) → handleTextShuffle (1318) / handleDocxShuffle (985) / handleMultiShuffle (1470)</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="card-doc">
+  <div class="cd-head"><span class="nm">TokText</span><span class="badge m">M</span><span class="path">src/components/mcq/tok-text.tsx</span><span>46 ln</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>UI name:</b> none — text render primitive. <code>TokText({line, dominant, colored=true})</code> (21) renders a line word-by-word: Bijoy words get the embedded SutonnyMJ web font (<code>tokfont-bijoy</code>), <code>colored</code> adds per-script classes (<code>tok tok-bijoy|unicode|english</code>). <b>Consumers:</b> both detect cards, sets-result, docx-sets-result, redownload-questions-card. Colors come from globals.css <code>--st-brand-*</code> tokens.</p>
+  </div>
+</div>
+
+<div class="card-doc">
+  <div class="cd-head"><span class="nm">UploadFirstCard (+ StagedFilesCard)</span><span class="badge m">M</span><span class="path">src/components/mcq/upload-first-card.tsx</span><span>218 ln</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>UI name:</b> "Upload a file first" (91) — the site's step-1 entry point · <b>Where:</b> the only visible card when there is no input at all (page 1665) · <b>Testids:</b> <code>id="step-upload"</code> (87). Tabs 99–143, detect button 146–154.</p>
+    <table class="btns"><colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+      <tr><th>Button / control (exact)</th><th>What it does</th><th>Code path</th></tr>
+      <tr><td class="lbl">Tab Upload file (102) / Tab Paste text (105)</td><td>switches input mode</td><td class="wire">local shadcn Tabs</td></tr>
+      <tr><td class="lbl">Click to select a file or drag &amp; drop (116)</td><td><b>staging-time validation:</b> every .docx must pass isValidDocxZip else toast "&lt;name&gt; is not a valid .docx"; .txt/.csv capped at 5MB — inline error "Text file too large (5MB max)" (59)</td><td class="wire">onFiles → stageFiles (305) → isValidDocxZip (file-pipeline 33); .txt → loadAndDetect (549); cap TEXT_MAX_BYTES (24)</td></tr>
+      <tr><td class="lbl">🔍 Detect questions (paste mode) (153, busy: Detecting…)</td><td>parses pasted text → jumps straight into the shuffle work view</td><td class="wire">onDetect → handleDetect (568) → parseMcq (parser 141)</td></tr>
+    </table>
+    <p class="cd-meta"><b>StagedFilesCard</b> (166–218, co-exported — there is NO staged-files-card.tsx file): "📁 {N} files ready — pick a mode now" (185); shown at step 2 above ModeTabs (1677). Control: icon-only <code>aria-label="Clear files"</code> (195) → <code>setStagedFiles(null)</code>.</p>
+  </div>
+</div>
+
+<div class="card-doc">
+  <div class="cd-head"><span class="nm">page.tsx — THE WIRING MOTHER</span><span class="badge m">M</span><span class="path">src/app/page.tsx</span><span>2080 ln</span></div>
+  <div class="cd-body">
+    <p class="cd-meta"><b>Role:</b> the single-page app shell and the ONLY stateful layer — every card is presentational and receives handlers as props. Renders the header (1639–1659: hero "MCQ Shuffler Pro" + badges "100% free" / "Data stays in your browser"), the main flow switch (1663–2069), and the footer (2073–2077).</p>
+    <p class="cd-meta"><b>Key state groups:</b> flow — <code>mode</code> (175), <code>stagedFiles</code> (179), <code>flowStep</code> (183) · text input — <code>rawText</code>, <code>parsed</code> (186–189) · single-docx — <code>docx</code> (192) · selection — <code>selected</code>, <code>allowBroken</code> (196–197) · shuffle config — <code>setCount</code>, <code>distribution</code>, <code>shuffleWithin</code>, <code>refMode</code> (201–206) · <b>fontSettings</b> (209, persisted <code>mcq-font-settings</code>) · <b>downloadFormat</b> (212, persisted <code>mcq-download-format</code>, DOCX default) · text results — <code>sets</code>, <code>renumber</code>, <code>exportOpts</code> (215–221) · serial — <code>serialDocs</code>, <code>serialSchemes</code>, <code>serialPaste*</code> (224–237) · shuffle multi — <code>shuffleItems</code> (242–247) · redownload — <code>rdDocs</code>, <code>rdParts</code>, <code>rdSel</code> (250–258).</p>
+    <p class="cd-meta"><b>Cross-cutting handlers:</b> <code>stageFiles</code> 305 · <code>updateFontSettings</code> 354 · <code>updateDownloadFormat</code> 363 · <code>finalizeDownload</code> 376 (DOCX → downloadBlob / PDF → docxBlobToPdfBlob) · <code>finalizeZipEntries</code> 387 · <code>changeMode</code> 397 · <code>backToHome</code> 408 · <code>handleAddMoreFiles</code> 427 · carry-over <code>carryToMode</code> 469 · <code>resetResults</code> 512.</p>
+    <p class="cd-meta"><b>Per-mode handlers:</b> text flow — 520/532/549/568/580/599/1318/1557/1574/1590/1602/1611/1623 · shuffle docx — 629/712/985/1013/1042/1067/1099–1150 · shuffle multi — 1360/1452/1464/1470/1496/1527 · serial — 717/767/776/786/827/859/886/917/935/961 · redownload — 1155/1202/1211/1222/1231–1249/1265/1291. <b>Shuffle dispatch:</b> <code>handleShuffle</code> (1347) = shuffleItems ? multi : docx ? docx : text.</p>
+  </div>
+</div>
+
+<!-- PART 4 -->
+<div class="chapter-header">
+  <div class="part-tag">Part 4</div>
+  <div class="section-title">Mode playbooks — trace any click end-to-end</div>
+  </div>
+<p class="body-text">Each playbook walks a real user action through the full code path. Read the line next to a step, open the file at that line, and you are standing exactly where a change would land.</p>
+
+<h3 class="sub">4.1 · Shuffle mode — single .docx flow</h3>
+<ol class="steps">
+  <li><b>Upload</b> on UploadFirstCard → <code>stageFiles</code> (page 305) → <code>isValidDocxZip</code> (file-pipeline 33) rejects fake docx files with an English toast.</li>
+  <li>Click <b>🔀 MCQ Shuffle</b> on ModeTabs → <code>changeMode</code> (397) → <code>carryToMode</code> (469) → <code>handleShuffleFiles</code> (1360) → single file → <code>handleDocxFile</code> (629) → <code>runFilePipeline</code> + <code>prepareShuffleXml</code> (125) strips color headers + non-MCQ lines → <code>parseDocxXml</code> (docx-xml 426) → state <code>docx</code>.</li>
+  <li><b>DocxDetectCard:</b> selection buttons → <code>selectAll / selectNone / selectRange</code> (1099–1111); broken serial → <b>🔧 Fix serial &amp; download .docx (1..N)</b> → <code>handleDocxSerialFix</code> (1042) → <code>buildSerialFixedDocxBlob</code> (docx-exporter 190) → <code>repackDocxRemapped</code> → <code>finalizeDownload</code> (376); or enable <b>Run as-is</b>.</li>
+  <li><b>ShuffleCard → 🔀 Shuffle &amp; build sets</b> → <code>handleShuffle</code> (1347) → <code>handleDocxShuffle</code> (985) → <code>buildSets</code> (set-engine 46) → <code>setsDocx</code> → auto-scroll to results.</li>
+  <li><b>DocxSetsResult:</b> <b>⬇️ Word (.docx) — renumbered / original</b> → <code>handleDocxDownload</code> (1013) → <code>buildShuffledDocxBlob</code> (170) → <code>buildShuffledXml</code> (90: XML surgery + renumber + refs) → <code>repackDocxRemapped</code> (font remap runs last) → <code>finalizeDownload</code>; if format is PDF → <code>docxBlobToPdfBlob</code> (pdf-export 80).</li>
+  <li>Color-header files additionally show <b>ColorShuffleInfoCard</b> (jump to serial mode via <code>openInSerialMode</code> 961) and <b>BlockedLinesCard</b>.</li>
+</ol>
+
+<h3 class="sub">4.2 · Shuffle mode — multi-file flow</h3>
+<ol class="steps">
+  <li><code>handleShuffleFiles</code> (1360) with ≥2 files (cap 50 — <code>SHUFFLE_MAX_FILES</code>, limits.ts 30; over-cap toast at 1371) → <code>runFilePipeline</code> + <code>prepareShuffleXml</code> per file → <code>shuffleItems</code>.</li>
+  <li>Inline files Card (1864) + <b>MultiFileList</b>: reorder / remove → <code>reorderShuffleItems</code> (1452) / <code>removeShuffleItem</code> (1464, clears previous results).</li>
+  <li><b>ShuffleCard</b> → <code>handleMultiShuffle</code> (1470): per-file <code>buildSets</code> → <code>shuffleMultiSets</code>.</li>
+  <li><b>MultiDownloadCard — Download as one file (.docx)</b> → <code>handleMultiMergedDownload</code> (1496): per file <code>buildShuffledXml</code> → <code>replaceDocumentXml</code> (multi-docx 268) → <code>buildMergedDocxBlob</code> (414, one container-level font remap) → finalize. <b>Download separately (.zip)</b> → <code>handleMultiZipDownload</code> (1527): per-file <code>replaceDocumentXml(file, xml, fontSettings)</code> → <code>finalizeZipEntries</code> (387) → <code>buildZipBlob</code> (556) → <code>MCQ-shuffled-files.zip</code>.</li>
+</ol>
+
+<h3 class="sub">4.3 · Shuffle mode — text / paste flow (also .txt)</h3>
+<ol class="steps">
+  <li>UploadFirstCard paste tab → textarea → <code>handleTextChange</code> (520; autosave <code>mcq-shuffler-text</code>, debounced 600 ms) or .txt upload → <code>loadAndDetect</code> (549) → <code>runTextParse</code> (532) → <code>parseMcq</code> (parser 141) → auto-jumps into the shuffle work view.</li>
+  <li><b>DetectCard:</b> selection / <b>🔧 Fix numbering automatically</b> → <code>handleAutoFix</code> (580) → <code>autoFixNumbering</code> (parser 223).</li>
+  <li><b>ShuffleCard</b> → <code>handleTextShuffle</code> (1318) → <code>buildSets</code> → <code>sets</code>.</li>
+  <li><b>SetsResult:</b> <b>⬇️ Word (.docx) — one set per page</b> → <code>handleExportDocx</code> (1574) → <code>buildSetsDocxBlob</code> (202; <code>maybeRemapPackedDocx</code> 192 applies the font remap) → finalize; <b>.doc (legacy Word)</b> → <code>handleExportDoc</code> (1590) → <code>exportDocHtml</code> (299); <b>🖨️ Print</b> → <code>handlePrint</code> (1602) → <code>printSets</code> (306); copy buttons → <code>handleCopySet</code> (1611) / <code>handleCopyAll</code> (1623).</li>
+</ol>
+
+<h3 class="sub">4.4 · Serial mode — file flow</h3>
+<ol class="steps">
+  <li><b>🔢 MCQ Serial</b> → SerialInputCard dropzone → <code>loadSerialFiles</code> (717) → <code>runFilePipeline</code> + <code>analyzeColorDocx</code> (color-serial 231) → <code>serialDocs</code> (schemes default to continuous).</li>
+  <li>Exactly 1 file <b>with</b> colors → <b>ColorSerialCard:</b> pick a color chip or <b>Continuous across the file</b> → <b>Download serial .docx (B1)</b> → <code>handleColorSerial</code> (786) → <code>planSerialByColor</code> (472) → <code>applyColorSerialXml</code> (648) + <code>repackDocxRemapped</code> → finalize.</li>
+  <li>Exactly 1 file <b>without</b> colors → <b>NoColorSerialCard → Download continuous 1..N serial .docx</b> → same <code>handleColorSerial</code> with <code>{kind:"continuous"}</code>.</li>
+  <li>≥2 files → <b>MultiSerialSchemeCard</b> (per-file scheme → <code>setSerialSchemes</code> 1821) + <b>MultiDownloadCard:</b> merged → <code>handleSerialMultiMerged</code> (827) → per-file plan/apply → <code>buildMergedDocxBlob(items, fontSettings)</code> → finalize (name "{base} (merged serial).docx"); ZIP → <code>handleSerialMultiZip</code> (859) → <code>MCQ-serial-files.zip</code>.</li>
+</ol>
+
+<h3 class="sub">4.5 · Serial mode — paste flow</h3>
+<ol class="steps">
+  <li>SerialInputCard Paste tab → <b>🔍 Detect questions</b> → <code>handleSerialPasteDetect</code> (886) → <code>parseMcq</code>; clears the file list (mutually exclusive).</li>
+  <li><b>SerialPasteCard:</b> <b>🔧 Fix numbering automatically</b> → <code>handleSerialPasteFix</code> (917) → <code>autoFixNumbering</code>; <b>Download serial .docx (1..N)</b> → <code>handleSerialPasteDownload</code> (935) → <code>renumberQuestionsByPosition</code> (serial-paste 17) → <code>buildSetsDocxBlob(…, {includeHeader:false, includeSetHeader:false, fileName:"MCQ-Serial-Nq.docx"}, fontSettings)</code> → finalize.</li>
+</ol>
+
+<h3 class="sub">4.6 · Redownload mode</h3>
+<ol class="steps">
+  <li><b>📥 MCQ Redownload</b> → RedownloadInputCard → <code>loadRedownloadFiles</code> (1155) → <code>runFilePipeline</code> with <code>parseRedownloadXml</code> (redownload 259) + <code>extractWatermark</code> (761) → <code>rdDocs</code>; all questions default-selected (1182).</li>
+  <li><b>RedownloadPartsCard:</b> six checkboxes → <code>setRdParts</code> (1712); <b>Renumber serials 1, 2, 3…</b> → <code>setRdRenumber</code>.</li>
+  <li><b>RedownloadQuestionsCard</b> per file: Select all / Deselect / Select range / checkboxes → page 1231–1246.</li>
+  <li><b>MultiDownloadCard "4. Download…":</b> <b>Download as one file (.docx)</b> → <code>handleRdMerged</code> (1265) → <code>buildRdItems</code> (1249) → <code>buildRedownloadXml</code> (511) → single file: <code>replaceDocumentXml</code> / many: <code>buildMergedDocxBlob</code> → finalize (names "{base} (redownload).docx" / "MCQ-Redownload-merged.docx"); <b>Download separately (.zip)</b> → <code>handleRdZip</code> (1291) → <code>MCQ-Redownload.zip</code>.</li>
+</ol>
+
+<!-- PART 5 -->
+<div class="chapter-header">
+  <div class="part-tag">Part 5</div>
+  <div class="section-title">Where to change common things — quick recipes</div>
+  </div>
+<p class="body-text">The lookup table below covers the edits you will most often ask for. The last column lists what must stay untouched so the edit stays safe — and, when a visible label changes, remember to sync the E2E selectors (Appendix) in the same commit.</p>
+
+<table class="ref">
+  <colgroup><col style="width:24%"><col style="width:24%"><col style="width:28%"><col style="width:24%"></colgroup>
+  <tr><th>I want to change…</th><th>Open this file</th><th>Touch this</th><th>Do NOT touch</th></tr>
+  <tr><td>Site font everywhere</td><td class="path">src/config/theme.ts</td><td><code>fonts.sans</code> (147); web-font recipe in the bottom comment (a)</td><td>globals.css font chain, theme-css.ts</td></tr>
+  <tr><td>Brand color (the green)</td><td class="path">src/config/theme.ts</td><td><code>colors.light.brand</code> 600/700 (+neighbors, 181–193); recipe (b)</td><td>--st-* var chain, component classes</td></tr>
+  <tr><td>Popup corners / toast shadow</td><td class="path">src/config/theme.ts</td><td><code>popup</code> object (254–261); recipe (c)</td><td>ui/toast.tsx / ui/select.tsx wiring</td></tr>
+  <tr><td>Corner radius of everything</td><td class="path">src/config/theme.ts</td><td><code>radius.base</code> (245) — one knob</td><td>sm/md/lg/xl (derived)</td></tr>
+  <tr><td>A card's title text</td><td>that card's component (Part 3 lists the exact line)</td><td>the <code>&lt;CardTitle&gt;</code> string</td><td>page.tsx props — unless the title is passed in (MultiDownloadCard titles come from page 1737/1824/1915)</td></tr>
+  <tr><td>A button label</td><td>that card's component</td><td>the <code>&lt;Button&gt;</code> text (many labels swap on .docx/.pdf — keep the <code>format === "pdf" ? …</code> template)</td><td>E2E selectors in scripts/e2e-*.ts — sync them in the same commit</td></tr>
+  <tr><td>Upload size limit (50 MB)</td><td class="path">src/lib/mcq/limits.ts</td><td><code>MAX_FILE_BYTES</code> (24) + <code>FILE_TOO_BIG_MSG</code> in file-pipeline.ts (24)</td><td>dropzone emit logic</td></tr>
+  <tr><td>Max files in shuffle (50)</td><td class="path">src/lib/mcq/limits.ts</td><td><code>SHUFFLE_MAX_FILES</code> (30)</td><td>mode-work-bar cap logic</td></tr>
+  <tr><td>The 3 mode names / emoji / icons</td><td class="path">src/lib/mcq/mode-meta.ts</td><td><code>MODE_META</code> (25–53): title / tabTitle / description / emoji / Icon</td><td>the id strings &amp; localStorage <code>mcq-shuffler-mode</code> values</td></tr>
+  <tr><td>Font choices in "Fonts in the output file"</td><td class="path">src/lib/mcq/font-remap.ts</td><td><code>FONT_CHOICES</code> (63–67)</td><td>nothing — <code>sanitizeFontSettings</code> (page 107) reads this list automatically</td></tr>
+  <tr><td>Default remap fonts</td><td class="path">src/lib/mcq/font-remap.ts</td><td><code>DEFAULT_FONT_REMAP_SETTINGS</code> (55–60)</td><td>repack-docx wiring</td></tr>
+  <tr><td>PDF page cap (300) / quality</td><td class="path">src/lib/mcq/pdf-export.ts</td><td><code>PDF_MAX_PAGES</code> (40), scale rule (157), JPEG quality (199/215)</td><td>the DOCX path</td></tr>
+  <tr><td>Download format default (DOCX)</td><td class="path">src/app/page.tsx</td><td><code>DOWNLOAD_FORMAT_KEY</code> (120), initial state (212), hydrate effect (345)</td><td>DownloadFormatToggle component</td></tr>
+  <tr><td>Set-name style output (সেট A / ক / ১ / Set 1)</td><td class="path">src/lib/mcq/set-engine.ts</td><td><code>getSetName</code> (93) + option labels in sets-result.tsx (190–193)</td><td>exported-file samples are functional strings</td></tr>
+  <tr><td>Parser keywords / question-start regex</td><td class="path">src/lib/mcq/parser.ts (Q_RE) · docx-xml.ts</td><td>⚠️ functional Bengali patterns — change only together with the unit tests (test-mcq.ts, test-docx.ts)</td><td>coupling with <code>MAX_SERIAL_NUMBER</code> (limits.ts 18)</td></tr>
+  <tr><td>.txt/.csv paste size cap (5 MB)</td><td class="path">src/components/mcq/upload-first-card.tsx</td><td><code>TEXT_MAX_BYTES</code> (24) + message (59)</td><td>—</td></tr>
+  <tr><td>Hero title / badges / footer</td><td class="path">src/app/page.tsx</td><td>header 1639–1659, footer 2073–2077</td><td>layout.tsx metadata</td></tr>
+  <tr><td>Output file names</td><td class="path">src/app/page.tsx (+ docx-exporter.ts)</td><td>merged/zip name templates (page 843/871/1305/1544/1278; suffixes 182/205)</td><td>finalizeDownload / finalizeZipEntries</td></tr>
+  <tr><td>localStorage keys</td><td class="path">src/app/page.tsx</td><td><code>STORAGE_KEY / MODE_KEY / FONT_SETTINGS_KEY / DOWNLOAD_FORMAT_KEY</code> (97–120)</td><td>hydration effects</td></tr>
+  <tr><td>Format-kept-exact zip surgery</td><td class="path">repack-docx.ts · multi-docx.ts · docx-xml.ts</td><td>mothers — edit only with the full test suite green</td><td>anything, without running scripts/test-*.ts</td></tr>
+</table>
+
+<div class="callout warn"><b class="tag">Before you push —</b> the safety net is: <code>npx tsc --noEmit</code> · <code>npx eslint src</code> · unit tests <code>bun run scripts/test-mcq.ts</code> (+ test-docx, test-color-serial, test-multi-docx, test-redownload, test-reference, test-font-remap — 530+ assertions) · E2E <code>bun run scripts/e2e-*.ts</code> (10 suites) · static export <code>STATIC_EXPORT=1 NEXT_PUBLIC_BASE_PATH=/MCQ_Shuffler_Pro npx next build</code> → <code>bash scripts/deploy-pages.sh &lt;token&gt;</code>.</div>
+
+<h3 class="sub">Appendix — quick E2E anchor cross-reference</h3>
+<p class="body-text">Selectors the automated tests depend on — if you rename one of these labels, update the matching selector in the same commit:</p>
+<table class="ref">
+  <colgroup><col style="width:30%"><col style="width:70%"></colgroup>
+  <tr><th>E2E script</th><th>Anchors used</th></tr>
+  <tr><td class="path">scripts/e2e-modes.ts</td><td><code>#step-result</code>, <code>#step-shuffle</code>, <code>#step-rd-questions</code>, "Download as one file (.docx)", "Download separately (.zip)", <code>button[aria-label="Move up"]</code>, <code>button[aria-label="Remove from list"]</code>, "Select all" (exact) / "Deselect all", <code>input[placeholder="From"/"To"]</code>, "Select range", "Word (.docx)", "1/50 files", <code>button[role="tab"]:has-text("MCQ Shuffle")</code>.</td></tr>
+  <tr><td class="path">scripts/e2e-pdf-export.ts</td><td><code>data-testid="download-format"</code>, <code>format-docx</code>, <code>format-pdf</code>.</td></tr>
+  <tr><td class="path">scripts/e2e-font-remap.ts</td><td><code>data-testid="font-settings-card"</code>, select ids <code>font-unicode / font-bijoy</code>, "Use fonts".</td></tr>
+  <tr><td class="path">other suites</td><td>e2e-mode-tabs · e2e-multi-file · e2e-shuffle-headers · e2e-shuffle-limit · e2e-reference · e2e-live-bare-ref · e2e-back-home — mode tabs, staged texts, work-bar and card titles.</td></tr>
+</table>
+
+
+<h3 class="sub">What shipped in this edition (v1.0 of the guide)</h3>
+<table class="ref">
+  <colgroup><col style="width:30%"><col style="width:70%"></colgroup>
+  <tr><th>Feature</th><th>Where it lives now</th></tr>
+  <tr><td>English UI (all cards, toasts, labels)</td><td>every component in <span class="path">src/components/mcq/</span>; <code>lang="en"</code> in layout.tsx; E2E selectors synced in <span class="path">scripts/e2e-*.ts</span></td></tr>
+  <tr><td>Font remap in output files</td><td>engine <span class="path">src/lib/mcq/font-remap.ts</span> + card <span class="path">font-settings-card.tsx</span> wired into all 11 export call sites via <code>repackDocxRemapped</code></td></tr>
+  <tr><td>DOCX / PDF download toggle</td><td><span class="path">download-format-toggle.tsx</span> + <span class="path">pdf-export.ts</span> (docx-preview → html2canvas-pro → jsPDF, A4 slicing, 300-page cap)</td></tr>
+  <tr><td>One-place site theme</td><td><span class="path">src/config/theme.ts</span> → CSS vars → Tailwind brand utilities (246 classes migrated)</td></tr>
+  <tr><td>Multi-agent review fixes</td><td>destructive-foreground token, PDF page slicing, staging-time zip validation, toast feedback for rejected files, a11y + hydration guards</td></tr>
+</table>
+</div><!-- /main-content -->
+
+<!-- ============ ENDING ============ -->
+<div class="ending">
+  <div class="big">Change one card.<br><span class="green">Never the whole project.</span></div>
+  <p style="margin-top:18px;">That is what the mother / child architecture buys you: cards live in their own files, buttons trace to named handlers, shared behavior lives in the mothers of Part 2, and the whole site's look obeys one file — <b>src/config/theme.ts</b>.</p>
+  <p>Keep the test suite green, keep the E2E selectors in sync, and every future edit stays a five-minute job.</p>
+  <div class="foot"><span>MCQ Shuffler Pro — Project Guide · Edition 1 · September 2026</span><span>generated from the verified codebase map</span></div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,46 @@
+# MCQ Shuffler Pro — Free MCQ Shuffler & Exam Set Generator
+
+### 🔗 [**Try it live →**](https://afnan-samin.github.io/MCQ_Shuffler_Pro/)
+
+![Deploy](https://github.com/afnan-samin/MCQ_Shuffler_Pro/actions/workflows/deploy.yml/badge.svg)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Client-side](https://img.shields.io/badge/100%25-client--side-brightgreen)
+![Next.js](https://img.shields.io/badge/Next.js-16-black)
+![TypeScript](https://img.shields.io/badge/TypeScript-blue)
+
+A completely free web tool that shuffles MCQ questions into multiple exam sets. It reads questions from Word (.docx), text and CSV files, detects and auto-fixes serial numbers, and exports exam-ready Word files. **100% client-side** — no file ever leaves your browser.
+
+## Key features
+
+- **Shuffle + set building** — Fisher-Yates shuffle; multiple sets with interleaved / chunk / random distributions, or all questions in every set (Original Shuffle)
+- **Color serial** — serializes questions per colored header section; per-file serial schemes with merge/ZIP export
+- **Multi-file merge + ZIP** — process several .docx files at once and download one merged .docx or a ZIP of separate files
+- **Redownload** — pick questions/parts (serial, question, options, answer, explanation) from uploaded files into a new .docx
+- **Bijoy ↔ Unicode detection** — word-by-word detection of Bijoy (ANSI) / Unicode Bengali / English with color preview; broken-serial detection + one-click auto-fix
+- **Reference tags** — keep, strip, or move `[CU-A: 22-23]`-style source tags when shuffling
+- **Privacy** — the whole pipeline runs in the browser; no API routes, no uploads
+
+## Download formats
+
+Every download card shows a **"Download as"** toggle before you download: **DOCX (default)** or **PDF**. The choice is remembered in your browser (`localStorage: mcq-download-format`).
+
+- **DOCX** — byte-faithful Word output (original formatting, tabs, equations, fonts); this is the recommended format.
+- **PDF** — the generated DOCX is rendered in your browser (docx-preview → canvas → jsPDF) and packed as PDF. Single outputs download as `.pdf`; multi-file outputs pack all PDFs into the same ZIP that the DOCX path would produce (entries renamed `*.pdf`). This is **best-effort**: PDF is a rendered snapshot, and legacy Bijoy fonts (SutonnyMJ, etc.) appear correctly only if those fonts are installed on the viewer's device — otherwise the browser substitutes a fallback font. Documents that rely on style-level/theme fonts (rather than run-level fonts) keep those fonts in the PDF, and export is capped at **300 pages per file** — for longer documents, download as DOCX instead.
+
+The legacy `.doc (legacy Word)` button and the Print button are unaffected by the toggle.
+
+## Local development
+
+```bash
+bun install
+bun run dev        # http://localhost:3000
+```
+
+## Tech stack
+
+Next.js 16 (App Router, Turbopack) + Tailwind CSS v4 + shadcn/ui + TypeScript. Fonts: Kalpurush and SutonnyMJ (embedded via `next/font/local`).
+
+## Notes for developers
+
+- The UI is English, but **functional Bengali stays**: the parser understands Bengali exam markers (`১.`, `ক)`, `উত্তর`, `উঃ`), Bengali digits (`০১২৩৪৫৬৭৮৯`), and output .docx files keep Bengali set-name styles (`সেট A/ক/১`) and `উত্তরমালা` headers — these are product decisions.
+- Unit tests live in `scripts/test-*.ts` (run with `bun run scripts/test-mcq.ts` etc.); browser E2E scripts are `scripts/e2e-*.ts` and expect the dev server on `localhost:3000`.
