@@ -243,6 +243,10 @@ export function buildShuffledXml(
     refMode === "keep"
       ? null
       : buildRefEditedMap(doc, questions, refMode, (q) => {
+            // প্রশ্নের মাঝে হারিয়ে-যাওয়া ব্লব (খালি অপশন-লাইন / UwcK-ref লাইন —
+            // ৪-লাইন উইন্ডোতে অপশন-মার্কার ২-এর কম) প্রি-কনটেন্টে রাখা — ড্রপ নয়।
+            // শর্ত: question-content নয় (+ ট্যাব-লেড নয় — ট্যাব-লেড সবসময় কনটেন্ট)।
+
           const els: Element[] = [];
           for (let i = q.blockStart; i <= q.blockEnd; i++) {
             const src = kids[i];
