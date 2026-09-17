@@ -67,7 +67,7 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${displaySerif.variable} ${sutonny.variable} ${geistSans.variable} ${geistMono.variable} ${notoBengali.variable}`}
     >
-      <body className="antialiased bg-background text-foreground">
+      <body className="min-h-screen antialiased bg-background text-foreground">
         {/* Site theme tokens (fonts/colors/radius/popups) — generated from
             src/config/theme.ts, the ONE place that controls the whole look. */}
         <style dangerouslySetInnerHTML={{ __html: themeCss }} />

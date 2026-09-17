@@ -2,7 +2,8 @@
 // Weekly-file (SET A/B/C) regression — non-question blobs survive shuffle
 // রান: bun run scripts/test-weekly-sets.ts
 // কভার করে: খালি অপশন-লাইন ("A. B."), UwcK-ref লাইন, Topic-লাইন,
-//   ফাইল-মেটা (Sub:/Time:) একবার, প্রতি-সেটে "Set X" হেডার, কোনো ড্রপ/ডুপ্লিকেট নয়
+//   ফ্রন্ট-ম্যাটার (Sub:/Time:) প্রতিটি সেটে, প্রতি-সেটে "Set X" হেডার,
+//   কোনো ড্রপ/ডুপ্লিকেট নয়
 // ============================================================
 
 import { readFileSync } from "node:fs";
@@ -52,8 +53,26 @@ const texts = Array.from(outDoc.getElementsByTagNameNS(NS, "body")[0].children).
 const count = (re: RegExp, s: string) => (s.match(re) ?? []).length;
 ok(count(/Uwc/g, out) === count(/Uwc/g, xml), `Uwc-লাইন সব অক্ষত (${count(/Uwc/g, out)})`);
 ok(count(/Topic/g, out) === count(/Topic/g, xml), `Topic-লাইন সব অক্ষত (${count(/Topic/g, out)})`);
-ok(texts.filter((t) => t.includes("Sub:")).length === 1, "ফাইল-মেটা (Sub:) ঠিক ১ বার — প্রতি-সেটে ডুপ্লিকেট নয়");
-ok(texts.filter((t) => /^Set [A-Z]/.test(t.trim())).length === 3, "৩ সেটে ৩টা Set-হেডার");
+ok(texts.filter((t) => t.includes("Sub:")).length === sets.length, "ফ্রন্ট-ম্যাটার (Sub:) প্রতিটি সেটের উপরে — ৩ সেটে ৩ বার");
+ok(texts.filter((t) => t.includes("Time:")).length === sets.length, `Time:-লাইনও প্রতি সেটে (${texts.filter((t) => t.includes("Time:")).length} বার)`);
+ok(
+  texts.filter((t) => /^Set [A-Z]/.test(t.trim())).length === 3,
+  "৩ সেটে ৩টা Set-হেডার"
+);
+// প্রতি সেটে ফ্রন্ট-ম্যাটার সেট-হেডারের ঠিক আগে, আর সেট-হেডার ওই সেটের প্রশ্নের আগে
+{
+  const setHdrIdxs = texts.map((t, i) => (/^Set [A-Z]/.test(t.trim()) ? i : -1)).filter((i) => i >= 0);
+  const subIdxs = texts.map((t, i) => (t.includes("Sub:") ? i : -1)).filter((i) => i >= 0);
+  const timeIdxs = texts.map((t, i) => (t.includes("Time: 50 minute") ? i : -1)).filter((i) => i >= 0);
+  const qIdxs = texts.map((t, i) => (/^\s*\d+[.)]/.test(t) ? i : -1)).filter((i) => i >= 0);
+  const firstQAfter = (from: number) => qIdxs.find((i) => i > from) ?? texts.length;
+  ok(
+    setHdrIdxs.length === 3 &&
+      subIdxs.every((s, k) => s < setHdrIdxs[k] && setHdrIdxs[k] < firstQAfter(setHdrIdxs[k])) &&
+      timeIdxs.every((t, k) => t > subIdxs[k] && t < setHdrIdxs[k]),
+    `প্রতি সেটে Sub:/Time: সেট-হেডারের আগে ও প্রশ্নের আগে [set=${JSON.stringify(setHdrIdxs)}, sub=${JSON.stringify(subIdxs)}, time=${JSON.stringify(timeIdxs)}]`
+  );
+}
 ok(count(/Gi Ea/g, out) === count(/Gi Ea/g, xml), "GiEa-ব্লব অক্ষত");
 
 console.log("\n== ৩) শাফলে টেইল নিজের প্রশ্নের সাথে ==");

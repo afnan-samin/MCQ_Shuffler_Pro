@@ -16,6 +16,8 @@ import {
   looksOptionLed,
   ANSWER_TAIL_RE,
   BEKKHA_LINE_RE,
+  isSectionSeparator,
+  isExamTitleLine,
   type DocxQuestion,
 } from "./docx-xml";
 import {
@@ -148,8 +150,9 @@ function makePageBreakPara(doc: Document): Element {
  *
  * ফরম্যাট-প্রিজার্ভেশন (আপলোড করা ফাইলের লুক হুবহু): প্রশ্ন-ব্লকের বাইরের
  * কনটেন্টও থাকে —
- *   • প্রি-কনটেন্ট: প্রথম প্রশ্নের আগের সব (পরীক্ষার টাইটেল/প্রতিষ্ঠান/নির্দেশনা)
- *     — একবার, ডকুমেন্টের একদম উপরে
+ *   • ফ্রন্ট-ম্যাটার: প্রথম প্রশ্নের আগের সব (পরীক্ষার টাইটেল/প্রতিষ্ঠান/ছবি/
+ *     নির্দেশনা) — **প্রতিটি সেটের শুরুতে** হুবহু রিপিট হয় (প্রতি সেটই আলাদা
+ *     প্রশ্নপত্র; Set B/C-তেও হেডিং/ছবি থাকে)
  *   • লিডিং-গ্যাপ: আগের প্রশ্নের শেষ থেকে এই প্রশ্নের শুরুর মাঝের প্যারা
  *     (সেকশন-হেডার/ফাঁকা-স্পেসিং) — প্রশ্নের সাথেই শাফল হয়
  *   • পোস্ট-কনটেন্ট: শেষ প্রশ্নের পরের সব (উত্তরমালা/সমাপ্তি-লাইন) — একবার,
@@ -182,7 +185,16 @@ export function buildShuffledXml(
   };
   const firstStart = docOrder.length ? docOrder[0].blockStart : kids.length;
   const lastEnd = docOrder.length ? docOrder[docOrder.length - 1].blockEnd : -1;
-  const preContent = sliceElems(0, firstStart);
+  // frontMatter = প্রথম প্রশ্নের **আগের সব কিছু**, হুবহু ডক-ক্রমে — পরীক্ষার
+  // টাইটেল/প্রতিষ্ঠানের নাম, ফাইল-মেটা (Sub:/Time:), নির্দেশনা, লোগো-ছবি,
+  // ছবির-প্যারা (যার কোনো w:t টেক্সট নেই — আগে "খালি প্যারা" ভেবে বাদ পড়ত),
+  // হেডার-টেবিল (tbl/altChunk) — কোনো ফিল্টার নেই, কিছুই হারায় না।
+  // ⚠️ প্রতিটি সেটের **শুরুতে** এটা রিপিট হয় (নিচে emitFrontMatter) — প্রতি সেটই
+  // আলাদা প্রশ্নপত্র, তাই ছবি/হেডিং প্রতিটি সেটের প্রশ্নের উপরে থাকা চাই।
+  // আগে ফ্রন্ট-ম্যাটার শুধু ডক-শুরুতে একবার বসত → Set B/C-তে হেডার/ছবি থাকত না।
+  // এই কারণেই gapBefore-লুপ firstStart থেকে শুরু (প্রথম প্রশ্নের গ্যাপ খালি —
+  // ফ্রন্ট-ম্যাটারে ঢুকে গেছে, তাই কোনো ডুপ্লিকেট নেই)।
+  const frontMatter = sliceElems(0, firstStart);
   const gapBefore = new Map<number, Element[]>();
   let prevEnd = firstStart - 1;
   for (const q of docOrder) {
@@ -205,11 +217,40 @@ export function buildShuffledXml(
   /** প্রশ্নের বাইরের কোনো কনটেন্ট-প্যারা (অ-খালি) কিনা — প্যারা নয় এমন এলিমেন্ট (টেবিল) সবসময় কনটেন্ট */
   const isBlankGapEl = (el: Element): boolean => el.localName === "p" && !paraTextOfEl(el).trim();
   /**
-   * প্রশ্নের ব্লকের শেষ-প্রান্তে লেগে থাকা নন-প্রশ্ন প্যারা (যেমন পরের সেকশনের
-   * হেডার — পার্সার সেটা আগের প্রশ্নের ব্লকে গিলে ফেলে, তাই শাফলে প্রশ্নের
-   * সাথেই ঘোরে) → ক্রম বদলালে এগুলোও পিন হবে, প্রশ্নের ব্লকে থাকবে না।
-   * খালি স্পেসার বা আসল কনটেন্ট পেলেই থেমে যায় — শুধু ফরেন টেক্সট-প্যারা বাদ।
+   * গ্যাপে থাকা নিরীহ নন-প মার্কার (bookmark/comment-রেঞ্জ — Word-এর তৈরি
+   * শূন্য-টেক্সট বডি-চাইল্ড) — পিন/রেন্ডার থেকে বাদ যাবে। এদের বাইরে সব নন-প
+   * (তালিকা/টেবিল/altChunk...) = আসল কনটেন্ট — কখনোই বাদ দেওয়া যাবে না
+   * (প্রোব-প্রমাণিত: শাফলে টেবিল gapBefore-এ পড়ে গেলে নীরবে হারাতো)।
    */
+  const HARMLESS_NON_P = new Set([
+    "bookmarkStart",
+    "bookmarkEnd",
+    "commentRangeStart",
+    "commentRangeEnd",
+    "proofErr",
+  ]);
+  /**
+   * ব্লক-টেইলের নন-প্রশ্ন লাইন — শুধু সেপারেটর-সদৃশগুলোই ডক-ক্রমে পিন হবে
+   * (PHYSICS-সেপারেটর, পরীক্ষা-টাইটেল — আসল সেকশন-হেডার)। প্রথমে
+   * isQuestionContentPara দিয়ে ব্যাখ্যা/অপশন/উত্তর বাদ; তারপর এখানে
+   * UwcK/Topic-জাতীয় প্রশ্ন-টেইল বাদ — সেগুলো ব্লকেই থাকে, প্রশ্নের সাথে ঘোরে।
+   * ("Part A - Physics" সেপারেটর-সদৃশ নয় — gapBefore-এ পিন হয়ে ফ্রন্ট-ম্যাটারে যায়।)
+   */
+  /** "Part A - Physics" / "Part 1: Chemistry" — ইংরেজি সেকশন-হেডার (পরীক্ষায় খুব কমন)।
+   * ওপরের isQuestionContentPara-গার্ডের পরে বলা হয় বলে প্রশ্ন-বডির ভেলোটেক্সট
+   * এখানে পৌঁছায়ই না — শুধু ব্লক-টেইল অথবা গ্যাপের প্যারা পিন হয়। */
+  const isPartHeader = (txt: string): boolean => {
+    const t = txt.trim();
+    if (t.length < 8 || t.length > 60) return false;
+    if (!/^Part\s+[A-Za-z0-9]\s*[-–—:]\s*/i.test(t)) return false;
+    return !isQuestionContentPara(t);
+  };
+  const isForeignTailLine = (txt: string): boolean =>
+    !txt.trim() || isQuestionContentPara(txt)
+      ? false
+      : isExamTitleLine(txt) || isSectionSeparator(txt) || isPartHeader(txt);
+  // ব্লকের নিচের ফরেন-টেইল স্ক্যান করে কোর-সীমা: ফরেন-লাইন পেলেই টেইল-শুরু;
+  // ব্যাখ্যা/অপশন/উত্তর/UwcK/Topic-লাইন বা খালি-স্পেসার/টেবিল পেলেই থামো।
   const coreEnd = new Map<number, number>();
   const pinned: Element[] = [];
   if (orderChanged) {
@@ -221,17 +262,25 @@ export function buildShuffledXml(
         if (el.localName !== "p") break; // টেবিল/অন্য এলিমেন্ট = কনটেন্ট — থামো
         const txt = paraTextOfEl(el);
         if (!txt.trim()) break; // খালি স্পেসার — প্রশ্নের সাথেই থাকুক
-        if (isQuestionContentPara(txt)) break; // আসল কনটেন্ট — থামো
+        if (!isForeignTailLine(txt)) break; // কনটেন্ট/UwcK/Topic/ব্যাখ্যা — ব্লকেই থাকুক
         tailStart = i;
       }
       coreEnd.set(q.id, tailStart - 1);
-      // ডকুমেন্ট-ক্রমেই পিন: ব্লকের ফরেন-টেইল আগে, তারপর ব্লকের আগের গ্যাপ
+      // ডকুমেন্ট-ক্রমেই পিন: ব্লকের ফরেন-টেইল আগে, তারপর ব্লকের আগের গ্যাপ।
+      // gapBefore(m)-এ ফ্রন্ট-ম্যাটার-ডুপ্লিকেট নেই (firstStart-বিভাজন)।
       for (let i = tailStart; i <= q.blockEnd; i++) {
         const el = kids[i];
-        if (el && el.localName !== "sectPr") pinned.push(el);
+        if (el && el.localName === "sectPr") continue;
+        if (el && el.localName !== "p") continue; // bookmarkEnd-জাতীয় নন-p পিন হয় না
+        if (el) pinned.push(el);
       }
       for (const el of gapBefore.get(q.id) ?? []) {
-        if (!isBlankGapEl(el)) pinned.push(el);
+        if (el.localName === "p") {
+          if (!isBlankGapEl(el)) pinned.push(el);
+        } else if (!HARMLESS_NON_P.has(el.localName)) {
+          // টেবিল/altChunk-জাতীয় আসল কনটেন্ট — একবার পিন, কোনোমতেই হারবে না
+          pinned.push(el);
+        }
       }
     }
   }
@@ -262,13 +311,23 @@ export function buildShuffledXml(
   // body খালি করি — এলিমেন্টগুলো kids অ্যারেতে ধরা আছে, সেখান থেকেই ক্লোন হবে
   while (body.firstChild) body.removeChild(body.firstChild);
 
-  // প্রি-কনটেন্ট (টাইটেল/নির্দেশনা) — হুবহু ক্লোন, একবার
-  for (const el of preContent) body.appendChild(el.cloneNode(true));
-  // Shuffled order: hoist non-empty gap content once, in document order (Phase 1.1).
-  for (const el of pinned) body.appendChild(el.cloneNode(true));
+  /**
+   * ফ্রন্ট-ম্যাটার = ডক-শুরুর কনটেন্ট (টাইটেল/ছবি/নির্দেশনা) + শাফলে-পিন হওয়া
+   * সেকশন-হেডার — প্রতিটি সেটের শুরুতে হুবহু ক্লোন হয়। কোনো সেটের উপরে হেডার/
+   * ছবি বাদ পড়ে না; প্রশ্নের সাথে ভুল প্রশ্নের গায়েও আটকায় না (Phase 1.1)।
+   */
+  const emitFrontMatter = () => {
+    for (const el of frontMatter) body.appendChild(el.cloneNode(true));
+    for (const el of pinned) body.appendChild(el.cloneNode(true));
+  };
+
+  // প্রশ্ন না থাকলে (ফাঁকা সেট-তালিকা) কনটেন্ট হারানো চলবে না — একবার লিখি
+  if (!sets.length) emitFrontMatter();
 
   sets.forEach((setIds, si) => {
     if (si > 0) body.appendChild(makePageBreakPara(doc));
+    // প্রতিটি সেটের শুরুতে পুরো ফ্রন্ট-ম্যাটার (হেডিং/ছবি/নির্দেশনা) রিপিট
+    emitFrontMatter();
     if (opts.includeSetHeader) body.appendChild(makeSetHeaderPara(doc, englishSetName(si), docFont));
 
     setIds.forEach((qid, qi) => {

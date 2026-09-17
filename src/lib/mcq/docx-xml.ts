@@ -489,19 +489,36 @@ export function findStarAnswerLetter(text: string): string | null {
   const at: number[] = [];
   for (let i = 0; i < text.length; i++) if (text[i] === "*") at.push(i);
   if (!at.length) return null;
-  const labelAfter = /^\s*([KLMNklmnকখগঘa-dA-D])\s*[.।):]/;
+  const labelAfter = /^[ \t]*([KLMNklmnকখগঘa-dA-D])\s*[.।):]/;
   const labelScan = /([KLMNklmnকখগঘa-dA-D])\s*[.।):]/g;
   for (const s of at) {
-    // ① স্টারের ঠিক পরেই লেবেল ("*C. টেক্সট" / "*A.B.")
-    const after = labelAfter.exec(text.slice(s + 1));
-    if (after) return after[1];
-    // ② স্টারের আগের নিকটতম লেবেল — ওই অপশনের টেক্সটের শেষেই স্টার
-    const before = text.slice(0, s);
+    // স্টার আগের টেক্সটের সাথে গ্লুড (স্পেস ছাড়া) কি না — "…প্লাসমোডেসমা*" হ্যাঁ,
+    // "*A. ডিম" / "  * খ. …" না। গ্লুড মানে স্টারটা আগের অপশনের টেক্সটের শেষে
+    // (টাইমারের নিয়ম), তাই আগের লেবেলটাই উত্তর।
+    const prev = s > 0 ? text[s - 1] : "";
+    const glued = prev !== "" && !/[\s(]/.test(prev);
+    // লাইন-বাউন্ডারি কখনো পার হয় না: "C. প্লাসমোডেসমা*\nD. মিউটেশন" — পরের
+    // লাইনের "D." কে স্টারের উত্তর ভাবা চলবে না (আসল উত্তর "C.")
+    const lineStart = text.lastIndexOf("\n", s - 1) + 1;
+    const before = text.slice(lineStart, s);
     labelScan.lastIndex = 0;
     let last: RegExpExecArray | null = null;
     let mm: RegExpExecArray | null;
     while ((mm = labelScan.exec(before))) last = mm;
-    if (last) return last[1];
+
+    if (glued) {
+      // ① স্টারের আগের নিকটতম লেবেল — ওই অপশনের টেক্সটের শেষেই স্টার
+      if (last) return last[1];
+      // ② ব্যাকআপ: স্টারের পরেই লেবেল (বিরল)
+      const after = labelAfter.exec(text.slice(s + 1));
+      if (after) return after[1];
+    } else {
+      // ① স্টারের ঠিক পরেই লেবেল ("*C. টেক্সট" / "*A.B.")
+      const after = labelAfter.exec(text.slice(s + 1));
+      if (after) return after[1];
+      // ② ব্যাকআপ: স্টারের আগের নিকটতম লেবেল
+      if (last) return last[1];
+    }
   }
   return null;
 }

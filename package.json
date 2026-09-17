@@ -22,7 +22,8 @@
     "test:font": "bun run scripts/test-font-remap.ts",
     "test:labels": "bun run scripts/test-option-labels.ts",
     "test:splits": "bun run scripts/test-redownload-splits.ts",
-    "test:all": "bun run test:mcq && bun run test:docx && bun run test:color && bun run test:multi && bun run test:font && bun run test:labels && bun run test:redownload && bun run test:splits && bun run test:reference && bun run test:doc1 && bun run test:export && bun run test:pdf"
+    "test:weekly": "bun run scripts/test-weekly-sets.ts",
+    "test:all": "bun run test:mcq && bun run test:docx && bun run test:color && bun run test:multi && bun run test:font && bun run test:labels && bun run test:redownload && bun run test:splits && bun run test:weekly && bun run test:reference && bun run test:doc1 && bun run test:export && bun run test:pdf"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.2",

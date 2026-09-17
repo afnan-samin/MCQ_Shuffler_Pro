@@ -1425,25 +1425,46 @@ function findStarAnswer(
   const lt = tabbedText ?? text;
   const atT: number[] = [];
   for (let i = 0; i < lt.length; i++) if (lt[i] === "*") atT.push(i);
-  const labelAfter = /^\s*([KLMNklmnকখগঘa-dA-D])\s*[.।):]/;
+  const labelAfter = /^[ \t]*([KLMNklmnকখগঘa-dA-D])\s*[.।):]/;
   const labelScan = /([KLMNklmnকখগঘa-dA-D])\s*[.।):]/g;
   let letter: string | null = null;
   for (const s of atT) {
-    // ① স্টারের ঠিক পরেই লেবেল ("*C. টেক্সট" / "*A.B.")
-    const after = labelAfter.exec(lt.slice(s + 1));
-    if (after) {
-      letter = after[1];
-      break;
-    }
-    // ② স্টারের আগের নিকটতম লেবেল — ওই অপশনের টেক্সটের শেষেই স্টার
-    const before = lt.slice(0, s);
+    // স্টার আগের টেক্সটের সাথে গ্লুড কি না ("টেক্সট*" হ্যাঁ, "*A." না) —
+    // গ্লুড হলে স্টারটা আগের অপশনের টেক্সটের শেষে, তাই আগের লেবেলই উত্তর
+    // (docx-xml.findStarAnswerLetter-এর হুবহু একই নিয়ম)।
+    const prev = s > 0 ? lt[s - 1] : "";
+    const glued = prev !== "" && !/[\s(]/.test(prev);
+    // লাইন-বাউন্ডারি পার হয় না — "…টেক্সট*\nD. মিউটেশন"-এ পরের লাইনের "D." নয়
+    const lineStart = lt.lastIndexOf("\n", s - 1) + 1;
+    const before = lt.slice(lineStart, s);
     labelScan.lastIndex = 0;
     let last: RegExpExecArray | null = null;
     let mm: RegExpExecArray | null;
     while ((mm = labelScan.exec(before))) last = mm;
-    if (last) {
-      letter = last[1];
-      break;
+
+    if (glued) {
+      // ① স্টারের আগের নিকটতম লেবেল
+      if (last) {
+        letter = last[1];
+        break;
+      }
+      const after = labelAfter.exec(lt.slice(s + 1));
+      if (after) {
+        letter = after[1];
+        break;
+      }
+    } else {
+      // ① স্টারের ঠিক পরেই লেবেল ("*C. টেক্সট" / "*A.B.")
+      const after = labelAfter.exec(lt.slice(s + 1));
+      if (after) {
+        letter = after[1];
+        break;
+      }
+      // ② ব্যাকআপ: স্টারের আগের নিকটতম লেবেল
+      if (last) {
+        letter = last[1];
+        break;
+      }
     }
   }
   if (!letter) return null;

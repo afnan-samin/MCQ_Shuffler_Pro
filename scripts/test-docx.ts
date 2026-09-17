@@ -118,9 +118,10 @@ function countRunTabsIn(x: string): number {
   ok(out1.lastIndexOf("<w:sectPr") > out1.lastIndexOf(">Set B<"), "sectPr একদম শেষে আছে");
 
   console.log("\n== ৪b) ফরম্যাট-প্রিজার্ভেশন (প্রশ্ন-ব্লকের বাইরের কনটেন্ট) ==");
-  // রিয়েল ফিক্সচার: প্রি-কনটেন্ট ("A"+"PHYSICS") একবার + সেকশন-গ্যাপ ("B".."F"+"PHYSICS") প্রশ্নের সাথে
+  // রিয়েল ফিক্সচার: ফ্রন্ট-ম্যাটার ("A"+"PHYSICS") প্রতিটি সেটের শুরুতে ×২ সেট
+  // + সেকশন-গ্যাপ ("B".."F"+"PHYSICS") প্রশ্নের সাথে (ক্রম না বদলানোয় নিজের জায়গায়)
   const physCount = (out1.match(/<w:t[^>]*>PHYSICS<\/w:t>/g) || []).length;
-  ok(physCount === 11, `PHYSICS হেডার প্রিজার্ভ: প্রি-১ + গ্যাপ ৫×২ সেট = ১১ [পেয়েছি ${physCount}]`);
+  ok(physCount === 12, `PHYSICS হেডার প্রিজার্ভ: ফ্রন্ট-১×২সেট + গ্যাপ ৫×২সেট = ১২ [পেয়েছি ${physCount}]`);
   ok(out1Parse.separators.includes("A") && out1Parse.separators.includes("B"), "A/B সেপারেটর-প্যারাও আউটপুটে থাকে");
   // সেট-হেডার এখন ডকুমেন্টের নিজের ফন্ট-ফ্যামিলিতে
   const srcDoc = new DOMParser().parseFromString(xmlText, "application/xml");
@@ -461,6 +462,110 @@ console.log("\n== ১৯) Word টেবিল (<w:tbl>) — পার্স + �
   );
 }
 console.log(`\n========================================`);
+console.log("\n== ২০) ফ্রন্ট-ম্যাটার (হেডিং/ছবি/টেবিল) প্রতিটি সেটের উপরে রিপিট ==");
+{
+  const W20 = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  const p20 = (text: string) =>
+    `<w:p xmlns:w="${W20}"><w:r><w:t xml:space="preserve">${text}</w:t></w:r></w:p>`;
+  // ছবির-প্যারা: কোনো w:t টেক্সট নেই (drawing-এ ইনলাইন ns — DOMParser খুশি থাকে)
+  const IMG_P =
+    `<w:p xmlns:w="${W20}"><w:r><w:drawing ` +
+    `xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">` +
+    `<wp:inline><wp:extent cx="914400" cy="914400"/><wp:docPr id="1" name="logo"/></wp:inline>` +
+    `</w:drawing></w:r></w:p>`;
+  // লেটারহেড-টেবিল (প্রশ্ন-শুরুর আগে)
+  const HDR_TBL =
+    `<w:tbl xmlns:w="${W20}"><w:tr><w:tc><w:p><w:r><w:t>লেটারহেড-টেবিল</w:t></w:r></w:p></w:tc></w:tr></w:tbl>`;
+  const docXml20 = (body: string) =>
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${W20}"><w:body>${body}<w:sectPr/></w:body></w:document>`;
+  // ফ্রন্ট-ম্যাটার: ছবি (টেক্সটহীন) → হেডিং → লেটারহেড-টেবিল → ২টি প্রশ্ন
+  const syn20 = docXml20(
+    IMG_P +
+      p20("DHAKA BOARD 2024") +
+      HDR_TBL +
+      p20("১. প্রথম প্রশ্ন") + p20("ক) এক") + p20("খ) দুই") + p20("গ) তিন") + p20("ঘ) চার") +
+      p20("২. দ্বিতীয় প্রশ্ন") + p20("ক) পাঁচ") + p20("খ) ছয়") + p20("গ) সাত") + p20("ঘ) আট")
+  );
+  const sp20 = parseDocxXml(syn20);
+  ok(sp20.questions.length === 2, `২০: ২ প্রশ্ন [পেয়েছি ${sp20.questions.length}]`);
+  // ২ সেট, ক্রম আলাদা (সত্যিকারের শাফল) — includeSetHeader ON
+  const out20 = buildShuffledXml(syn20, sp20.questions, [[0, 1], [1, 0]], {
+    renumber: true,
+    includeSetHeader: true,
+  });
+  const imgCount = (out20.match(/<wp:inline/g) || []).length;
+  const hdrCount = (out20.match(/DHAKA BOARD 2024/g) || []).length;
+  const tblCount = (out20.match(/<w:tbl[\s>]/g) || []).length;
+  ok(imgCount === 2, `২০: ছবি-প্যারা ২ সেটে ২ বার (আগে ১ বার-ই দিত) [পেয়েছি ${imgCount}]`);
+  ok(hdrCount === 2, `২০: হেডিং প্যারা ২ সেটে ২ বার [পেয়েছি ${hdrCount}]`);
+  ok(tblCount === 2, `২০: ফ্রন্ট-ম্যাটারের টেবিল ২ সেটে ২ বার [পেয়েছি ${tblCount}]`);
+  // DOM-ক্রম: প্রতি সেটে ফ্রন্ট-ম্যাটার সেট-হেডারের পরে, কিন্তু সেই সেটের প্রথম প্রশ্নের আগে
+  const d20 = new DOMParser().parseFromString(out20, "application/xml");
+  const k20 = Array.from(d20.getElementsByTagNameNS(W_NS, "body")[0].children) as Element[];
+  const txt20 = (el: Element) =>
+    el.localName === "p"
+      ? Array.from(el.getElementsByTagNameNS(W_NS, "t")).map((t) => t.textContent ?? "").join("")
+      : el.localName === "tbl"
+        ? "<tbl>"
+        : "";
+  const setA = k20.findIndex((el) => txt20(el).trim() === "Set A");
+  const setB = k20.findIndex((el) => txt20(el).trim() === "Set B");
+  const imgIdx = k20.map((el, i) => (el.getElementsByTagNameNS("*", "inline").length ? i : -1)).filter((i) => i >= 0);
+  const tblIdx = k20.map((el, i) => (el.localName === "tbl" ? i : -1)).filter((i) => i >= 0);
+  const qA = k20.findIndex((el) => /^১\./.test(txt20(el)));
+  const qB = k20.findIndex((el, i) => i > setB && /^১\./.test(txt20(el)));
+  ok(
+    setA >= 0 && setB > setA && imgIdx.length === 2 && tblIdx.length === 2,
+    `২০: দুই সেটই আছে + ছবি/টেবিল প্রতিটিতে [A=${setA}, B=${setB}, img=${JSON.stringify(imgIdx)}, tbl=${JSON.stringify(tblIdx)}]`
+  );
+  ok(
+    imgIdx[0] < setA && setA < imgIdx[1] && imgIdx[1] < setB,
+    `২০: ছবি ডক-শুরুর ফ্রন্ট-ম্যাটারে, Set-হেডারের আগেই [img=${JSON.stringify(imgIdx)}, A=${setA}, B=${setB}]`
+  );
+  ok(
+    qA > setA && imgIdx[1] < qB && tblIdx[1] < qB,
+    `২০: Set B-র ছবি/টেবিল Set B-র প্রথম প্রশ্নের আগেই [qA=${qA}, qB=${qB}]`
+  );
+  // প্রতি সেটে ঠিক একবার (ডুপ্লিকেট নয়)
+  const hdrIdxs = k20.map((el, i) => (/DHAKA BOARD 2024/.test(txt20(el)) ? i : -1)).filter((i) => i >= 0);
+  ok(
+    hdrIdxs.length === 2 && hdrIdxs[0] < setA && hdrIdxs[1] > setA && hdrIdxs[1] < setB,
+    `২০: হেডিং প্রতি সেটে ঠিক একবার [${JSON.stringify(hdrIdxs)}]`
+  );
+  // আউটপুট আবার পার্স হয় (স্ট্রাকচার বৈধ) — ৪ প্রশ্ন = ২ সেট × ২
+  ok(parseDocxXml(out20).questions.length === 4, `২০: আউটপুট পার্সে ৪ প্রশ্ন (২ সেট × ২)`);
+}
+console.log("\n== ২১) `*`-উত্তর (B-টাইমার) — অপশন-টেক্সটের শেষে স্টার শাফল-মোডেও ঠিক ==");
+{
+  const W21 = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  const p21 = (text: string) =>
+    `<w:p xmlns:w="${W21}"><w:r><w:t xml:space="preserve">${text}</w:t></w:r></w:p>`;
+  const docXml21 = (body: string) =>
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${W21}"><w:body>${body}<w:sectPr/></w:body></w:document>`;
+  // Q1: স্টার সঠিক অপশনের টেক্সটের শেষে ("গ. প্লাসমোডেসমা*") — পরের লাইনের
+  // "ঘ." কে উত্তর ভাবা চলবে না (আগের বাগ: উত্তর "ঘ" হয়ে যেত)
+  // Q2: স্টার লেবেলের আগে ("*ক. ডিম") — উত্তর "ক"
+  const syn21 = docXml21(
+    p21("১. নিচের কোনটি সঠিক নয়?") +
+      p21("ক. কোষ") + p21("খ. ক্লোরোফিল") + p21("গ. প্লাসমোডেসমা*") + p21("ঘ. মিউটেশন") +
+      p21("২. সবচেয়ে বড় কোষ?") +
+      p21("*ক. ডিম") + p21("খ. বীজ") + p21("গ. ফল") + p21("ঘ. শ্যাণ")
+  );
+  const s21 = parseDocxXml(syn21);
+  ok(s21.questions.length === 2, `২১: ২ প্রশ্ন [পেয়েছি ${s21.questions.length}]`);
+  ok(
+    s21.questions[0].answer === "গ",
+    `২১: টেক্সটের শেষে \`*\` → উত্তর "গ" (পরের লাইনের "ঘ" নয়) [পেয়েছি ${s21.questions[0].answer}]`
+  );
+  ok(
+    s21.questions[1].answer === "ক",
+    `২১: লেবেলের আগে \`*\` → উত্তর "ক" [পেয়েছি ${s21.questions[1].answer}]`
+  );
+  ok(
+    s21.questions[0].options.every((o) => !o.text.includes("*")),
+    "২১: অপশন-টেক্সটে `*` থাকে না (মার্কার বাদ)"
+  );
+}
 console.log(`\n========================================`);
 console.log(`ফলাফল: ${passed} পাস, ${failed} ফেল`);
 console.log(`========================================\n`);
