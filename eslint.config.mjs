@@ -44,7 +44,19 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "no-useless-escape": "off",
   },
 }, {
-  ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "examples/**", "skills"]
+  ignores: [
+    "node_modules/**",
+    ".next/**",
+    ".next-static/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+    "examples/**",
+    "skills",
+    // নেস্টেড আলাদা প্রজেক্ট/স্ক্রিপ্ট — এই অ্যাপের লিন্টের সাথে সম্পর্কহীন
+    "freellmapi/**",
+    ".zscripts/**",
+  ]
 }];
 
 export default eslintConfig;

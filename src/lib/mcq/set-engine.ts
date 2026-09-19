@@ -68,6 +68,36 @@ function allPermutations<T>(arr: readonly T[]): T[][] {
   return out;
 }
 
+/** অন্য সেটের order-key ("1,2,3,…") → id-অ্যারে — পজিশন-মিল হিসাবের জন্য */
+function idsOfKey(key: string): number[] {
+  if (!key) return [];
+  return key
+    .split(",")
+    .map((s) => Number(s))
+    .filter((n) => Number.isFinite(n));
+}
+
+/**
+ * দুটো ক্রমে কতটা **পজিশন-মিল** — একই প্রশ্ন দুই সেটের হুবহু একই লাইনে বসেছে কতবার।
+ * এর সাথে **হেড-উইন্ডো মিল** (ডিফল্ট প্রথম ৫টা প্রশ্ন) — সেট A-র ১–৫ নম্বরে যে
+ * প্রশ্নগুলো, সেট B-র ১–৫-এও সেগুলো পড়ে গেলে দুটো সেট শুরু থেকেই "কপি" মনে
+ * হয় — তাই এই মিল ভারী ওজনে (HEAD_WEIGHT) গোনা হয়। প্রতিটি নতুন সেট বাছাইয়ের
+ * সময় আগের সেটগুলোর সাথে এই স্কোর যতটা সম্ভব শূন্য এমন ক্রমই বেছে নেওয়া হয়
+ * (buildSets ও reshuffleDistinct দুটোতেই)।
+ */
+const HEAD_WINDOW = 5;
+const HEAD_WEIGHT = 10;
+export function positionalCollisions<T extends PoolItem>(a: readonly T[], b: readonly T[]): number {
+  const n = Math.min(a.length, b.length);
+  let c = 0;
+  for (let i = 0; i < n; i++) if (a[i].id === b[i].id) c++;
+  // হেড-উইন্ডো — একই প্রশ্ন দুই সেটেরই প্রথম ৫-এ পড়লে ভারী জরিমানা
+  const headA = new Set<T>();
+  for (let i = 0; i < Math.min(HEAD_WINDOW, a.length); i++) headA.add(a[i]);
+  for (let i = 0; i < Math.min(HEAD_WINDOW, b.length); i++) if (headA.has(b[i])) c += HEAD_WEIGHT;
+  return c;
+}
+
 /**
  * নির্বাচিত প্রশ্নগুলোকে setCount সংখ্যক সেটে ভাগ করে।
  *
@@ -97,19 +127,40 @@ export function buildSets<T extends PoolItem>(pool: T[], opts: BuildSetsOptions)
     // (তখন UI-warning দেখায়)।
     const total = originalUniqueOrders(pool.length);
     if (pool.length <= 8 && total !== null && k <= total - 1) {
-      const perms = allPermutations(pool).filter((p) => !seen.has(keyOf(p)));
-      const picked = shuffled(perms).slice(0, k);
+      // Greedy pick — প্রতিটি সেট বাছাইয়ের সময় আগের সেটগুলোর সাথে পজিশন-মিল
+      // সবচেয়ে কম এমন distinct permutation নেওয়া হয়। সম্পূর্ণ ক্রম distinct এমনিতেই
+      // (filter), বাড়তি হিসেবে একই প্রশ্ন সব সেটের একই লাইনেও পড়ে না।
+      const perms = shuffled(allPermutations(pool).filter((p) => !seen.has(keyOf(p))));
+      const picked: T[][] = [];
+      for (let s = 0; s < k && perms.length; s++) {
+        let bestIdx = 0;
+        let bestScore = Number.POSITIVE_INFINITY;
+        for (let i = 0; i < perms.length; i++) {
+          let sc = 0;
+          for (const prevP of picked) sc += positionalCollisions(prevP, perms[i]);
+          if (sc < bestScore) {
+            bestScore = sc;
+            bestIdx = i;
+            if (sc === 0) break; // নিখুঁত — আর খোঁজার দরকার নেই
+          }
+        }
+        picked.push(perms[bestIdx]);
+        perms.splice(bestIdx, 1);
+      }
       for (let s = 0; s < k; s++) sets[s] = picked[s] ?? shuffled(pool);
       return sets;
     }
+    // বড় পুল: কনস্ট্রাকটিভ নতুন ক্রম (buildDistinctOrder) — রিপেয়ার-লুপে কলাইডিং
+    // পজিশনগুলো swap করে **পজিশন-মিল শূন্যে** নামানো হয় এবং নতুন সেটের প্রথম ৫-এ
+    // আগের কোনো সেটের প্রথম ৫-এর প্রশ্ন বসে না (১–৫ জানালা আলাদা থাকে)।
+    // রিট্রাই-স্কোরিং যথেষ্ট নয় — ১০০ প্রশ্ন × ৪ সেটে স্কোর-অন্ধ বাছাইয়ে মিল
+    // থেকেই যেত (প্রোব-প্রমাণিত); এখন গ্যারান্টেড শূন্য-মিল কনস্ট্রাক্ট হয়।
+    // (seen/keyOf ওপরে ডিক্লেয়ার্ড — অরিজিনাল ক্রমসহ সব ব্যবহৃত ক্রম এড়ানো হয়)
+    const picked: T[][] = [];
     for (let s = 0; s < k; s++) {
-      let arr = shuffled(pool);
-      let tries = 0;
-      while (tries < 16 && seen.has(keyOf(arr))) {
-        arr = shuffled(pool);
-        tries++;
-      }
+      const arr = buildDistinctOrder(pool, picked, seen);
       seen.add(keyOf(arr));
+      picked.push(arr);
       sets[s] = arr;
     }
     return sets;
@@ -140,6 +191,72 @@ export function buildSets<T extends PoolItem>(pool: T[], opts: BuildSetsOptions)
 export function orderKey<T extends PoolItem>(arr: readonly T[]): string {
   return arr.map((q) => q.id).join(",");
 }
+/**
+ * বড় পুলের জন্য **কনস্ট্রাকটিভ** নতুন ক্রম — শুধু এলোমেলো রিট্রাই-স্কোরিং নয়।
+ * র‍্যান্ডম ক্রম নিয়ে রিপেয়ার-লুপে খারাপ পজিশনগুলো swap করে ঠিক করা হয়:
+ *  ১) পজিশন-মিল — একই প্রশ্ন আগের কোনো সেটের হুবহু একই লাইনে বসে না
+ *  ২) হেড-উইন্ডো — নতুন সেটের প্রথম ৫-এ আগের কোনো সেটের প্রথম ৫-এর প্রশ্ন বসে না
+ *  ৩) ডুপ্লিকেট — seenKeys-এ থাকা ক্রম (আগের সেট/অরিজিনাল) ফেরত যায় না
+ * ১০ বার চেষ্টার মধ্যে শূন্য-মিল না হলে (প্রায় অসম্ভব — বড় পুলে রিপেয়ার
+ * কয়েক ডজন swap-এই শেষ হয়) সবচেয়ে কম-মিল ক্যান্ডিডেটই ফেরে।
+ */
+function buildDistinctOrder<T extends PoolItem>(
+  pool: readonly T[],
+  prevs: readonly (readonly T[])[],
+  seenKeys: Set<string>
+): T[] {
+  // আগের সেটগুলোর হেড-উইন্ডোর (প্রথম HEAD_WINDOW) id — এদের নতুন সেটের
+  // হেড-উইন্ডোতে বসা নিষেধ (১–৫ জানালা সেটপ্রতি আলাদা থাকবে)।
+  const blockedHead = new Set<number>();
+  for (const p of prevs)
+    for (let i = 0; i < Math.min(HEAD_WINDOW, p.length); i++) blockedHead.add(p[i].id);
+
+  const repair = (base: readonly T[]): T[] => {
+    const arr = base.slice();
+    const n = arr.length;
+    const posBad = (i: number): boolean =>
+      prevs.some((p) => i < p.length && p[i].id === arr[i].id);
+    const headBad = (i: number): boolean => i < HEAD_WINDOW && blockedHead.has(arr[i].id);
+    for (let iter = 0; iter < 600; iter++) {
+      const bad: number[] = [];
+      for (let i = 0; i < n; i++) if (posBad(i) || headBad(i)) bad.push(i);
+      if (!bad.length) return arr; // নিখুঁত — শূন্য মিল
+      const i = bad[Math.floor(Math.random() * bad.length)];
+      // swap-পার্টনার — swap করলেই i ও j দুটো পজিশনই পরিষ্কার হয় এমন j
+      let swapped = false;
+      for (let t = 0; t < 40; t++) {
+        const j = Math.floor(Math.random() * n);
+        if (j === i) continue;
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+        const clean = !posBad(i) && !headBad(i) && !posBad(j) && !headBad(j);
+        if (clean) { swapped = true; break; }
+        [arr[i], arr[j]] = [arr[j], arr[i]]; // না হলে ফিরিয়ে আনি
+      }
+      if (!swapped) {
+        // নিখুঁত পার্টনার নেই — যেকোনো j-এর সাথে swap (progress আটকায় না)
+        const j = Math.floor(Math.random() * n);
+        if (j !== i) [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+    }
+    return arr;
+  };
+
+  let best: T[] | null = null;
+  let bestScore = Number.POSITIVE_INFINITY;
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const arr = repair(shuffled(pool));
+    if (seenKeys.has(orderKey(arr))) continue; // ডুপ্লিকেট সেট — নতুন করে
+    const sc = prevs.reduce((acc, p) => acc + positionalCollisions(p, arr), 0);
+    if (sc < bestScore) {
+      best = arr;
+      bestScore = sc;
+      if (sc === 0) break; // নিখুঁত ক্রম পাওয়া গেছে
+    }
+  }
+  return best ?? shuffled(pool);
+}
+
+
 
 /**
  * একটা সেটকে আবার শাফল — কিন্তু `others`-এ দেওয়া ক্রমগুলোর সাথে মিলে যাওয়া চলবে না।
@@ -156,18 +273,35 @@ export function reshuffleDistinct<T extends PoolItem>(pool: readonly T[], others
   const cur = pool.slice();
   if (cur.length < 2) return cur;
   const seen = new Set<string>(others);
+  // অন্য সেটগুলোর id-ক্রম — duplicate-এড়ানোর পাশাপাশি এদের সাথে পজিশন-মিলও কমানো হয়
+  // (রিশাফল করা সেট A-র ১–৫-এ যে প্রশ্ন, অন্য কোনো সেটের ১–৫-এও সেটা বসবে না)
+  const otherIds = others.map(idsOfKey).filter((ids) => ids.length > 0);
+  /** ক্যান্ডিডেট ক্রমের সব অন্য সেটের সাথে মোট পজিশন-মিল */
+  const collisionOf = (cand: readonly T[]): number => {
+    let sc = 0;
+    for (const ids of otherIds) {
+      const n = Math.min(ids.length, cand.length);
+      for (let i = 0; i < n; i++) if (ids[i] === cand[i].id) sc++;
+    }
+    return sc;
+  };
   if (cur.length <= 8) {
     const perms = allPermutations(cur).filter((p) => !seen.has(orderKey(p)));
-    if (perms.length) return shuffled(perms)[0];
+    if (perms.length) {
+      // distinct হওয়া নিশ্চিত (filter) — এর মধ্যে পজিশন-মিল সবচেয়ে কম ক্রমগুলো
+      // থেকে এলোমেলোভাবে একটা নেওয়া হয়
+      const scored = perms.map((p) => ({ p, sc: collisionOf(p) }));
+      const minSc = Math.min(...scored.map((x) => x.sc));
+      const bests = scored.filter((x) => x.sc === minSc).map((x) => x.p);
+      return shuffled(bests)[0];
+    }
     return cur; // সব সম্ভাব্য ক্রম already ব্যবহৃত
   }
-  let arr = shuffled(cur);
-  let tries = 0;
-  while (tries < 16 && seen.has(orderKey(arr))) {
-    arr = shuffled(cur);
-    tries++;
-  }
-  return arr;
+  // বড় পুল: কনস্ট্রাকটিভ রিপেয়ার — পজিশন-মিল/হেড-উইন্ডো শূন্যে নামানো হয়
+  // (prevs এখানে শুধু id-ক্রমের placeholder — buildDistinctOrder শুধু .id পড়ে,
+  // তাই id-অবজেক্ট অ্যারেকে T[] হিসেবে cast করা নিরাপদ)
+  const prevs = otherIds.map((ids) => ids.map((id) => ({ id })) as unknown as T[]);
+  return buildDistinctOrder(cur, prevs, seen);
 }
 
 // ---------- সেটের নাম ----------

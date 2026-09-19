@@ -78,6 +78,8 @@ function RdPresetsBar({
   const [name, setName] = useState("");
 
   useEffect(() => {
+    // localStorage-hydration মাউন্টের পরেই হতে হবে (SSR/SSG প্রথম-রেন্ডার ডিফল্ট থাকে) —
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPresets(loadRdPresets());
   }, []);
 
