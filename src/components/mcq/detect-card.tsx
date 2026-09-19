@@ -51,6 +51,8 @@ export function DetectCard({
   const [visible, setVisible] = useState(PAGE);
   const [rangeFrom, setRangeFrom] = useState("");
   const [rangeTo, setRangeTo] = useState("");
+  /** সিরিয়াল-সমস্যার তালিকা প্রথমে ৩টাই দেখায় — "Show all" ক্লিকে সব খোলে */
+  const [showAllIssues, setShowAllIssues] = useState(false);
 
   const stats = useMemo(() => {
     if (!parsed) return null;
@@ -210,12 +212,20 @@ export function DetectCard({
                       Found {Math.min(serial.issues.length, 30)} problem(s) in the serial
                     </div>
                     <div className="mt-1 text-sm text-amber-700/90 dark:text-amber-400/90">
-                      {serial.issues.slice(0, 3).map((is, i) => (
+                      {(showAllIssues ? serial.issues : serial.issues.slice(0, 3)).map((is, i) => (
                         <div key={i}>
                           Question #{is.index + 1}: expected number {is.expected}, found {is.found}
                         </div>
                       ))}
-                      {serial.issues.length > 3 && <div>...and {serial.issues.length - 3} more</div>}
+                      {serial.issues.length > 3 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowAllIssues((v) => !v)}
+                          className="mt-1 font-medium text-brand-700 underline-offset-2 hover:underline dark:text-brand-400"
+                        >
+                          {showAllIssues ? "Show less" : `Show all ${serial.issues.length} problems`}
+                        </button>
+                      )}
                     </div>
                   </>
                 )}

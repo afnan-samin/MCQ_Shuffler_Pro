@@ -16,7 +16,14 @@
 
 import JSZip from "jszip";
 
-import { MARKER_WINDOW_PARAS, MAX_SERIAL_NUMBER, MIN_OPTIONS_PER_MCQ } from "./limits";
+import {
+  MARKER_WINDOW_PARAS,
+  MAX_SERIAL_NUMBER,
+  MIN_OPTIONS_PER_MCQ,
+  YEAR_GUARD_MAX,
+  YEAR_GUARD_MIN,
+  YEAR_GUARD_WORD_RE,
+} from "./limits";
 import type { ZipProgress } from "./docx-xml";
 import { relabelOptionPara, type OptionLabelSettings } from "./option-labels";
 import { findRefTokens } from "./reference";
@@ -324,9 +331,10 @@ function isQuestionStartPara(
   // সাল-গার্ড (docx-xml isQuestionStart-এর সাথে সামঞ্জস্য): "1815 mv‡j…"
   // (Bijoy "সালে" = m+v+‡+j — ‡ হলো া-কার, তাই mv‡?j) / "2016 সালের…" —
   // ইতিহাস-নোটের সাল-লাইন, সিরিয়াল নয়
-  if (si.num >= 1500 && si.num <= 2100) {
+  // রেঞ্জ+রেজেক্স limits.ts-এর শেয়ার্ড কনস্ট্যান্ট — দুই পাইপলাইনে হুবহু এক
+  if (si.num >= YEAR_GUARD_MIN && si.num <= YEAR_GUARD_MAX) {
     const head = si.after.trimStart().slice(0, 10).toLowerCase();
-    if (/সাল|year|mv‡?j/.test(head)) return false;
+    if (YEAR_GUARD_WORD_RE.test(head)) return false;
   }
   if (countSerialLetterPairs(t) >= 2) return false;
   const afterTrim = si.after.trim();

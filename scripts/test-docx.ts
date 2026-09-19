@@ -13,9 +13,10 @@ const dom = new JSDOM("<!doctype html><html><body></body></html>");
 (globalThis as unknown as Record<string, unknown>).XMLSerializer = dom.window.XMLSerializer;
 (globalThis as unknown as Record<string, unknown>).Node = dom.window.Node;
 
-const { parseDocxXml, renumberSerialPara, extractParaText, W_NS } = await import(
+const { parseDocxXml, renumberSerialPara, extractParaText, isSectionSeparator, W_NS } = await import(
   "../src/lib/mcq/docx-xml"
 );
+const { YEAR_GUARD_MAX, YEAR_GUARD_MIN } = await import("../src/lib/mcq/limits");
 const { buildShuffledXml, englishSetName } = await import("../src/lib/mcq/docx-exporter");
 
 let passed = 0;
@@ -565,6 +566,39 @@ console.log("\n== ২১) `*`-উত্তর (B-টাইমার) — অপ�
     s21.questions[0].options.every((o) => !o.text.includes("*")),
     "২১: অপশন-টেক্সটে `*` থাকে না (মার্কার বাদ)"
   );
+console.log("\n== ২২) শেয়ার্ড বছর-গার্ড (1500..2100) + ছোট-লাইনের অপশন-সুরক্ষা ==");
+{
+  const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  const p = (text: string) =>
+    `<w:p xmlns:w="${W}"><w:r><w:t xml:space="preserve">${text}</w:t></w:r></w:p>`;
+  const docXml = (body: string) =>
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${W}"><w:body>${body}<w:sectPr/></w:body></w:document>`;
+
+  // ---- (ক) শেয়ার্ড-রেঞ্জের ঠিক নিচে (1499) → গার্ড চালু হয় না, প্রশ্নই থাকে ----
+  const below = parseDocxXml(docXml(p("1499. সালের কথা") + p("ক. উত্তর")));
+  ok(below.questions.length === 1, `২২: ${YEAR_GUARD_MIN}-এর নিচের সিরিয়াল (1499) প্রশ্নই থাকে [${below.questions.length}]`);
+  // ---- (খ) রেঞ্জের দুই প্রান্ত (1500 / 2100) + "সাল"/"সালে" → প্রশ্ন নয় ----
+  const atMin = parseDocxXml(docXml(p(`${YEAR_GUARD_MIN}. সালের কথা`) + p("ক. উত্তর")));
+  ok(atMin.questions.length === 0, `২২: ${YEAR_GUARD_MIN} + "সাল" → প্রশ্ন নয় [${atMin.questions.length}]`);
+  const atMax = parseDocxXml(docXml(p(`${YEAR_GUARD_MAX}. সালে কী ঘটেছিল`) + p("ক. উত্তর")));
+  ok(atMax.questions.length === 0, `২২: ${YEAR_GUARD_MAX} + "সালে" → প্রশ্ন নয় [${atMax.questions.length}]`);
+  // ---- (গ) Bijoy "mv‡j" (= সালে) — টেক্সট-পার্সারের সাথে এখন একই সিদ্ধান্ত ----
+  const bijoy = parseDocxXml(docXml(p("1815 mv‡j Avgiv †`LwQ") + p("ক. উত্তর")));
+  ok(bijoy.questions.length === 0, `২২: Bijoy "1815 mv‡j…" প্রশ্ন নয় (শেয়ার্ড গার্ড) [${bijoy.questions.length}]`);
+  // ---- (ঘ) টাইট গার্ড: রেঞ্জের বড় সিরিয়াল কিন্তু "সাল"/"year" ছাড়া = আসল প্রশ্ন ----
+  const tight = parseDocxXml(docXml(p("1815. বাংলাদেশের ইতিহাসের প্রশ্ন?") + p("ক. উত্তর")));
+  ok(tight.questions.length === 1 && tight.questions[0].serial === 1815, `২২: 1815 (সাল-শব্দ ছাড়া) আসল প্রশ্ন [${tight.questions.length}]`);
+
+  // ---- (ঙ) ছোট (≤৩ অক্ষর) লাইন: অপশন-লাইন কখনো সেকশন-হেডার নয় (নাহলে ব্লক কেটে অপশন হারাত) ----
+  ok(!isSectionSeparator("ক)২"), '২২: "ক)২" (৩ অক্ষরের অপশন) সেকশন-হেডার নয়');
+  ok(!isSectionSeparator("K)2"), '২২: "K)2" (৩ অক্ষরের অপশন) সেকশন-হেডার নয়');
+  ok(!isSectionSeparator("*A."), '২২: "*A." (স্টার-অপশন) সেকশন-হেডার নয়');
+  ok(isSectionSeparator("OR"), '২২: "OR" আসল সেপারেটর হিসেবে অপরিবর্তিত');
+  ok(
+    isSectionSeparator("A") && isSectionSeparator("PHYSICS") && isSectionSeparator("গ"),
+    "২২: সেকশন-হেডার A/PHYSICS/গ অপরিবর্তিত"
+  );
+}
 }
 console.log(`\n========================================`);
 console.log(`ফলাফল: ${passed} পাস, ${failed} ফেল`);

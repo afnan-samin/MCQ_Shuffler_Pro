@@ -6,9 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { AlertTriangle, CheckCircle2, ChevronDown, Download, ListChecks, ScanText, TriangleAlert } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ListChecks, ScanText, TriangleAlert } from "lucide-react";
 import type { DocxParseResult, DocxQuestion } from "@/lib/mcq/docx-xml";
 import { DIGIT_ENC_LABEL, digitsToNumber } from "@/lib/mcq/docx-xml";
 import { lineDominantOf, type Enc, type EncodingStats } from "@/lib/mcq/encoding";
@@ -22,11 +20,6 @@ interface DocxDetectCardProps {
   onSelectAll: () => void;
   onSelectNone: () => void;
   onSelectRange: (fromPos: number, toPos: number) => void;
-  /** সিরিয়াল ঠিক করে (১..N) অরিজিনাল অর্ডারে .docx ডাউনলোড */
-  onSerialFix: () => void;
-  fixing: boolean;
-  allowBroken: boolean;
-  onAllowBrokenChange: (v: boolean) => void;
   encStats: EncodingStats | null;
   dominant: Enc | null;
 }
@@ -63,16 +56,14 @@ export function DocxDetectCard({
   onSelectAll,
   onSelectNone,
   onSelectRange,
-  onSerialFix,
-  fixing,
-  allowBroken,
-  onAllowBrokenChange,
   encStats,
   dominant,
 }: DocxDetectCardProps) {
   const [visible, setVisible] = useState(PAGE);
   const [rangeFrom, setRangeFrom] = useState("");
   const [rangeTo, setRangeTo] = useState("");
+  /** সিরিয়াল-সমস্যার তালিকা প্রথমে ৩টাই দেখায় — "Show all" ক্লিকে সব খোলে */
+  const [showAllIssues, setShowAllIssues] = useState(false);
 
   const questions = parse.questions;
   const stats = useMemo(() => {
@@ -259,7 +250,7 @@ export function DocxDetectCard({
                         Multiple sections/exams in one file — numbering restarts at 1 in {serial.issues.length} place(s)
                       </div>
                       <div className="mt-0.5 text-sm text-sky-700/90 dark:text-sky-400/90">
-                        That's not an error — each section has its own numbering (starting at {serial.startAt}). To shuffle, enable "Run as-is" below.
+                        That's not an error — each section has its own numbering (starting at {serial.startAt}). Shuffle works as-is; turn on "Renumber" in shuffle settings to write fresh 1..N serials in the output.
                       </div>
                     </>
                   ) : (
@@ -268,33 +259,29 @@ export function DocxDetectCard({
                         {Math.min(serial.issues.length, 30)} serial problem(s) (duplicates/jumps)
                       </div>
                       <div className="mt-1 text-sm text-amber-700/90 dark:text-amber-400/90">
-                        {serial.issues.slice(0, 3).map((is, i) => (
+                        {(showAllIssues ? serial.issues : serial.issues.slice(0, 3)).map((is, i) => (
                           <div key={i}>
                             Question #{is.index + 1}: expected number {is.expected}, found {is.found}
                             {is.restart ? " (new section)" : ""}
                           </div>
                         ))}
-                        {serial.issues.length > 3 && <div>...and {serial.issues.length - 3} more</div>}
+                        {serial.issues.length > 3 && (
+                          <button
+                            type="button"
+                            onClick={() => setShowAllIssues((v) => !v)}
+                            className="mt-1 font-medium text-brand-700 underline-offset-2 hover:underline dark:text-brand-400"
+                          >
+                            {showAllIssues ? "Show less" : `Show all ${serial.issues.length} problems`}
+                          </button>
+                        )}
+                        <div className="mt-1">
+                          Shuffle works as-is — "Renumber" (ON by default) writes fresh 1..N serials in the output. To fix the original file instead, use the <b>MCQ Serial</b> mode.
+                        </div>
                       </div>
                     </>
                   )}
                 </div>
               </div>
-
-              {serial.status === "broken" && (
-                <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-amber-200 pt-3 dark:border-amber-800">
-                  <Button size="sm" className="gap-2 bg-amber-600 hover:bg-amber-700" onClick={onSerialFix} disabled={fixing}>
-                    <Download className="h-4 w-4" />
-                    {fixing ? "Building..." : "Fix serial & download .docx (1..N)"}
-                  </Button>
-                  <div className="flex items-center gap-2">
-                    <Switch id="docx-allow-broken" checked={allowBroken} onCheckedChange={onAllowBrokenChange} />
-                    <Label htmlFor="docx-allow-broken" className="cursor-pointer text-sm">
-                      Run as-is
-                    </Label>
-                  </div>
-                </div>
-              )}
             </div>
           );
         })()}

@@ -1,13 +1,14 @@
 // ============================================================
-// Font-remap E2E — ফন্ট-কার্ড UI থেকে সেটিংস দিয়ে ডাউনলোড-করা .docx-এর
-// document.xml (+styles.xml)-এ রিম্যাপ যাচাই (ON ও OFF দুই পাথ)
+// Font-remap E2E — persisted font-সেটিংস (localStorage "mcq-font-settings")
+// ডাউনলোড-করা .docx-এর document.xml (+styles.xml)-এ রিম্যাপ যাচাই (ON ও OFF দুই পাথ)
 // ============================================================
 // সেলফ-সাফিশিয়েন্ট: নিজেই JSZip দিয়ে মিনিমাল Bijoy+Bengali docx জেনারেট করে
 // (gen-e2e-fixtures.ts-এর জেনারেটর-প্যাটার্ন) — upload/ ফিক্সচার লাগে না।
-// ফ্লো: আপলোড → শাফল মোড → ফন্ট-কার্ড খোলা → Unicode→"Noto Sans Bengali" +
-// Bijoy→"Shibly" → "Use fonts" → শাফল → ডাউনলোড → document.xml-এ নতুন ফন্ট +
-// styles.xml-এ লিগ্যাসি রিম্যাপ। এরপর সুইচ OFF → পুনঃডাউনলোড → ফন্ট অস্পৃশ্য
-// (সোর্সের সাথে বাইট-অভিন্ন যাচাই)।
+// ফন্ট-কার্ড এখন শুধু Serial/Redownload মোডে আছে — শাফল মোডে নেই; তাই সেটিংস
+// addInitScript দিয়ে localStorage-এ সিড করা হয় (হুক মাউন্টে হাইড্রেট করে)।
+// ফ্লো: সিড(ON) → আপলোড → শাফল মোড → শাফল → ডাউনলোড → document.xml-এ নতুন
+// ফন্ট + styles.xml-এ লিগ্যাসি রিম্যাপ। এরপর সিড(OFF) + reload → পুনঃশাফল →
+// পুনঃডাউনলোড → ফন্ট অস্পৃশ্য (সোর্সের সাথে বাইট-অভিন্ন যাচাই)।
 // রান: dev-server চালু (localhost:3000) → bun run scripts/e2e-font-remap.ts
 // ============================================================
 import { chromium } from "playwright";
@@ -97,7 +98,15 @@ page.on("pageerror", (e) => errors.push("pageerror: " + e.message));
 page.on("console", (m) => { if (m.type() === "error") errors.push("console: " + m.text()); });
 
 try {
+  // ফন্ট-কার্ড এখন শুধু Serial/Redownload মোডে — শাফল মোডে সেটিংস localStorage-সিডে হাইড্রেট হয়
+  // English-স্লটও এক্সপ্লিসিট (কার্ডের ডিফল্ট "Default" = অরিজিনাল রাখে, তাই TNR আসত না)
+  const ON_JSON = JSON.stringify({ englishFont: "Times New Roman", bijoyFont: "Shibly", unicodeFont: "Noto Sans Bengali", enabled: true });
+  const OFF_JSON = JSON.stringify({ englishFont: "Default", bijoyFont: "Default", unicodeFont: "Default", enabled: false });
+  // ⚠️ addInitScript ব্যবহার করা যাবে না — ওটা প্রতিটা নেভিগেশনে (reload-এও) আবার সিড
+  // করে OFF-সিডকে ক্লোব করে দেয় (OFF পাথ চুপচাপ ON-এই চলত)। তাই: goto → সিড → reload।
   await page.goto("http://localhost:3000", { waitUntil: "networkidle" });
+  await page.evaluate((v) => localStorage.setItem("mcq-font-settings", v as string), ON_JSON);
+  await page.reload({ waitUntil: "networkidle" });
 
   // ---- আপলোড → শাফল মোড ----
   await page.waitForSelector("#step-upload", { timeout: 30000 });
@@ -108,29 +117,10 @@ try {
   await page.waitForSelector("text=question(s) detected", { timeout: 60000 });
   ok(true, "ফাইল আপলোড → শাফল মোডে ৫ প্রশ্ন ডিটেক্ট");
 
-  // ---- ফন্ট-কার্ড: কলাপ্সড অবস্থায় দেখা যায়, খুললে কন্ট্রোল ----
-  const card = page.locator('[data-testid="font-settings-card"]');
-  ok((await card.count()) === 1, "ফন্ট-কার্ড ডাউনলোড-কার্ডের ঠিক উপরে রেন্ডার হয়েছে");
-  await page.click('text=Fonts in the output file');
-  await page.waitForSelector('button[aria-label="Font remap toggle"]', { timeout: 10000 });
-  ok(true, "কার্ড খোলা গেল (কলাপস-টগল কাজ করে)");
-  const switchOn = await page.getAttribute('button[aria-label="Font remap toggle"]', "data-state");
-  ok(switchOn === "checked", `রিম্যাপ সুইচ ডিফল্ট ON (data-state=${switchOn})`);
+  // ---- ফন্ট-কার্ড শাফল মোডে আর রেন্ডার হয় না (Serial/Redownload মোডে আছে) ----
+  ok((await page.locator('[data-testid="font-settings-card"]').count()) === 0, "ফন্ট-কার্ড শাফল মোডে নেই");
 
-  // ---- ড্রপডাউন: Unicode → Noto Sans Bengali, Bijoy → Shibly ----
-  await page.click("#font-unicode");
-  await page.click('div[role="option"]:has-text("Noto Sans Bengali")');
-  await page.click("#font-bijoy");
-  await page.click('div[role="option"]:has-text("Shibly")');
-  ok(true, "দুই ড্রপডাউন বদলানো হলো (Unicode→Noto Sans Bengali, Bijoy→Shibly)");
-
-  // ---- "Use fonts" কনফার্ম ----
-  await page.click('button:has-text("Use fonts")');
-  await page.waitForSelector("text=Applied — downloads will use these fonts", { timeout: 10000 });
-  const summary = await card.locator("text=Remap ON — Unicode → Noto Sans Bengali").count();
-  ok(summary === 1, "কার্ড-সামারি নতুন সেটিংস দেখাচ্ছে (Remap ON — Unicode → Noto Sans Bengali)");
-
-  // ---- শাফল → ডাউনলোড (ON) ----
+  // ---- শাফল → ডাউনলোড (সিড করা ON সেটিংস) ----
   await page.click('button:has-text("Shuffle & build sets")');
   await page.waitForSelector("text=Shuffle complete", { timeout: 120000 });
   await downloadDocx(page, ON_PATH);
@@ -144,24 +134,37 @@ try {
   ok(!docOn.includes('w:ascii="SutonnyMJ"'), "ON: document.xml-এ লিগ্যাসি SutonnyMJ শূন্য");
   ok(!stylesOn.includes("SutonnyMJ") && stylesOn.includes('w:ascii="Shibly"'), "ON: styles.xml লিগ্যাসি ভ্যালু → Shibly");
 
-  // ---- রিম্যাপ OFF → পুনঃডাউনলোড ----
-  await page.click('button[aria-label="Font remap toggle"]');
-  const switchOff = await page.getAttribute('button[aria-label="Font remap toggle"]', "data-state");
-  ok(switchOff === "unchecked", "সুইচ OFF হলো");
-  await page.click('button:has-text("Use fonts")');
-  await page.waitForSelector("text=Applied — downloads will use these fonts", { timeout: 10000 });
+  // ---- রিম্যাপ OFF (localStorage সিড + reload) → পুনঃশাফল → পুনঃডাউনলোড ----
+  await page.evaluate((v) => localStorage.setItem("mcq-font-settings", v as string), OFF_JSON);
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForSelector("#step-upload", { timeout: 30000 });
+  await page.setInputFiles("#step-upload input[type='file']", f);
+  await page.waitForSelector('button[role="tab"]:has-text("MCQ Shuffle")', { timeout: 30000 });
+  await page.click('button[role="tab"]:has-text("MCQ Shuffle")');
+  await page.waitForSelector("text=question(s) detected", { timeout: 60000 });
+  await page.click('button:has-text("Shuffle & build sets")');
+  await page.waitForSelector("text=Shuffle complete", { timeout: 120000 });
   await downloadDocx(page, OFF_PATH);
   const docOff = await readPart(OFF_PATH, "word/document.xml");
   const stylesOff = await readPart(OFF_PATH, "word/styles.xml");
   ok(!docOff.includes("Noto Sans Bengali") && !docOff.includes("Shibly") && !docOff.includes("Times New Roman"), "OFF: document.xml-এ নতুন কোনো ফন্ট নেই");
-  // সেট-হেডার ("Set A"…) এখন ডকুমেন্টের নিজের ফন্ট-ফ্যামিলি নেয় → প্রতি সেট-হেডারে
-  // ঠিক ১টা করে w:ascii="SutonnyMJ" যোগ হয়; প্রশ্ন-রানগুলো সোর্সের হুবহু
+  // ডিফল্ট distribution এখন "original" (প্রতি সেটে সব প্রশ্ন) — তাই সোর্সের প্রতিটি
+  // SutonnyMJ অ্যাট্রিবিউট প্রতি সেটে ১ বার = × সেট-সংখ্যা। সেট-হেডার ("Set A"…) অ্যাপের
+  // নিজের Arial ফন্ট নেয়, SutonnyMJ যোগ করে না (আগের "+১ প্রতি হেডারে" ধারণা বদলেছে)।
   const offSetHeaders = (docOff.match(/>Set [A-Z0-9]+</g) || []).length;
-  ok((docOff.match(/w:ascii="SutonnyMJ"/g) || []).length === SRC_SUTONNY_COUNT + offSetHeaders, `OFF: সোর্সের ${SRC_SUTONNY_COUNT}টা + প্রতি সেট-হেডারে ১টা (${offSetHeaders} সেট) = ${SRC_SUTONNY_COUNT + offSetHeaders} w:ascii="SutonnyMJ" হুবহু অক্ষত`);
+  const offSutonny = (docOff.match(/w:ascii="SutonnyMJ"/g) || []).length;
+  ok(offSutonny === SRC_SUTONNY_COUNT * offSetHeaders, `OFF: সোর্সের ${SRC_SUTONNY_COUNT}টা × ${offSetHeaders} সেট = ${SRC_SUTONNY_COUNT * offSetHeaders} w:ascii="SutonnyMJ" হুবহু অক্ষত [পেয়েছি ${offSutonny}]`);
   ok(docOff.includes("বাংলা নমুনা প্রশ্ন") && docOff.includes("†KvW wKQz"), "OFF: প্রশ্ন-টেক্সট অক্ষত");
   ok(stylesOff === STYLES_XML, "OFF: styles.xml সোর্সের সাথে বাইট-অভিন্ন");
-  ok((await page.getAttribute('button[aria-label="Font remap toggle"]', "data-state")) === "unchecked", "কার্ড-সামারি OFF দেখাচ্ছে (Remap is OFF)");
-  ok((await card.locator("text=Remap is OFF — the output keeps the original fonts").count()) === 1, "সামারি: Remap is OFF");
+  const storedOff = await page.evaluate(() => {
+    try {
+      const parsed: unknown = JSON.parse(localStorage.getItem("mcq-font-settings") ?? "{}");
+      return (parsed as { enabled?: boolean }).enabled;
+    } catch {
+      return undefined;
+    }
+  });
+  ok(storedOff === false, "persisted সেটিংসে enabled=false (Remap OFF)");
 
   console.log("\nJS errors:", errors.length ? errors : "শূন্য ✓");
   if (errors.length) throw new Error("ব্রাউজার JS-এরর পাওয়া গেছে");

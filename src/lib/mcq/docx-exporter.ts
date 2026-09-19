@@ -28,6 +28,38 @@ import type { FontSettings } from "./font-remap";
 import { repackDocxRemapped, DOCX_MIME } from "./repack-docx";
 import type { ZipProgress } from "./docx-xml";
 
+/** DrawingML wordprocessingDrawing namespace — wp:docPr (ছবি/শেপের id) এখানেই থাকে */
+const WP_DRAWING_NS = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
+
+/**
+ * Word-corruption ফিক্স: একই document.xml-এ duplicate wp:docPr/@id থাকলে
+ * Word ফাইল খুলতে "corrupted" দেখায়। প্রতিটি সেটের শুরুতে ফ্রন্ট-ম্যাটার
+ * (লোগো/হেডার-ছবি) হুবহু ক্লোন হয় বলে একই id ৩ বার বসে যেত — ১-সেটে
+ * সমস্যা হয় না, ৩-সেটে হয়। প্রথম occurrence অক্ষত রেখে পরের
+ * ডুপ্লিকেটগুলোকে max+1, max+2… নতুন id দেওয়া হয়।
+ */
+function uniquifyDrawingDocPrIds(body: Element): void {
+  const list = body.getElementsByTagNameNS(WP_DRAWING_NS, "docPr");
+  if (list.length < 2) return;
+  let max = 0;
+  for (let i = 0; i < list.length; i++) {
+    const n = parseInt(list[i].getAttribute("id") ?? "", 10);
+    if (!Number.isNaN(n) && n > max) max = n;
+  }
+  const used = new Set<string>();
+  for (let i = 0; i < list.length; i++) {
+    const el = list[i];
+    const id = el.getAttribute("id") ?? "";
+    if (id !== "" && !used.has(id)) {
+      used.add(id);
+      continue;
+    }
+    max += 1;
+    el.setAttribute("id", String(max));
+    used.add(String(max));
+  }
+}
+
 /** ডকুমেন্টের প্রথম ফন্ট-অ্যাট্রিবিউট সেট (সেট-হেডারে ডকুমেন্টের নিজের ফন্ট বসাতে) */
 interface BodyFontAttrs {
   ascii: string;
@@ -367,6 +399,10 @@ export function buildShuffledXml(
 
   if (sectPr) body.appendChild(sectPr);
 
+  // Word-corruption ফিক্স: প্রতি-সেট ফ্রন্ট-ম্যাটার ক্লোনের ফলে একই
+  // ছবির wp:docPr/@id একাধিকবার বসে — এখানে ইউনিক করে দিই।
+  uniquifyDrawingDocPrIds(body);
+
   const out = new XMLSerializer().serializeToString(doc);
   // ⚠️ ব্রাউজারের XMLSerializer নিজেই <?xml …?> ডেক্লারেশন সিরিয়ালাইজ করে
   // (jsdom করে না) — দুবার ঢোকালে XML অবৈধ হয়ে যায়, তাই আগেটা কেটে ফেলি
@@ -398,28 +434,4 @@ export async function buildShuffledDocxBlob(params: {
   const newXml = buildShuffledXml(params.xml, params.questions, params.sets, params.opts);
   const blob = await zipWithXml(params.originalFile, newXml, params.fontSettings, params.onProgress);
   return { blob, fileName: `${params.baseName}${params.suffix}.docx` };
-}
-
-/**
- * সিরিয়াল ফিক্স এক্সপোর্ট ("Start"): অরিজিনাল অর্ডারেই প্রশ্নগুলো,
- * সিরিয়াল ১..N দিয়ে ঠিক করা — এক ফাইল, কোনো সেট-ভাগ নেই।
- */
-/** সিরিয়াল-ফিক্স .docx blob (ডাউনলোড নয়) — PDF-কনভার্সন পাথও এটাই ব্যবহার করে */
-export async function buildSerialFixedDocxBlob(params: {
-  originalFile: Blob;
-  xml: string;
-  questions: DocxQuestion[];
-  baseName: string;
-  refMode?: RefMode;
-  fontSettings?: FontSettings;
-  onProgress?: ZipProgress;
-}): Promise<{ blob: Blob; fileName: string }> {
-  const allIds = params.questions.map((q) => q.id);
-  const newXml = buildShuffledXml(params.xml, params.questions, [allIds], {
-    renumber: true,
-    includeSetHeader: false,
-    refMode: params.refMode,
-  });
-  const blob = await zipWithXml(params.originalFile, newXml, params.fontSettings, params.onProgress);
-  return { blob, fileName: `${params.baseName} (serial fixed).docx` };
 }

@@ -63,7 +63,6 @@ import {
   NoColorSerialCard,
 } from "@/components/mcq/serial-extra-cards";
 import {
-  buildSerialFixedDocxBlob,
   buildShuffledDocxBlob,
   buildShuffledXml,
   englishSetName,
@@ -310,7 +309,9 @@ export default function Home() {
   const [setsDocx, setSetsDocx] = useState<number[][] | null>(null);
   // শাফল মোডে সিরিয়াল বদলের দরকার নেই (সিরিয়ালের আলাদা মোড আছেই) —
   // ডিফল্ট OFF: ডাউনলোডে প্রশ্নের আসল নম্বরই থাকে; চাইলে টগল ON করে ১,২,৩…
-  const [renumber, setRenumber] = useState(true);
+  // (আগে কোডে useState(true) ছিল — কমেন্টের সাথে উল্টো, তাই Sets-separately
+  //  ডাউনলোড ডিফল্টেই ১,২,৩… হয়ে যেত। এখন কমেন্ট ও আচরণ দুটোই OFF।)
+  const [renumber, setRenumber] = useState(false);
   const [sortedFlags, setSortedFlags] = useState<boolean[]>([]);
   const [exportOpts, setExportOpts] = useState<ExportOptions>(DEFAULT_EXPORT_OPTIONS);
   const [busy, setBusy] = useState<string | null>(null);
@@ -1333,36 +1334,6 @@ export default function Home() {
     }
   };
 
-  const handleDocxSerialFix = async () => {
-    if (!docx?.parse) return;
-    setFixing(true);
-    clearProc();
-    setProcStage("Fixing serials...", 0);
-    await yieldToUI();
-    try {
-      await finalizeDownload(
-        await buildSerialFixedDocxBlob({
-          originalFile: docx.file,
-          xml: docx.xml,
-          questions: docx.parse.questions,
-          baseName: docx.baseName,
-          refMode,
-          fontSettings,
-          onProgress: dlFileProgress("Fixing serials...", 0, 1, docx.baseName),
-        })
-      );
-      toast({
-        title: `Serial-fixed .${downloadFormat === "pdf" ? "pdf" : "docx"} downloaded`,
-        description: "Questions in original order with serials 1..N — formatting exactly intact.",
-      });
-    } catch (e) {
-      toast({ title: "Download failed", description: String(e), variant: "destructive" });
-    } finally {
-      clearProc();
-      setFixing(false);
-    }
-  };
-
   const handleDocxCopySet = async (si: number) => {
     if (!docx?.parse || !setsDocx) return;
     try {
@@ -2104,6 +2075,10 @@ export default function Home() {
     } catch (e) {
       toast({ title: "Download failed", description: String(e), variant: "destructive" });
     } finally {
+      // overlay OFF — নাহলে টেক্সট-মোডের Word ডাউনলোডের পরেও "Building Word file..."
+      // ফুল-স্ক্রিন ওভারলে (fixed inset-0, কোনো ক্লোজ-বাটন নেই) আটকে থাকত
+      // → ইউজার রিলোড না করা পর্যন্ত কিছুই ক্লিক করতে পারত না।
+      clearProc();
       setBusy(null);
     }
   };
@@ -2480,9 +2455,6 @@ export default function Home() {
                 {/* ডুপ্লিকেট-প্রশ্ন কার্ড — একাধিক ফাইলে একই প্রশ্ন থাকলে লাল (Phase 3 #9) */}
                 <DuplicateQuestionsCard groups={shuffleDuplicates} />
 
-                {/* আউটপুট ফাইলের ফন্ট-রিম্যাপ — মার্জ/ZIP ডাউনলোডে প্রয়োগ হয় */}
-                <FontSettingsCard settings={fontSettings} onChange={updateFontSettings} />
-
                 <div ref={resultsRef} className="scroll-mt-4">
                   {shuffleMultiSets && (
                     <>
@@ -2502,7 +2474,15 @@ export default function Home() {
                       <div className="mt-5">
                         <MultiDownloadCard
                           title="Shuffle complete — download now"
-                          description="Each file's sets on separate pages, serials 1,2,3…."
+                          description={
+                            // Serial-replace এখন প্রতি ফাইলে আলাদা (Serial switch উপরে) —
+                            // সব ফাইল original হলে "serials 1,2,3…" লেখা মিথ্যা হতো।
+                            shuffleItems.every((it) => fileRenumber(it.id))
+                              ? "Each file's sets on separate pages, serials 1,2,3…."
+                              : shuffleItems.some((it) => fileRenumber(it.id))
+                                ? "Each file's sets on separate pages — serials follow each file's Serial switch above."
+                                : "Each file's sets on separate pages, with the questions' original numbers."
+                          }
                           stats={`${shuffleItems.length} file(s) • ${multiEffectiveSets} set(s) per file`}
                           onDownloadMerged={handleMultiMergedDownload}
                           onDownloadZip={handleMultiZipDownload}
@@ -2543,10 +2523,6 @@ export default function Home() {
                     onSelectAll={selectAll}
                     onSelectNone={selectNone}
                     onSelectRange={selectRange}
-                    onSerialFix={handleDocxSerialFix}
-                    fixing={fixing}
-                    allowBroken={allowBroken}
-                    onAllowBrokenChange={setAllowBroken}
                     encStats={encData.stats}
                     dominant={encData.dominant}
                   />
@@ -2568,9 +2544,6 @@ export default function Home() {
                   refMode={refMode}
                   onRefModeChange={setRefMode}
                 />
-
-                {/* আউটপুট ফাইলের ফন্ট-রিম্যাপ — ডাউনলোড ও সিরিয়াল-ফিক্স দুটোতেই প্রয়োগ হয় */}
-                <FontSettingsCard settings={fontSettings} onChange={updateFontSettings} />
 
                 <div ref={resultsRef} className="scroll-mt-4">
                   {setsDocx && docx.parse && (
@@ -2626,9 +2599,6 @@ export default function Home() {
                   refMode={refMode}
                   onRefModeChange={setRefMode}
                 />
-
-                {/* আউটপুট ফাইলের ফন্ট-রিম্যাপ — .docx এক্সপোর্টে প্রয়োগ হয় */}
-                <FontSettingsCard settings={fontSettings} onChange={updateFontSettings} />
 
                 <div ref={resultsRef} className="scroll-mt-4">
                   {sets && (

@@ -3,7 +3,7 @@
 // বাংলা (১২৩ / ০-৯) এবং English (1,2,3) উভয় নম্বরিং সাপোর্ট করে
 // ============================================================
 
-import { MAX_SERIAL_NUMBER } from "./limits";
+import { MAX_SERIAL_NUMBER, YEAR_GUARD_MAX, YEAR_GUARD_MIN, YEAR_GUARD_WORD_RE } from "./limits";
 
 export interface McqQuestion {
   /** অরিজিনাল ডকুমেন্ট অর্ডারে ইউনিক আইডি (0-based) */
@@ -115,13 +115,15 @@ function classifyLine(
   const textAfter = line.slice(m[0].length);
   if (!textAfter.trim()) return { kind: "continuation" };
 
-  // বছর-গার্ড (Task 21-a): 1900..2100-র মত সংখ্যা + সেপারেটরের পরের টেক্সটের
-  // প্রথম ~১০ অক্ষরে "সাল"/"year" থাকলে এটা সিরিয়াল নয়, বছর-টোকেন
-  // (যেমন "2024. সালের ফলাফল…" / "২০২৫ সালে…") → কনটিনিউয়েশন।
-  // টাইট গার্ড: শুধু এই সংকীর্ণ রেঞ্জ + শুরুর ১০ অক্ষর — বাকি আচরণ অপরিবর্তিত।
-  if (num >= 1900 && num <= 2100) {
+  // বছর-গার্ড: YEAR_GUARD_MIN..MAX রেঞ্জের সংখ্যা + সেপারেটরের পরের টেক্সটের
+  // প্রথম ~১০ অক্ষরে "সাল"/"year"/Bijoy "mv‡j" থাকলে এটা সিরিয়াল নয়, বছর-টোকেন
+  // (যেমন "2024. সালের ফলাফল…" / "২০২৫ সালে…" / "1815 mv‡j…") → কনটিনিউয়েশন।
+  // রে্জ+রেজেক্স limits.ts-এর শেয়ার্ড কনস্ট্যান্ট — docx/redownload-এর সাথে
+  // হুবহু এক, নাহলে একই ফাইল দুই মোডে আলাদা প্রশ্ন-সংখ্যা দিত।
+  // টাইট গার্ড: শুধু এই রেঞ্জ + শুরুর ১০ অক্ষর — বাকি আচরণ অপরিবর্তিত।
+  if (num >= YEAR_GUARD_MIN && num <= YEAR_GUARD_MAX) {
     const head = textAfter.trimStart().slice(0, 10).toLowerCase();
-    if (head.includes("সাল") || head.includes("year")) return { kind: "continuation" };
+    if (YEAR_GUARD_WORD_RE.test(head)) return { kind: "continuation" };
   }
 
   if (hasSep) return { kind: "question", match: m };

@@ -161,7 +161,7 @@ check("দুই প্রশ্নেই ২টা করে অপশন অ�
 const b9999 = parseMcq("9999. শেষ সিরিয়ালের প্রশ্ন?\nক) উত্তর");
 check("সিলিং-বাউন্ডারি 9999 প্রশ্ন ডিটেক্ট", b9999.questions.length === 1 && b9999.questions[0].originalNumber === 9999, `got ${JSON.stringify(b9999.questions.map(q => q.originalNumber))}`);
 
-console.log("— টেস্ট ১৬: বছর-গার্ড (1900..2100 + 'সাল'/'year' = প্রশ্ন নয়) —");
+console.log("— টেস্ট ১৬: শেয়ার্ড বছর-গার্ড (1500..2100 + 'সাল'/'year'/Bijoy 'mv‡j' = প্রশ্ন নয়) —");
 // "2024. সালের ফলাফল…" — সেপারেটর-সহ লাইন; গার্ড ছাড়া ভুল করে প্রশ্ন-শুরু হত (Task 21-a)
 const yg1 = parseMcq("5. আসল প্রশ্ন?\nক) উত্তর\n2024. সালের ফলাফল প্রকাশিত হয়েছে।");
 check("'2024. সালের ফলাফল…' প্রশ্ন নয় (কনটিনিউয়েশন)", yg1.questions.length === 1 && yg1.questions[0].originalNumber === 5, `got ${JSON.stringify(yg1.questions.map(q => q.originalNumber))}`);
@@ -172,7 +172,14 @@ check("'২০২৫ সালে…' প্রশ্ন নয়", yg2.questio
 // English "year" (case-insensitive)
 const yg3 = parseMcq("4. Real question?\na) ans\n2024. Year of the war?");
 check("'2024. Year of…' প্রশ্ন নয় (case-insensitive)", yg3.questions.length === 1 && yg3.questions[0].originalNumber === 4, `got ${JSON.stringify(yg3.questions.map(q => q.originalNumber))}`);
-// গার্ড টাইট: 1900..2100 রেঞ্জের নম্বর হলেও "সাল"/"year" ছাড়া টেক্সট = আসল প্রশ্ন
+// Bijoy বছৰ-লাইন ("1815 mv‡j…" = ১৮১৫ সালে…): আগে শুধু docx/redownload-পাইপলাইন
+// ধরত, টেক্সট-পার্সে 1850 ঘটনাকে সিরিয়াল-প্রশ্ন ধরে ফেলত → একই ফাইল দুই মোডে
+// আলাদা প্রশ্ন-সংখ্যা দিত। এখন তিন পাইপলাইন limits.ts-এর একই গার্ড শেয়ার করে।
+const ygBijoy = parseMcq("5. চিরস্থায়ী বন্দোবস্ত কবে হয়?\\nক) ১৭৯৩\\n1815 mv‡j Avgiv †`LwQ|");
+check("Bijoy 'mv‡j' বছৰ-লাইন প্রশ্ন নয় (1500-রেঞ্জ শেয়ার্ড গার্ড)", ygBijoy.questions.length === 1 && ygBijoy.questions[0].originalNumber === 5, `got ${JSON.stringify(ygBijoy.questions.map(q => q.originalNumber))}`);
+const yg1850 = parseMcq("5. আসল প্রশ্ন?\\nক) উত্তর\\n1850. সালের কথা বলা হয়েছে।");
+check("'1850. সালের…' প্রশ্ন নয় (গার্ড ছাড়া আগে প্রশ্ন ধরা পড়ত)", yg1850.questions.length === 1 && yg1850.questions[0].originalNumber === 5, `got ${JSON.stringify(yg1850.questions.map(q => q.originalNumber))}`);
+// গার্ড টাইট: গার্ড-রেঞ্জের (1500..2100) নম্বর হলেও "সাল"/"year" ছাড়া টেক্সট = আসল প্রশ্ন
 const yg4 = parseMcq("2024. বাংলাদেশের প্রথম রাজধানী?\nক) সোনারগাঁও\n2025. বর্তমান রাজধানী?\nক) ঢাকা");
 check("গার্ড-রেঞ্জের নম্বর হলেও 'সাল/year' ছাড়া প্রশ্ন হয়", yg4.questions.length === 2 && yg4.questions[0].originalNumber === 2024 && yg4.questions[1].originalNumber === 2025, `got ${JSON.stringify(yg4.questions.map(q => q.originalNumber))}`);
 // প্রথম-প্রশ্ন num ≤ 50 নিয়ম অপরিবর্তিত (সেপারেটর-হীন প্রথম লাইনে বড় সংখ্যা প্রশ্ন নয়)

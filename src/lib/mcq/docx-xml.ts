@@ -11,7 +11,14 @@
 
 import JSZip from "jszip";
 
-import { MARKER_WINDOW_PARAS, MAX_SERIAL_NUMBER, MIN_OPTIONS_PER_MCQ } from "./limits";
+import {
+  MARKER_WINDOW_PARAS,
+  MAX_SERIAL_NUMBER,
+  MIN_OPTIONS_PER_MCQ,
+  YEAR_GUARD_MAX,
+  YEAR_GUARD_MIN,
+  YEAR_GUARD_WORD_RE,
+} from "./limits";
 
 export const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 export const M_NS = "http://schemas.openxmlformats.org/officeDocument/2006/math";
@@ -342,7 +349,11 @@ export function isSectionSeparator(text: string): boolean {
   if (!text.trim() || text.includes("\t")) return false;
   const t = text.trim();
   if (isExamTitleLine(t)) return true;
-  if (t.length <= 3) return true;
+  if (t.length <= 3) {
+    // কিন্তু ছোট অপশন-লাইন ("ক)২", "D)5", "*A.") কখনো হেডার নয় — নাহলে
+    // প্রশ্ন-ব্লক কেটে অপশনটা হারিয়ে যেত (ট্যাব-লেড সারির মতোই সুরক্ষা)।
+    return !looksOptionLed(t);
+  }
   return /^[A-Za-z][A-Za-z0-9 .\-]{1,29}$/.test(t) && t === t.toUpperCase();
 }
 
@@ -353,12 +364,13 @@ export function isQuestionStart(si: SerialPrefix, hasRunTab: boolean, nextText: 
   // সিলিং = MAX_SERIAL_NUMBER (৪-ডিজিট, SERIAL_RE-এর {1,4}-এর সাথে সামঞ্জস্য) —
   // টেক্সট-পার্সারের (parser.ts) সাথে ইউনিফাইড; আগে এখানে 5000 ছিল (Task 21-a)
   if (si.num > MAX_SERIAL_NUMBER) return false;
-  // সাল-গার্ড (parser.ts-এর সাথে সামঞ্জস্য + Bijoy "mv‡?j"/সালে): "1815 mv‡j…" /
-  // "2016 সালের ফলাফল…" — ইতিহাস-নোটের সাল-লাইন, সিরিয়াল নয়
-  // (‡ হলো SutonnyMJ া-কার: সালে = m+v+‡+j)
-  if (si.num >= 1500 && si.num <= 2100) {
+  // সাল-গার্ড: "1815 mv‡j…" / "2016 সালের ফলাফল…" — ইতিহাস-নোটের সাল-লাইন,
+  // সিরিয়াল নয় (‡ হলো SutonnyMJ া-কার: সালে = m+v+‡+j)। রেঞ্জ+রেজেক্স এখন
+  // limits.ts-এর শেয়ার্ড কনস্ট্যান্ট — টেক্সট-পার্সারের (parser.ts) সাথে হুবহু এক,
+  // তাই একই লাইন দুই মোডে একই সিদ্ধান্ত পায়।
+  if (si.num >= YEAR_GUARD_MIN && si.num <= YEAR_GUARD_MAX) {
     const head = si.after.trimStart().slice(0, 10).toLowerCase();
-    if (/সাল|year|mv‡?j/.test(head)) return false;
+    if (YEAR_GUARD_WORD_RE.test(head)) return false;
   }
   // ক্রমবাচক-গার্ড: সেপারেটর-হীন সিরিয়ালের পরে সরাসরি "তম/শে/য়…" — টাইটেল
   if (!si.separator && ORDINAL_AFTER_RE.test(si.after)) return false;

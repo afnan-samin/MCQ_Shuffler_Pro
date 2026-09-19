@@ -118,6 +118,9 @@ const page = await browser.newPage();
 const errors: string[] = [];
 page.on("pageerror", (e) => errors.push("pageerror: " + e.message));
 page.on("console", (m) => { if (m.type() === "error") errors.push("console: " + m.text()); });
+// back-home-এ window.confirm (Phase 4.2) — হ্যান্ডলার না থাকলে Playwright ডায়ালগ
+// auto-dismiss করে (false) → হোমে ফেরে না → "#step-upload" টাইমআউট। তাই accept।
+page.on("dialog", (d) => d.accept());
 
 try {
   await page.goto("http://localhost:3000", { waitUntil: "networkidle" });
@@ -202,12 +205,8 @@ try {
   await page.waitForSelector('button[role="tab"]:has-text("MCQ Shuffle")', { timeout: 30000 });
   await page.click('button[role="tab"]:has-text("MCQ Shuffle")');
   await page.waitForSelector('button:has-text("Shuffle & build sets")', { timeout: 120000 });
-  // raw চ্যাপ্টারে সিরিয়াল ভাঙা থাকতে পারে — গেট লক থাকলে "Run as-is" অন করি
+  // raw চ্যাপ্টারে সিরিয়াল ভাঙা থাকলেও docx-মোডে সিরিয়াল gate নেই — shuffle সরাসরি চলে
   const longShuffleBtn = page.locator('button:has-text("Shuffle & build sets")');
-  if (await longShuffleBtn.isDisabled()) {
-    await page.click("#docx-allow-broken");
-    await page.waitForSelector('button:has-text("Shuffle & build sets"):not([disabled])', { timeout: 15000 });
-  }
   await longShuffleBtn.click();
   await page.waitForSelector("text=Shuffle complete", { timeout: 120000 });
   const longName = await clickDownload(page, "renumbered serials", LONG_PDF);

@@ -26,6 +26,9 @@ const page = await browser.newPage();
 const errors: string[] = [];
 page.on("pageerror", (e) => errors.push("pageerror: " + e.message));
 page.on("console", (m) => { if (m.type() === "error") errors.push("console: " + m.text()); });
+// back-home-এ window.confirm (Phase 4.2) — হ্যান্ডলার না থাকলে Playwright ডায়ালগ
+// auto-dismiss করে (false) → হোমে ফেরে না → "#step-upload" টাইমআউট। তাই accept।
+page.on("dialog", (d) => d.accept());
 
 const fresh = async () => {
   await page.goto("http://localhost:3000", { waitUntil: "networkidle" });
@@ -75,6 +78,9 @@ await page.locator('#step-shuffle').getByRole("button", { name: "3", exact: true
 await page.waitForTimeout(300);
 const quickVal = await page.inputValue("#set-count");
 ok(quickVal === "3", "কুইক-চিপ 3 → ইনপুটে 3", `(মান=${quickVal})`);
+// ডিফল্ট distribution এখন "original" (প্রতি সেটে সব প্রশ্ন) — ৩×২০ দেখতে
+// interleaved বেছে নিই (এই ব্লকের আসল উদ্দেশ্য ছিল interleaved-এর ২০/২০ ভাগ)
+await page.click('label[for="dist-inter"]');
 await page.click(shuffleBtn);
 await page.waitForSelector('#step-result :text("3 sets")', { timeout: 60000 });
 ok((await page.locator('#step-result :text("20 questions")').count()) === 3, "৩ সেট × ২০ প্রশ্ন");
@@ -118,10 +124,10 @@ ok((await page.locator('#step-result :text("60 questions")').count()) === 3, "or
 await page.click('label[for="dist-inter"]');
 await page.click(shuffleBtn);
 await page.waitForSelector('#step-result :text("3 sets")', { timeout: 60000 });
-ok((await page.locator('text=Serial: 1,2,3').count()) >= 1, "রিনাম্বার ON ডিফল্ট ব্যাজ");
+ok((await page.locator('text=Serial: original').count()) >= 1, "Serial replace ডিফল্ট OFF ব্যাজ (আসল নম্বর)");
 await page.click("#renumber-switch");
 await page.waitForTimeout(300);
-ok((await page.locator('text=Serial: original').count()) >= 1, "রিনাম্বার টগল → আসল-নম্বর ব্যাজ");
+ok((await page.locator('text=Serial: 1,2,3').count()) >= 1, "টগল ON → ১,২,৩… ব্যাজ");
 
 // A9. দুই ডাউনলোডই ফায়ার + ফাইলনেম
 const [dlR] = await Promise.all([
@@ -201,20 +207,7 @@ const [dlZip2] = await Promise.all([
 ]);
 ok(dlZip2.suggestedFilename() === "MCQ-serial-files.zip", "২-ফাইল ZIP আবারও চলে");
 
-// B6. সিরিয়াল পেস্ট-পাথ — পেস্ট-ট্যাব (ফাইল লোড থাকলেও ট্যাব ক্লিকযোগ্য) → ডিটেক্ট (docx-লিস্ট অটো-ক্লিয়ার) → ফিক্স → ডাউনলোড
-await page.click('button[role="tab"]:has-text("Paste")');
-await page.fill("textarea", "1. পানির সংকেত কী?\nক) H2O খ) CO2 গ) O2 ঘ) NaCl\n2. বাতাসে সবচেয়ে বেশি কী আছে?\nক) অক্সিজেন খ) নাইট্রোজেন গ) হিলিয়াম ঘ) হাইড্রোজেন\n5. লোহার প্রতীক?\nক) Fe খ) Au গ) Ag ঘ) Cu");
-await page.click('button:has-text("Detect questions")');
-await page.waitForSelector("#serial-paste-result", { timeout: 30000 });
-ok(await toastSeen("the serial has problems"), "ভাঙা সিরিয়াল ডিটেক্ট (৩,৪ লাফ)");
-await page.click('button:has-text("Fix numbering automatically")');
-await page.waitForSelector("text=Serial is correct", { timeout: 30000 });
-ok(true, "অটো-ফিক্স → সিরিয়াল ঠিক");
-const [dlPaste] = await Promise.all([
-  page.waitForEvent("download", { timeout: 120000 }),
-  page.click('button:has-text("Download serial .docx (1..N)")'),
-]);
-ok(dlPaste.suggestedFilename().startsWith("MCQ-Serial-3q.docx"), "পেস্ট সিরিয়াল ডাউনলোড নাম", dlPaste.suggestedFilename());
+// B6. [SKIP] serial paste-path: bortoman SerialInputCard sudhu file-list dekhay (paste-tab nei); paste korle home-card theke text/shuffle flow chole. Flow abar jog hole ei block chalu koro.
 
 // ============================================================
 // C. রিডাউনলোড মোড — অংশ/রিনাম্বার/সিলেকশন + মার্জ/ZIP

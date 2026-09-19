@@ -92,22 +92,6 @@ export function DocxSetsResult({
           <DownloadFormatToggle value={format} onChange={onFormatChange} disabled={busy !== null} />
         )}
 
-        {/* এক্সপোর্ট বার */}
-        <div className="sticky top-2 z-10 flex flex-wrap items-center justify-center gap-2 rounded-xl border bg-white/95 p-3 shadow-sm backdrop-blur dark:bg-background/95">
-          <Button className="gap-2 bg-brand-600 hover:bg-brand-700" onClick={() => onDownload(true)} disabled={busy !== null}>
-            {busy === "docx-r" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-            ⬇️ {fmtLabel} — renumbered serials (1,2,3…)
-          </Button>
-          <Button variant="outline" className="gap-2" onClick={() => onDownload(false)} disabled={busy !== null}>
-            {busy === "docx-o" ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlignLeft className="h-4 w-4" />}
-            ⬇️ {fmtLabel} — original numbers
-          </Button>
-          <Button variant="outline" className="gap-2" onClick={onDownloadSets} disabled={busy !== null}>
-            {busy === "docx-sets" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Files className="h-4 w-4" />}
-            ⬇️ Sets separately{sets.length > 1 ? " (ZIP)" : ""}
-          </Button>
-        </div>
-
         {/* সেট কার্ডগুলো */}
         <div className="grid gap-4 lg:grid-cols-2">
           {sets.map((ids, si) => (
@@ -168,6 +152,21 @@ export function DocxSetsResult({
 
         <div className="rounded-lg border bg-muted/30 px-3 py-2 text-center text-xs text-muted-foreground">
           ✍️ Serials stay <span className="font-medium text-foreground/80">plain text</span> — no bullets/auto-numbering. Tabs, equations (math), sub/superscript, Bijoy (SutonnyMJ) fonts — all exactly like the original.
+        </div>
+
+        <div className="sticky top-2 z-10 flex flex-wrap items-center justify-center gap-2 rounded-xl border bg-white/95 p-3 shadow-sm backdrop-blur dark:bg-background/95">
+          <Button className="gap-2 bg-brand-600 hover:bg-brand-700" onClick={() => onDownload(true)} disabled={busy !== null}>
+            {busy === "docx-r" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+            ⬇️ {fmtLabel} — renumbered serials (1,2,3…)
+          </Button>
+          <Button variant="outline" className="gap-2" onClick={() => onDownload(false)} disabled={busy !== null}>
+            {busy === "docx-o" ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlignLeft className="h-4 w-4" />}
+            ⬇️ {fmtLabel} — original numbers
+          </Button>
+          <Button variant="outline" className="gap-2" onClick={onDownloadSets} disabled={busy !== null}>
+            {busy === "docx-sets" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Files className="h-4 w-4" />}
+            ⬇️ Sets separately{sets.length > 1 ? " (ZIP)" : ""}
+          </Button>
         </div>
 
         <div className="flex items-center justify-center gap-1.5 pt-2 text-xs text-muted-foreground">
