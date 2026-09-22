@@ -288,10 +288,16 @@ export interface SerialPrefix {
   after: string;
 }
 
+// "​" = ZERO-WIDTH SPACE (U+200B) — Word থেকে কপি/পেস্ট করা ফাইলে প্যারার
+// শুরুতে অদৃশ্য অক্ষর হিসেবে বসে থাকে ("Weekly Exam 3 Raw"-এ ১০টা প্রশ্নের
+// আগে ছিল)। ^\s* একে ধরে না, তাই সিরিয়াল-রেজেক্স ম্যাচ করত না ও প্রশ্ন
+// গোনা থেকে বাদ পড়ত (৯০ বনাম ১০০)। সব শুরুর-রেজেক্স এটা স্কিপ করে।
+const INVISIBLE_LEAD = "​‌‍﻿￾";
+const LEAD = `\\s${INVISIBLE_LEAD}`;
 // "|" = SutonnyMJ-এ দাঁড়ি (।) — Bijoy ফাইলে "44|" = "৪৪।" — তাই pipe-ও সেপারেটর
 const SEP_CLASS = ".।):\\-–—:|";
 const ALL_DIGITS = DIGIT_CLASS.en + DIGIT_CLASS.bn + DIGIT_CLASS.bijoy;
-const SERIAL_RE = new RegExp(`^\\s*([${ALL_DIGITS}]{1,4})\\s*([${SEP_CLASS}])?`);
+const SERIAL_RE = new RegExp(`^[${LEAD}]*([${ALL_DIGITS}]{1,4})\\s*([${SEP_CLASS}])?`);
 
 /**
  * আইসোটোপ-গার্ড: ডিজিটের ঠিক পরে (স্পেস/সেপারেটর ছাড়াই) ইংরেজি অক্ষর বসলে
@@ -313,13 +319,18 @@ export function detectSerialPrefix(text: string): SerialPrefix | null {
   if (isotopeLikeAfterDigits(text, digitsEnd)) return null;
   const after = text.slice(m[0].length);
   if (!after.trim()) return null;
-  return { raw: m[0], digits: m[1], num: conv.num, enc: conv.enc, separator: m[2] ?? "", after };
+  // raw-এ লিডিং অদৃশ্য অক্ষর (ZWSP) রাখি না — ZWSP-সহ প্রশ্নেও রিনাম্বার/
+  // রিপ্লেস অফসেট ভাঙে না, আউটপুট XML পরিচ্ছন্ন থাকে
+  const leadLen = m[0].length - m[0].replace(new RegExp(`^[${LEAD}]*`), "").length;
+  return { raw: m[0].slice(leadLen), digits: m[1], num: conv.num, enc: conv.enc, separator: m[2] ?? "", after };
 }
 
 export function looksOptionLed(t: string): boolean {
   if (/^\t/.test(t)) return true;
   // `*`-প্রিফিক্স = B-টাইমার ফরম্যাটের উত্তর-মার্কড অপশন-লাইন ("*A. টেক্সট")
-  return /^\s*\*?\s*(?:[KLMNklmn]\s*[.।):]|[কখগঘ]\s*[.।):]|[a-dA-D]\s*[.):]|[([]\s*[কখগঘa-dA-D]\s*[)\]]|Dt\b|উঃ|উত্তর)/.test(t);
+  return new RegExp(
+    `^[${LEAD}]*\\*?\\s*(?:[KLMNklmn]\\s*[.।):]|[কখগঘ]\\s*[.।):]|[a-dA-D]\\s*[.):]|[([]\\s*[কখগঘa-dA-D]\\s*[)\\]]|Dt\\b|উঃ|উত্তর)`
+  ).test(t);
 }
 
 /**
@@ -350,9 +361,9 @@ export function isSectionSeparator(text: string): boolean {
   const t = text.trim();
   if (isExamTitleLine(t)) return true;
   if (t.length <= 3) {
-    // কিন্তু ছোট অপশন-লাইন ("ক)২", "D)5", "*A.") কখনো হেডার নয় — নাহলে
-    // প্রশ্ন-ব্লক কেটে অপশনটা হারিয়ে যেত (ট্যাব-লেড সারির মতোই সুরক্ষা)।
-    return !looksOptionLed(t);
+    if (looksOptionLed(t)) return false;
+    // শুধু ALL-CAPS ল্যাটিন সংক্ষেপ (A, I, II) হেডার — "OR"/"Yes"/"No" নয়
+    return /^[A-Z]$/.test(t) || /^I{2,3}$/.test(t);
   }
   return /^[A-Za-z][A-Za-z0-9 .\-]{1,29}$/.test(t) && t === t.toUpperCase();
 }
@@ -360,7 +371,12 @@ export function isSectionSeparator(text: string): boolean {
 /** সিরিয়ালের পরে সরাসরি ক্রমবাচক-সাফিক্স ("৪৫তম বিসিএস…" — টাইটেল, প্রশ্ন নয়) */
 const ORDINAL_AFTER_RE = /^\s*(?:তম|শে|য়|র্থ|ঠ|ই|ম(?=[\s।,]|$))/;
 
-export function isQuestionStart(si: SerialPrefix, hasRunTab: boolean, nextText: string | null): boolean {
+export function isQuestionStart(
+  si: SerialPrefix,
+  hasRunTab: boolean,
+  nextText: string | null,
+  leadingTab = false
+): boolean {
   // সিলিং = MAX_SERIAL_NUMBER (৪-ডিজিট, SERIAL_RE-এর {1,4}-এর সাথে সামঞ্জস্য) —
   // টেক্সট-পার্সারের (parser.ts) সাথে ইউনিফাইড; আগে এখানে 5000 ছিল (Task 21-a)
   if (si.num > MAX_SERIAL_NUMBER) return false;
@@ -374,12 +390,23 @@ export function isQuestionStart(si: SerialPrefix, hasRunTab: boolean, nextText: 
   }
   // ক্রমবাচক-গার্ড: সেপারেটর-হীন সিরিয়ালের পরে সরাসরি "তম/শে/য়…" — টাইটেল
   if (!si.separator && ORDINAL_AFTER_RE.test(si.after)) return false;
+  // লিডিং-ট্যাব ভেটো: প্যারার একদম শুরুতেই রান-ট্যাব ("\t5.0g + 2.0g …",
+  // "\t28 mm …") — ওটা আগের প্রশ্নের ইনডেন্টেড কনটিনিউয়েশন/অপশন-সারি,
+  // প্রশ্ন-শুরু নয়। redownload-এর পাস-১ isOptionLine-এর /^\t/ শর্ট-সার্কিটের
+  // সাথে হুবহু এক — টিয়ার ১/২ (ট্যাব/পরের-অপশন-লেড) এখানে পৌঁছানোর আগেই বাদ।
+  // (টিয়ার-১-এর hasRunTab ভেতরের ট্যাবও ধরে — "32.<tab>প্রশ্ন" তাই আলাদা।)
+  if (leadingTab) return false;
+  // ডেসিমাল-ভেটো (নিচের টিয়ার-৩ নিয়মটাই টিয়ার ১/২-এর **আগে**): সেপারেটরের পরে
+  // স্পেস/ট্যাব ছাড়াই ডিজিট বসলে "5.0" দশমিক সংখ্যা — সিরিয়াল নয়। আসল সিরিয়ালে
+  // সেপারেটরের পরে স্পেস/ট্যাব থাকে ("5.\t10% NaCl" → after="\t10%…", "5. 10%"
+  // → after=" 10%…") — দুটোই এই ভেটো এড়িয়ে টিয়ারে যায়।
+  if (si.separator && /^[0-9০-৯]/.test(si.after)) return false;
   // টিয়ার ১: সিরিয়ালের পরে ট্যাব আছে (ইউজারের ফরম্যাট: "32.<tab>প্রশ্ন")
   if (hasRunTab) return true;
   // টিয়ার ২: পরের নন-এম্পটি প্যারা অপশন-লেড (ট্যাব/ক খ গ ঘ মার্কার)
   if (nextText !== null && looksOptionLed(nextText)) return true;
   // টিয়ার ৩: ডেসিমাল গার্ড — "2.5 মিটার" যেন সিরিয়াল না হয়
-  if (si.separator && !/^[0-9০-৯]/.test(si.after)) return si.num <= 999;
+  if (si.separator && !/^[0-9০-৯]/.test(si.after)) return true;
   return false;
 }
 
@@ -861,7 +888,7 @@ export function parseDocxXml(xml: string): DocxParseResult {
     let started = false;
     if (el.localName === "p") {
       const si = detectSerialPrefix(text);
-      if (si && isQuestionStart(si, hasRunTabs[i], nextNonEmptyText(i + 1))) {
+      if (si && isQuestionStart(si, hasRunTabs[i], nextNonEmptyText(i + 1), /^\t/.test(text))) {
         if (cur) cands.push(cur);
         cur = { start: i, end: i, si, texts: [text] };
         started = true;
@@ -1038,7 +1065,7 @@ export function serialMatchSpans(joined: string, segEnds?: number[]): { digitsSt
   if (!m) return null;
   const conv = digitsToNumber(m[1]);
   if (!conv) return null;
-  // ডিজিট ম্যাচের শুরু: লিডিং স্পেস ও ডিজিট-সেপারেটরের মাঝের স্পেস সঠিকভাবে স্কিপ
+  // ডিজিট ম্যাচের শুরু: লিডিং স্পেস/অদৃশ্য-অক্ষর ও ডিজিট-সেপারেটরের মাঝের স্পেস সঠিকভাবে স্কিপ
   const digitsStart = m.index + joined.indexOf(m[1], m.index);
   const digitsEnd = digitsStart + m[1].length;
   if (isotopeLikeAfterDigits(joined, digitsEnd)) {

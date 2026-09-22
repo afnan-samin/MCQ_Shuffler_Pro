@@ -17,13 +17,16 @@
 // ============================================================
 
 import {
+  countOptionMarkers,
   detectSerialPrefix,
   isQuestionStart,
+  isSectionSeparator,
   looksOptionLed,
   serialMatchSpans,
   numberToDigits,
   type DigitEnc,
 } from "./docx-xml";
+import { MARKER_WINDOW_PARAS, MIN_OPTIONS_PER_MCQ } from "./limits";
 import { repackDocxRemapped, DOCX_MIME } from "./repack-docx";
 import type { FontSettings } from "./font-remap";
 import type { ZipProgress } from "./docx-xml";
@@ -233,24 +236,26 @@ export function analyzeColorDocx(xml: string): ColorAnalysis {
   const children = scanBodyChildren(xml);
 
   // ধাপ ১: প্রতিটা প্যারার টেক্সট + রঙ + ট্যাব
+  // ⚠️ childText-এ **সব** body-child-এর টেক্সট থাকে (টেবিল/অন্য এলিমেন্টও) —
+  // docx-xml-এর `paraTexts`-এর হুবহু; নাহলে টেবিলের ভিতরে-থাকা অপশনের মার্কার
+  // MCQ-শর্তের গণনায় পড়ে না আর আসল প্রশ্ন ভুলে merge হয়ে যায় (Sheet-ফাইল বাগ)।
+  const childText: string[] = new Array(children.length).fill("");
   const texts: string[] = [];
   const colorKeys: (string | null)[] = [];
   const hasTabs: boolean[] = [];
   const paraChildIdx: number[] = []; // paras অ্যারের এন্ট্রি → children ইনডেক্স
+  const childParaIdx: number[] = new Array(children.length).fill(-1); // children ইনডেক্স → paras এন্ট্রি
 
   for (let i = 0; i < children.length; i++) {
     const ch = children[i];
-    if (ch.kind !== "w:p") continue; // tbl/bookmarkEnd/sectPr — রঙ-মোডে স্কিপ
-    if (ch.selfClosing) {
-      texts.push("");
-      colorKeys.push(null);
-      hasTabs.push(false);
-    } else {
-      const sub = xml.slice(ch.start, ch.end);
-      texts.push(paraTextOf(sub));
-      colorKeys.push(paraShadingKeyOf(sub));
-      hasTabs.push(sub.includes("<w:tab/>"));
-    }
+    if (ch.kind === "sectPr") continue;
+    const sub = ch.selfClosing ? "" : xml.slice(ch.start, ch.end);
+    childText[i] = ch.selfClosing ? "" : paraTextOf(sub);
+    if (ch.kind !== "w:p") continue; // tbl/bookmarkEnd — প্যারা-তালিকায় আসে না
+    texts.push(childText[i]);
+    colorKeys.push(ch.selfClosing ? null : paraShadingKeyOf(sub));
+    hasTabs.push(ch.selfClosing ? false : sub.includes("<w:tab/>"));
+    childParaIdx[i] = paraChildIdx.length;
     paraChildIdx.push(i);
   }
 
@@ -262,23 +267,68 @@ export function analyzeColorDocx(xml: string): ColorAnalysis {
     return null;
   };
 
+  // ---- ধাপ ২ক: প্রার্থী-ফ্ল্যাগ + ব্লক-সীমা (docx-xml-এর হুবহু ব্লক-নিয়ম) ----
+  // এখানে শুধু "অভিভাবক" ডিটেকশন — সিরিয়াল-প্রিফিক্স + isQuestionStart।
+  const candFlags: boolean[] = texts.map(() => false);
+  for (let k = 0; k < texts.length; k++) {
+    if (colorKeys[k]) continue; // রঙ-দেওয়া লাইন কখনো প্রশ্ন না
+    const si = detectSerialPrefix(texts[k]);
+    if (si && isQuestionStart(si, hasTabs[k], nextNonEmpty(k + 1), /^\t/.test(texts[k])))
+      candFlags[k] = true;
+  }
+
+  // ব্লক = সিরিয়াল-শুরু থেকে পরের সিরিয়াল-শুরু/সেকশন-সেপারেটর পর্যন্ত
+  // (docx-xml-এর `cur.texts` জমানোর সাথে হুবহু — টেবিল-টেক্সটসহ, মার্কার-গণনার ভিত্তি)।
+  const blocks: number[][] = []; // প্রতি ব্লকে child-ইনডেক্স
+  let curBlock: number[] | null = null;
+  for (let i = 0; i < children.length; i++) {
+    const ch = children[i];
+    if (ch.kind === "sectPr") continue;
+    const k = childParaIdx[i];
+    if (k >= 0 && candFlags[k]) {
+      if (curBlock) blocks.push(curBlock);
+      curBlock = [i];
+      continue;
+    }
+    if (!curBlock) continue;
+    if (isSectionSeparator(childText[i])) {
+      blocks.push(curBlock);
+      curBlock = null;
+    } else {
+      curBlock.push(i);
+    }
+  }
+  if (curBlock) blocks.push(curBlock);
+
+  // ---- ধাপ ২খ: MCQ-শর্ত — এক ইঞ্জিনের এক নিয়ম (shuffle/redownload-এর সাথে অভিন্ন) ----
+  // শাফল (parseDocxXml) ও রিডাউনলোড (parseRedownloadXml) একই শেয়ার্ড নিয়ম চালায়:
+  // কম-অপশন-মার্কার ব্লক (ব্যাখ্যার ভিতরের "1./2." তালিকা, উত্তর-লাইন) আলাদা
+  // প্রশ্ন নয় — আগের প্রশ্নের ধারাবাহিক অংশ। সিরিয়াল-ইঞ্জিনে এই নিয়মটা ছিল না,
+  // তাই সিরিয়াল-মোড বেশি প্রশ্ন গুনত (৫১ বনাম ৫০ — প্রোব-প্রমাণিত) আর ওই
+  // ফরেন-লাইনটা ভুলভাবে নিজের সিরিয়াল-নম্বরও পেত। এখন তিন ইঞ্জিন অভিন্ন।
+  const blockTexts = blocks.map((b) => b.map((i) => childText[i]));
+  const totalMarkers = blockTexts.reduce((a, t) => a + countOptionMarkers(t.join("\n")), 0);
+  const applyMcqRule = blocks.length > 0 && totalMarkers >= MIN_OPTIONS_PER_MCQ * blocks.length;
+  const questionParas = new Set<number>();
+  for (let i = 0; i < blocks.length; i++) {
+    const firstChild = blocks[i][0];
+    const k = childParaIdx[firstChild];
+    const enoughMarkers =
+      countOptionMarkers(blockTexts[i].slice(0, MARKER_WINDOW_PARAS).join("\n")) >= MIN_OPTIONS_PER_MCQ;
+    // প্রথম ব্লক সর্বদা প্রশ্ন; বাকিগুলো মার্কার-কম হলে আগের প্রশ্নে merge (প্রশ্ন নয়)
+    if (k >= 0 && (i === 0 || !applyMcqRule || enoughMarkers)) questionParas.add(k);
+  }
+
   const paras: ColorPara[] = [];
   const sectionCount = new Map<string, number>();
-  let questionCount = 0;
+  const questionCount = questionParas.size;
 
   for (let k = 0; k < texts.length; k++) {
     const colorKey = colorKeys[k];
-    let isQuestion = false;
-    if (!colorKey) {
-      const si = detectSerialPrefix(texts[k]);
-      if (si && isQuestionStart(si, hasTabs[k], nextNonEmpty(k + 1))) {
-        isQuestion = true;
-        questionCount++;
-      }
-    } else {
+    if (colorKey) {
       sectionCount.set(colorKey, (sectionCount.get(colorKey) ?? 0) + 1);
     }
-    paras.push({ idx: paraChildIdx[k], text: texts[k], colorKey, isQuestion });
+    paras.push({ idx: paraChildIdx[k], text: texts[k], colorKey, isQuestion: questionParas.has(k) });
   }
 
   const colors: DetectedColor[] = [...sectionCount.entries()]

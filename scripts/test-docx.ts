@@ -205,9 +205,11 @@ console.log("\n== ৮) সিরিয়াল-সিলিং ইউনিফ�
   const rTab = parseDocxXml(docXml(tabP));
   ok(rTab.questions.length === 1 && rTab.questions[0].serial === 6001, "টিয়ার-১ (রান-ট্যাব): সিরিয়াল 6001 প্রশ্ন-স্টার্ট");
 
-  // টিয়ার-৩ ডেসিমাল-গার্ড অপরিবর্তিত (num ≤ 999): ট্যাব/অপশন-লেড ছাড়া 2000 প্রশ্ন নয়
-  const rTier3 = parseDocxXml(docXml(p("2000. ডেসিমাল-গার্ডের শিকার") + p("সাধারণ কনটিনিউয়েশন লাইন")));
-  ok(rTier3.questions.length === 0, "টিয়ার-৩ ডেসিমাল-গার্ড অপরিবর্তিত: 2000 (ট্যাব/অপশন-লেড ছাড়া, >999) প্রশ্ন নয়");
+  // টিয়ার-৩: ট্যাব/অপশন-লেড ছাড়া 2500 এখন প্রশ্ন (Bug C fix), দশমিক 2.5 নয়
+  const rTier3 = parseDocxXml(docXml(p("2500. বড় সিরিয়াল প্রশ্ন") + p("সাধারণ কনটিনিউয়েশন লাইন")));
+  ok(rTier3.questions.length === 1, "টিয়ার-৩: 2500 (ট্যাব/অপশন-লেড ছাড়া) এখন প্রশ্ন [Bug C]");
+  const rDecimal = parseDocxXml(docXml(p("2.5 মিটার দৈর্ঘ্য") + p("সাধারণ লাইন")));
+  ok(rDecimal.questions.length === 0, "দশমিক 2.5 প্রশ্ন নয়");
 }
 
 console.log("\n== ১০) repeat-লেবেল টাইপো (Physics Q27-কেস: K, L, L, N) — ৪ অপশনই গোনা হয় ==");
@@ -574,29 +576,32 @@ console.log("\n== ২২) শেয়ার্ড বছর-গার্ড (15
   const docXml = (body: string) =>
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${W}"><w:body>${body}<w:sectPr/></w:body></w:document>`;
 
-  // ---- (ক) শেয়ার্ড-রেঞ্জের ঠিক নিচে (1499) → গার্ড চালু হয় না, প্রশ্নই থাকে ----
-  const below = parseDocxXml(docXml(p("1499. সালের কথা") + p("ক. উত্তর")));
-  ok(below.questions.length === 1, `২২: ${YEAR_GUARD_MIN}-এর নিচের সিরিয়াল (1499) প্রশ্নই থাকে [${below.questions.length}]`);
-  // ---- (খ) রেঞ্জের দুই প্রান্ত (1500 / 2100) + "সাল"/"সালে" → প্রশ্ন নয় ----
+  // ---- (ক) শেয়ার্ড-রেঞ্জের ঠিক নিচে (1899) → গার্ড চালু হয় না, প্রশ্নই থাকে ----
+  const below = parseDocxXml(docXml(p("1899. সালের কথা") + p("ক. উত্তর")));
+  ok(below.questions.length === 1, `২২: ${YEAR_GUARD_MIN}-এর নিচের সিরিয়াল (1899) প্রশ্নই থাকে [${below.questions.length}]`);
+  // ---- (খ) রেঞ্জের দুই প্রান্ত (1900 / 2100) + "সাল"/"সালে" → প্রশ্ন নয় ----
   const atMin = parseDocxXml(docXml(p(`${YEAR_GUARD_MIN}. সালের কথা`) + p("ক. উত্তর")));
   ok(atMin.questions.length === 0, `২২: ${YEAR_GUARD_MIN} + "সাল" → প্রশ্ন নয় [${atMin.questions.length}]`);
   const atMax = parseDocxXml(docXml(p(`${YEAR_GUARD_MAX}. সালে কী ঘটেছিল`) + p("ক. উত্তর")));
   ok(atMax.questions.length === 0, `২২: ${YEAR_GUARD_MAX} + "সালে" → প্রশ্ন নয় [${atMax.questions.length}]`);
-  // ---- (গ) Bijoy "mv‡j" (= সালে) — টেক্সট-পার্সারের সাথে এখন একই সিদ্ধান্ত ----
+  // ---- (গ) Bijoy "mv‡j" (= সালে) — 1900-রেঞ্জে 1815 গার্ডে পড়ে না, প্রশ্নই থাকে ----
   const bijoy = parseDocxXml(docXml(p("1815 mv‡j Avgiv †`LwQ") + p("ক. উত্তর")));
-  ok(bijoy.questions.length === 0, `২২: Bijoy "1815 mv‡j…" প্রশ্ন নয় (শেয়ার্ড গার্ড) [${bijoy.questions.length}]`);
-  // ---- (ঘ) টাইট গার্ড: রেঞ্জের বড় সিরিয়াল কিন্তু "সাল"/"year" ছাড়া = আসল প্রশ্ন ----
-  const tight = parseDocxXml(docXml(p("1815. বাংলাদেশের ইতিহাসের প্রশ্ন?") + p("ক. উত্তর")));
-  ok(tight.questions.length === 1 && tight.questions[0].serial === 1815, `২২: 1815 (সাল-শব্দ ছাড়া) আসল প্রশ্ন [${tight.questions.length}]`);
+  ok(bijoy.questions.length === 1, `২২: Bijoy "1815 mv‡j…" 1900-রেঞ্জে প্রশ্নই থাকে [${bijoy.questions.length}]`);
+  const bijoyInRange = parseDocxXml(docXml(p("1950 mv‡j Avgiv †`LwQ") + p("ক. উত্তর")));
+  ok(bijoyInRange.questions.length === 0, `২২: Bijoy "1950 mv‡j…" প্রশ্ন নয় (1900-গার্ড) [${bijoyInRange.questions.length}]`);
+  // ---- (ঘ) টাইট গার্ড: রেঞ্জের ভিতরে কিন্তু "সাল"/"year" ছাড়া = আসল প্রশ্ন ----
+  const tight = parseDocxXml(docXml(p("1950. বাংলাদেশের ইতিহাসের প্রশ্ন?") + p("ক. উত্তর")));
+  ok(tight.questions.length === 1 && tight.questions[0].serial === 1950, `২২: 1950 (সাল-শব্দ ছাড়া) আসল প্রশ্ন [${tight.questions.length}]`);
 
   // ---- (ঙ) ছোট (≤৩ অক্ষর) লাইন: অপশন-লাইন কখনো সেকশন-হেডার নয় (নাহলে ব্লক কেটে অপশন হারাত) ----
   ok(!isSectionSeparator("ক)২"), '২২: "ক)২" (৩ অক্ষরের অপশন) সেকশন-হেডার নয়');
   ok(!isSectionSeparator("K)2"), '২২: "K)2" (৩ অক্ষরের অপশন) সেকশন-হেডার নয়');
   ok(!isSectionSeparator("*A."), '২২: "*A." (স্টার-অপশন) সেকশন-হেডার নয়');
-  ok(isSectionSeparator("OR"), '২২: "OR" আসল সেপারেটর হিসেবে অপরিবর্তিত');
+  ok(!isSectionSeparator("OR"), '২২: "OR" আর সেপারেটর নয় (Bug E fix)');
+  ok(!isSectionSeparator("Yes"), '২২: "Yes" সেপারেটর নয়');
   ok(
-    isSectionSeparator("A") && isSectionSeparator("PHYSICS") && isSectionSeparator("গ"),
-    "২২: সেকশন-হেডার A/PHYSICS/গ অপরিবর্তিত"
+    isSectionSeparator("A") && isSectionSeparator("PHYSICS"),
+    "২২: সেকশন-হেডার A/PHYSICS অপরিবর্তিত"
   );
 }
 }

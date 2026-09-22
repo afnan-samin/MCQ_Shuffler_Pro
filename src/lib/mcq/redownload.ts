@@ -336,6 +336,11 @@ function isQuestionStartPara(
     const head = si.after.trimStart().slice(0, 10).toLowerCase();
     if (YEAR_GUARD_WORD_RE.test(head)) return false;
   }
+  // ডেসিমাল-ভেটো (docx-xml isQuestionStart-এর সাথে হুবহু শেয়ার্ড নিয়ম):
+  // সেপারেটরের পরে স্পেস/ট্যাব ছাড়াই ডিজিট ("5.0g …") দশমিক সংখ্যা — সিরিয়াল
+  // নয়। (ট্যাব-লেড লাইন আগেই isOptionLine-এর /^\t/ শর্ট-সার্কিটে বাদ পায় —
+  // এই ভেটো ট্যাব-ছাড়া "5.0g"-কেও একই রকম বাদ দেয়, তাই দুই ইঞ্জিন সমান।)
+  if (si.separator && /^[0-9০-৯]/.test(si.after)) return false;
   if (countSerialLetterPairs(t) >= 2) return false;
   const afterTrim = si.after.trim();
   const nextOpt = nextText !== null && isOptionLine(nextText);
@@ -667,6 +672,11 @@ export function parseRedownloadXml(xml: string): RdParseResult {
   // ভাগ হওয়া অংশ) আলাদা মূল্যায়ন হয়, আগের পুরো-ফাইল-গড় না। মিশ্র
   // MCQ + non-MCQ (CQ/সংক্ষিপ্ত) ফাইলে আগে গড় নেমে গিয়ে পুরো ফাইলের
   // জন্য rule বন্ধ হয়ে যেত — এখন MCQ অংশের গেট অন থাকে, non-MCQ অংশের বন্ধ।
+  // Engine-parity fix: আগে "আগের ব্লক একই section-এ হতে হবে" শর্তটাও ছিল —
+  // তাতে সেকশন-সীমানা-পরের কম-মার্কার লাইন (আগের প্রশ্নের ধারাবাহিক অংশ)
+  // merge না হয়ে আলাদা প্রশ্ন হয়ে যেত (Sheet-ফাইলে ১টা বাড়তি — প্রোব-প্রমাণিত),
+  // আর শাফল-ইঞ্জিনে (parseDocxXml) ওটা merge হয়। এখন শর্ত হুবহু শাফলের মতো:
+  // শুধু নিজের সেকশনের গেট + মার্কার-গণনাই merge ঠিক করে — তিন ইঞ্জিন অভিন্ন।
   const secIds = [...new Set(blkSec)];
   const secRule = new Map<number, boolean>();
   for (const sid of secIds) {
@@ -675,21 +685,18 @@ export function parseRedownloadXml(xml: string): RdParseResult {
     secRule.set(sid, grpMarkers >= MIN_OPTIONS_PER_MCQ * idxs.length);
   }
   const merged: CurBlock[] = [];
-  const mergedSec: number[] = [];
   for (let bi = 0; bi < blks.length; bi++) {
     const b = blks[bi];
     const prevIdx = merged.length - 1;
     if (
       secRule.get(blkSec[bi]) &&
       prevIdx >= 0 &&
-      mergedSec[prevIdx] === blkSec[bi] &&
       countOptionMarkers(b.texts.slice(0, MARKER_WINDOW_PARAS).join("\n")) < MIN_OPTIONS_PER_MCQ
     ) {
       merged[prevIdx].end = b.end;
       merged[prevIdx].texts.push(...b.texts);
     } else {
       merged.push(b);
-      mergedSec.push(blkSec[bi]);
     }
   }
   for (const b of merged) pushBlock(b);
