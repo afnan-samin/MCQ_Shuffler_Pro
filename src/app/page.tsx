@@ -54,7 +54,7 @@ import { ColorSerialCard } from "@/components/mcq/color-serial-card";
 import { ModeTabs, type McqMode } from "@/components/mcq/mode-tabs";
 import { SerialInputCard } from "@/components/mcq/serial-input-card";
 import { NextModesCard } from "@/components/mcq/next-modes-card";
-import { StagedFilesCard, UploadFirstCard } from "@/components/mcq/upload-first-card";
+import { StagedFilesCard, UploadFirstCard, type StagedFile, type StagedFileStats } from "@/components/mcq/upload-first-card";
 import { ModeWorkBar } from "@/components/mcq/mode-work-bar";
 import {
   BlockedLinesCard,
@@ -260,8 +260,12 @@ export default function Home() {
   const [mode, setMode] = usePersistedString<McqMode>(MODE_KEY, "shuffle", isMcqMode);
 
   // ---- স্টেজড ফাইল — আপলোড হয়েছে, কিন্তু এখনো কোনো মোডে খোলা হয়নি ----
-  // ইউজার যেকোনো মোডে ক্লিক করলে এই ফাইলগুলো ওই মোডে লোড হয়ে যায়
-  const [stagedFiles, setStagedFiles] = useState<File[] | null>(null);
+  // ইউজার যেকোনো মোডে ক্লিক করলে এই ফাইলগুলো ওই মোডে লোড হয়ে যায়।
+  // প্রতিটা ফাইলের ডিটেকশন-সংখ্যা (প্রশ্ন/৬-অংশ) staging-সময়েই একবার গুনে রাখা হয় —
+  // মোড-লোডাররা পরে নিজেদের পার্স চালায়; এটা শুধু "files ready" টেবিলের প্রিভিউ।
+  const [stagedFiles, setStagedFiles] = useState<StagedFile[] | null>(null);
+  /** staging-পার্সের রান-আইডি — পুরনো রানের দেরিতে-আসা রেজাল্ট নতুন লিস্টে মিশবে না */
+  const stagedRunRef = useRef(0);
 
   // ---- ফ্লো-ধাপ: "select" = মোড-বাছাই (৩টা মোড-বাটন শুধু এখানেই), "work" = মোডের ভিতরে কাজ ----
   // মোডে ঢোকার পর ৩টা মোড-বাটন আর দেখানো হয় না — উপরে থাকে পেছনে + আরও-ফাইল বার
@@ -360,9 +364,9 @@ export default function Home() {
   const [rdLoading, setRdLoading] = useState(false);
   // প্রতি ফাইলে সিলেক্ট করা প্রশ্ন (কী = RdDocState.id)
   const [rdSel, setRdSel] = useState<Record<string, Set<number>>>({});
-  // কোন অংশগুলো নতুন ফাইলে থাকবে (ডিফল্ট: সিরিয়াল + প্রশ্ন)
+  // কোন অংশগুলো নতুন ফাইলে থাকবে (ডিফল্ট: ৬টাই সিলেক্ট)
   const [rdParts, setRdParts] = useState<PartSel>(DEFAULT_PART_SELECTION);
-  const [rdRenumber, setRdRenumber] = useState(true);
+  const [rdRenumber, setRdRenumber] = useState(false);
   const [optionLabels, updateOptionLabels] = usePersistedJson<OptionLabelSettings>(
     OPTION_LABELS_KEY,
     DEFAULT_OPTION_LABEL_SETTINGS,
@@ -459,48 +463,157 @@ export default function Home() {
   const serialFileCount = serialDocs.length;
   const rdFileCount = rdDocs.length;
 
-  /**
-   * স্টেজিং-সময় .docx ভ্যালিডেশন (F3) — প্রতিটা .docx-এর হালকা JSZip চেক
-   * (zip খোলা যায় + word/document.xml আছে; XML পার্স নয়)। ব্যর্থ ফাইল বাদ +
-   * English টোস্ট; সবগুলো ব্যর্থ হলে স্টেজই হয় না (আপলোড-কার্ডেই থাকে)।
-   */
-  const stageFiles = useCallback(async (files: File[]) => {
-    const valid: File[] = [];
-    for (const f of files) {
-      if (await isValidDocxZip(f)) {
-        valid.push(f);
-      } else {
-        toast({
-          title: "Could not read the file",
-          description: `${f.name} is not a valid .docx`,
-          variant: "destructive",
-        });
-      }
-    }
-    // সব ব্যর্থ → স্টেজ নয় — আপলোড-কার্ডেই থাকে ("files ready" ভুল ইঙ্গিত নয়)
-    if (valid.length) setStagedFiles(valid);
-  }, []);
-  /** মোড-বাছাই ধাপে "Add files" — স্টেজড লিস্টের শেষে যোগ হয় (replace নয়) */
-  const stageMoreFiles = useCallback(async (files: File[]) => {
-    if (!files.length) return;
-    const valid: File[] = [];
-    for (const f of files) {
-      if (await isValidDocxZip(f)) {
-        valid.push(f);
-      } else {
-        toast({
-          title: "Could not read the file",
-          description: `${f.name} is not a valid .docx`,
-          variant: "destructive",
-        });
-      }
-    }
-    if (valid.length) setStagedFiles((prev) => [...(prev ?? []), ...valid]);
-  }, []);
   const stagedDzTrigger = useRef<DropzoneTrigger | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   /** লোডার রি-এন্ট্রান্সি গার্ড — state নয়, ref (stale-closure এড়াতে); চলমান লোড থাকলে নতুন কল নীরবে বাদ */
   const loadersBusyRef = useRef(false);
+
+  /**
+   * স্টেজড ফাইলের ডিটেকশন-প্রিভিউ — মোডে ঢোকার আগেই "files ready" টেবিলে
+   * প্রশ্ন/৬-অংশের সংখ্যা দেখানোর জন্য। parseRedownloadXml-এর নিজস্ব সংখ্যা
+   * (প্রতি প্রশ্নে kinds → found-স্ট্যাট) — মোড-ভেতরের RedownloadPartsCard-এর
+   * ব্যাজ-হিসাবের (rdFoundStats) হুবহু একই নিয়ম, তাই সংখ্যা মিলবে।
+   */
+  const previewStagedStats = useCallback(async (xml: string): Promise<StagedFileStats> => {
+    const { parseRedownloadXml } = await import("@/lib/mcq/redownload");
+    const parse = parseRedownloadXml(xml);
+    let serial = 0;
+    let question = 0;
+    let reference = 0;
+    let withOptions = 0;
+    let optionsTotal = 0;
+    let withAnswer = 0;
+    let withBekkha = 0;
+    for (const q of parse.questions) {
+      // Serial = প্রশ্নে নিজে লেখা নম্বর আছে কিনা (kinds "serial" শুধু একক-সিরিয়াল-লাইনে বসে —
+      // ইনলাইন "1. প্রশ্ন…" হলে কিন্তু প্রতি প্রশ্নের নম্বর থাকে — তাই serialDigits ধরি)
+      if (q.serialDigits.length > 0) serial++;
+      if (q.kinds.includes("question")) question++;
+      if (q.kinds.includes("reference")) reference++;
+      if (q.options.length > 0) withOptions++;
+      optionsTotal += q.options.length;
+      if (q.answer) withAnswer++;
+      if (q.bekkha) withBekkha++;
+    }
+    return {
+      questions: parse.questions.length,
+      serial,
+      question,
+      reference,
+      options: withOptions,
+      optionsTotal,
+      answer: withAnswer,
+      bekkha: withBekkha,
+    };
+  }, []);
+
+  /**
+   * স্টেজিং-সময় .docx ভ্যালিডেশন (F3) — প্রতিটা .docx-এর হালকা JSZip চেক
+   * (zip খোলা যায় + word/document.xml আছে; XML পার্স নয়)। ব্যর্থ ফাইল বাদ +
+   * English টোস্ট; সবগুলো ব্যর্থ হলে স্টেজই হয় না (আপলোড-কার্ডেই থাকে)।
+   * ভ্যালিড ফাইলগুলোর ডিটেকশন-সংখ্যা ব্যাকগ্রাউন্ডে গুনে টেবিলে বসে।
+   */
+  const stageFiles = useCallback(
+    async (files: File[]) => {
+      const valid: File[] = [];
+      for (const f of files) {
+        if (await isValidDocxZip(f)) {
+          valid.push(f);
+        } else {
+          toast({
+            title: "Could not read the file",
+            description: `${f.name} is not a valid .docx`,
+            variant: "destructive",
+          });
+        }
+      }
+      // সব ব্যর্থ → স্টেজ নয় — আপলোড-কার্ডেই থাকে ("files ready" ভুল ইঙ্গিত নয়)
+      if (!valid.length) return;
+      const runId = ++stagedRunRef.current;
+      setStagedFiles(valid.map((file) => ({ file, status: "parsing" as const })));
+      // ডিটেকশন-প্রিভিউ — একটা একটা করে (বড় ফাইলে UI ব্লক হয় না); রান বদলে গেলে থামে
+      for (let i = 0; i < valid.length; i++) {
+        if (stagedRunRef.current !== runId) return;
+        const f = valid[i];
+        try {
+          const { loadDocxXml } = await import("@/lib/mcq/docx-xml");
+          const xml = await loadDocxXml(f);
+          if (stagedRunRef.current !== runId) return;
+          const stats = await previewStagedStats(xml);
+          if (stagedRunRef.current !== runId) return;
+          setStagedFiles((prev) =>
+            prev === null
+              ? prev
+              : prev.map((s, j) => (j === i ? { ...s, status: "ready" as const, stats } : s))
+          );
+        } catch {
+          if (stagedRunRef.current !== runId) return;
+          setStagedFiles((prev) =>
+            prev === null
+              ? prev
+              : prev.map((s, j) =>
+                  j === i ? { ...s, status: "error" as const, error: "Could not read the file" } : s
+                )
+          );
+        }
+      }
+    },
+    [previewStagedStats]
+  );
+  /** মোড-বাছাই ধাপে "Add files" — স্টেজড লিস্টের শেষে যোগ হয় (replace নয়) */
+  const stageMoreFiles = useCallback(
+    async (files: File[]) => {
+      if (!files.length) return;
+      const valid: File[] = [];
+      for (const f of files) {
+        if (await isValidDocxZip(f)) {
+          valid.push(f);
+        } else {
+          toast({
+            title: "Could not read the file",
+            description: `${f.name} is not a valid .docx`,
+            variant: "destructive",
+          });
+        }
+      }
+      if (!valid.length) return;
+      const runId = ++stagedRunRef.current;
+      const base = (stagedFilesRef.current ?? []).length;
+      setStagedFiles((prev) => [...(prev ?? []), ...valid.map((file) => ({ file, status: "parsing" as const }))]);
+      for (let k = 0; k < valid.length; k++) {
+        if (stagedRunRef.current !== runId) return;
+        const idx = base + k;
+        const f = valid[k];
+        try {
+          const { loadDocxXml } = await import("@/lib/mcq/docx-xml");
+          const xml = await loadDocxXml(f);
+          if (stagedRunRef.current !== runId) return;
+          const stats = await previewStagedStats(xml);
+          if (stagedRunRef.current !== runId) return;
+          setStagedFiles((prev) =>
+            prev === null
+              ? prev
+              : prev.map((s, j) => (j === idx ? { ...s, status: "ready" as const, stats } : s))
+          );
+        } catch {
+          if (stagedRunRef.current !== runId) return;
+          setStagedFiles((prev) =>
+            prev === null
+              ? prev
+              : prev.map((s, j) =>
+                  j === idx ? { ...s, status: "error" as const, error: "Could not read the file" } : s
+                )
+          );
+        }
+      }
+    },
+    [previewStagedStats]
+  );
+  /** stageMoreFiles-এর base-ইনডেক্সের জন্য স্টেজড-লিস্টের লাইভ রেফ (stale-closure এড়াতে) */
+  const stagedFilesRef = useRef<StagedFile[] | null>(null);
+  useEffect(() => {
+    stagedFilesRef.current = stagedFiles;
+  }, [stagedFiles]);
 
   // ---- প্রসেস-ওভারলে — বড় ফাইলের লোডে "hang"-চেহারা আটকায় (সব মোডে) ----
   const [proc, setProc] = useState<ProcState>({ active: false, stage: "", pct: null });
@@ -665,7 +778,7 @@ export default function Home() {
   const carryToMode = (target: McqMode, source: McqMode) => {
     if (modeHasContent(target)) return;
     if (stagedFiles && stagedFiles.length) {
-      const files = stagedFiles;
+      const files = stagedFiles.map((s) => s.file);
       setStagedFiles(null);
       loadIntoMode(target, files);
       return;
@@ -2218,6 +2331,14 @@ export default function Home() {
               <StagedFilesCard
                 files={stagedFiles}
                 onClear={() => setStagedFiles(null)}
+                onRemoveFile={(idx) => {
+                  // একটা ফাইল বাদ — শেষ ফাইলটাও বাদ পড়লে তালিকা খালি হয়ে আপলোড-কার্ডে ফিরে যায়
+                  // (hasAnyInput ফলস হলে ধাপ ১ অটো দেখায়)
+                  setStagedFiles((prev) => {
+                    const next = (prev ?? []).filter((_, i) => i !== idx);
+                    return next.length ? next : null;
+                  });
+                }}
                 addFilesTriggerRef={stagedDzTrigger}
                 maxSizeBytes={MAX_FILE_BYTES}
                 onAddFiles={(fs, rej) => {

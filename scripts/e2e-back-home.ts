@@ -7,6 +7,9 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 
 const OUT_DIR = "/home/z/my-project/scripts/tmp-e2e/back-home-files";
 
+// "পেছনে" ক্লিকে window.confirm আসে — Playwright ডিফল্টে dismiss (false) করে,
+// তাই হোমে ফেরে না → "#step-upload" টাইমআউট। accept করতে হবে (e2e-modes এর মতো)।
+
 // মিনিমাল বৈধ docx (প্রশ্ন ০টা — নেভিগেশন-টেস্টের জন্য যথেষ্ট)
 const CONTENT_TYPES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`;
@@ -28,6 +31,7 @@ writeFileSync(f, buf);
 const browser = await chromium.launch();
 const page = await browser.newPage();
 const errors: string[] = [];
+page.on("dialog", (d) => d.accept());
 page.on("pageerror", (e) => errors.push("pageerror: " + e.message));
 page.on("console", (m) => {
   if (m.type() === "error") errors.push("console: " + m.text());

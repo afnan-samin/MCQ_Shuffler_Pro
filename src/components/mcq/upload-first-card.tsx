@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { FileDropzone, type DropzoneRejection, type DropzoneTrigger } from "@/components/mcq/file-dropzone";
-import { FileText, FileUp, Loader2, Search, ClipboardPaste, FolderOpen, FolderPlus, X } from "lucide-react";
+import { FileText, FileUp, Loader2, Search, ClipboardPaste, FolderOpen, FolderPlus, X, TriangleAlert } from "lucide-react";
 
 interface UploadFirstCardProps {
   /** একাধিক .docx — স্টেজে উঠবে, তারপর ইউজার মোড বেছে নিবে */
@@ -160,9 +160,34 @@ a) Beijing  b) Tokyo  c) Seoul  d) Bangkok`}
   );
 }
 
+/** স্টেজড প্রতি-ফাইলের ডিটেকশন-সারসংক্ষেপ — প্রশ্ন/৬-অংশের টেবিলে দেখায়।
+ *  স্ট্যাটাস: parsing চলছে / ready (সংখ্যাসহ) / error (ফাইল পড়া যায়নি)।
+ *  NOTE: মোড-লোডাররা পরে নিজেদের পার্স চালায় — এটা শুধু প্রিভিউ-সংখ্যা। */
+export interface StagedFileStats {
+  questions: number;
+  serial: number;
+  question: number;
+  reference: number;
+  options: number;
+  optionsTotal: number;
+  answer: number;
+  bekkha: number;
+}
+
+/** validation-পাস করা ফাইল + তার ডিটেকশন-অবস্থা */
+export interface StagedFile {
+  file: File;
+  /** অপেক্ষা/চলছে — সংখ্যা এখনো আসেনি; ready হলে stats আছে; error হলে message */
+  status: "parsing" | "ready" | "error";
+  stats?: StagedFileStats | null;
+  error?: string | null;
+}
+
 interface StagedFilesCardProps {
-  files: File[];
+  files: StagedFile[];
   onClear: () => void;
+  /** প্রতি-সারির ক্রস — ওই একটা ফাইল কেটে ফেলে (কনফার্ম পপআপসহ) */
+  onRemoveFile?: (index: number) => void;
   /** আরও ফাইল যোগ করার জন্য — ঐচ্ছিক */
   addFilesTriggerRef?: Ref<DropzoneTrigger | null>;
   onAddFiles?: (files: File[], rejections: DropzoneRejection) => void;
@@ -174,7 +199,7 @@ interface StagedFilesCardProps {
  * স্টেজ হওয়া ফাইলের তালিকা — আপলোড হয়েছে, কিন্তু কোনো মোডে খোলা হয়নি।
  * নিচের মোড-বাটনে ক্লিক করলেই এই ফাইলগুলো ওই মোডে চলে যাবে।
  */
-export function StagedFilesCard({ files, onClear, addFilesTriggerRef, onAddFiles, addFilesDisabled, maxSizeBytes }: StagedFilesCardProps) {
+export function StagedFilesCard({ files, onClear, onRemoveFile, addFilesTriggerRef, onAddFiles, addFilesDisabled, maxSizeBytes }: StagedFilesCardProps) {
   const openAddFiles = () => {
     if (addFilesTriggerRef && typeof addFilesTriggerRef === "object" && "current" in addFilesTriggerRef) {
       addFilesTriggerRef.current?.open();
@@ -228,18 +253,89 @@ export function StagedFilesCard({ files, onClear, addFilesTriggerRef, onAddFiles
           </Button>
         </div>
       </CardHeader>
-      <CardContent>
-        <ul className="flex flex-wrap gap-2">
-          {files.map((f, i) => (
-            <li
-              key={`${f.name}-${i}`}
-              className="flex max-w-full items-center gap-1.5 rounded-lg border bg-white px-2.5 py-1.5 text-xs dark:bg-background"
-            >
-              <FileText className="h-3.5 w-3.5 shrink-0 text-brand-600" />
-              <span className="truncate">{f.name}</span>
-            </li>
-          ))}
-        </ul>
+      <CardContent className="space-y-3">
+        {/* ফাইল-প্রতি এক-লাইন + ৬-অংশের ডিটেকশন-টেবিল — মোডে ঢোকার আগেই সংখ্যা দেখা যায় */}
+        <div className="overflow-x-auto rounded-lg border">
+          <table className="w-full min-w-[640px] border-collapse text-xs">
+            <thead>
+              <tr className="bg-muted/60 text-left text-muted-foreground">
+                <th className="px-2.5 py-2 font-semibold">File</th>
+                <th className="px-2 py-2 text-center font-semibold">Total MCQ</th>
+                <th className="px-2 py-2 text-center font-semibold">Question</th>
+                <th className="px-2 py-2 text-center font-semibold">Reference</th>
+                <th className="px-2 py-2 text-center font-semibold">Options</th>
+                <th className="px-2 py-2 text-center font-semibold">Answer</th>
+                <th className="px-2 py-2 text-center font-semibold">Expl.</th>
+                <th className="px-1 py-2 font-semibold">
+                  <span className="sr-only">Remove</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {files.map((s, i) => {
+                const st = s.stats;
+                return (
+                  <tr key={`${s.file.name}-${i}`} className="border-t">
+                    <td className="max-w-[220px] px-2.5 py-2">
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <FileText className="h-3.5 w-3.5 shrink-0 text-brand-600" />
+                        <span className="truncate font-medium">{s.file.name}</span>
+                      </span>
+                    </td>
+                    {s.status === "parsing" || !st ? (
+                      <td colSpan={6} className="px-2 py-2 text-center text-muted-foreground">
+                        {s.status === "error" ? (
+                          <span className="inline-flex items-center gap-1 text-red-600 dark:text-red-400">
+                            <TriangleAlert className="h-3.5 w-3.5" />
+                            {s.error ?? "Could not read the file"}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            Detecting…
+                          </span>
+                        )}
+                      </td>
+                    ) : (
+                      <>
+                        <td className="px-2 py-2 text-center font-bold text-brand-700 dark:text-brand-300">{st.questions}</td>
+                        <td className="px-2 py-2 text-center">{st.question}</td>
+                        <td className="px-2 py-2 text-center">{st.reference}</td>
+                        <td className="px-2 py-2 text-center" title={st.optionsTotal ? `${st.optionsTotal} option(s) in total` : undefined}>
+                          {st.options}
+                          {st.optionsTotal ? <span className="text-muted-foreground"> ({st.optionsTotal})</span> : null}
+                        </td>
+                        <td className="px-2 py-2 text-center">{st.answer}</td>
+                        <td className="px-2 py-2 text-center">{st.bekkha}</td>
+                      </>
+                    )}
+                    {/* প্রতি-সারির ক্রস — শুধু এই ফাইলটা কেটে ফেলে (ভুলে চাপলে ফেরানোর উপায় নেই, তাই কনফার্ম) */}
+                    {onRemoveFile && (
+                      <td className="px-1 py-1.5 text-center">
+                        <button
+                          type="button"
+                          aria-label={`Remove ${s.file.name}`}
+                          title="Remove this file"
+                          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
+                          onClick={() => {
+                            if (window.confirm(`Remove this file?\n\n${s.file.name}\n\nIt will be dropped from the list — you can upload it again any time.`)) {
+                              onRemoveFile(i);
+                            }
+                          }}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Same counting as inside every mode — <b>Total MCQ</b> = questions detected in the file; Question / Reference / Options / Answer / Expl. = in how many of those questions the part was found (Options also shows the total option count in brackets).
+        </p>
       </CardContent>
     </Card>
   );

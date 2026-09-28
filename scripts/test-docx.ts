@@ -576,19 +576,28 @@ console.log("\n== ২২) শেয়ার্ড বছর-গার্ড (15
   const docXml = (body: string) =>
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${W}"><w:body>${body}<w:sectPr/></w:body></w:document>`;
 
-  // ---- (ক) শেয়ার্ড-রেঞ্জের ঠিক নিচে (1899) → গার্ড চালু হয় না, প্রশ্নই থাকে ----
-  const below = parseDocxXml(docXml(p("1899. সালের কথা") + p("ক. উত্তর")));
-  ok(below.questions.length === 1, `২২: ${YEAR_GUARD_MIN}-এর নিচের সিরিয়াল (1899) প্রশ্নই থাকে [${below.questions.length}]`);
-  // ---- (খ) রেঞ্জের দুই প্রান্ত (1900 / 2100) + "সাল"/"সালে" → প্রশ্ন নয় ----
+  // ---- (ক) শেয়ার্ড-রেঞ্জের ঠিক নিচে (YEAR_GUARD_MIN-1) → গার্ড চালু হয় না, প্রশ্নই থাকে ----
+  const below = parseDocxXml(docXml(p(`${YEAR_GUARD_MIN - 1}. সালের কথা`) + p("ক. উত্তর")));
+  ok(
+    below.questions.length === 1,
+    `২২: ${YEAR_GUARD_MIN}-এর নিচের সিরিয়াল (${YEAR_GUARD_MIN - 1}) প্রশ্নই থাকে [${below.questions.length}]`
+  );
+  // ---- (খ) রেঞ্জের দুই প্রান্ত (YEAR_GUARD_MIN / YEAR_GUARD_MAX) + "সাল"/"সালে" → প্রশ্ন নয় ----
   const atMin = parseDocxXml(docXml(p(`${YEAR_GUARD_MIN}. সালের কথা`) + p("ক. উত্তর")));
   ok(atMin.questions.length === 0, `২২: ${YEAR_GUARD_MIN} + "সাল" → প্রশ্ন নয় [${atMin.questions.length}]`);
   const atMax = parseDocxXml(docXml(p(`${YEAR_GUARD_MAX}. সালে কী ঘটেছিল`) + p("ক. উত্তর")));
   ok(atMax.questions.length === 0, `২২: ${YEAR_GUARD_MAX} + "সালে" → প্রশ্ন নয় [${atMax.questions.length}]`);
-  // ---- (গ) Bijoy "mv‡j" (= সালে) — 1900-রেঞ্জে 1815 গার্ডে পড়ে না, প্রশ্নই থাকে ----
-  const bijoy = parseDocxXml(docXml(p("1815 mv‡j Avgiv †`LwQ") + p("ক. উত্তর")));
-  ok(bijoy.questions.length === 1, `২২: Bijoy "1815 mv‡j…" 1900-রেঞ্জে প্রশ্নই থাকে [${bijoy.questions.length}]`);
+  // ---- (গ) Bijoy "mv‡j" (= সালে) — রেঞ্জের নিচে (YEAR_GUARD_MIN-1) গার্ডে পড়ে না, প্রশ্নই থাকে ----
+  const bijoy = parseDocxXml(docXml(p(`${YEAR_GUARD_MIN - 1} mv‡j Avgiv †\`LwQ`) + p("ক. উত্তর")));
+  ok(
+    bijoy.questions.length === 1,
+    `২২: Bijoy "${YEAR_GUARD_MIN - 1} mv‡j…" ${YEAR_GUARD_MIN}-এর নিচে প্রশ্নই থাকে [${bijoy.questions.length}]`
+  );
   const bijoyInRange = parseDocxXml(docXml(p("1950 mv‡j Avgiv †`LwQ") + p("ক. উত্তর")));
-  ok(bijoyInRange.questions.length === 0, `২২: Bijoy "1950 mv‡j…" প্রশ্ন নয় (1900-গার্ড) [${bijoyInRange.questions.length}]`);
+  ok(
+    bijoyInRange.questions.length === 0,
+    `২২: Bijoy "1950 mv‡j…" প্রশ্ন নয় (${YEAR_GUARD_MIN}-${YEAR_GUARD_MAX} গার্ড) [${bijoyInRange.questions.length}]`
+  );
   // ---- (ঘ) টাইট গার্ড: রেঞ্জের ভিতরে কিন্তু "সাল"/"year" ছাড়া = আসল প্রশ্ন ----
   const tight = parseDocxXml(docXml(p("1950. বাংলাদেশের ইতিহাসের প্রশ্ন?") + p("ক. উত্তর")));
   ok(tight.questions.length === 1 && tight.questions[0].serial === 1950, `২২: 1950 (সাল-শব্দ ছাড়া) আসল প্রশ্ন [${tight.questions.length}]`);

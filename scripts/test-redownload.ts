@@ -87,7 +87,7 @@ ok(parse.questions[0].options.length === 4, "১ম প্রশ্নে ৪ট
 ok(parse.questions[0].answer === "ক", "১ম প্রশ্নের উত্তর ক");
 ok(parse.questions[1].answer === "খ", "২য় প্রশ্নের উত্তর খ");
 
-console.log("\n== ২) ডিফল্ট অংশ (সিরিয়াল+প্রশ্ন) — পরীক্ষার প্রশ্নপত্র ==");
+console.log("\n== ২) ডিফল্ট অংশ (সব অংশ ON) — সম্পূর্ণ নতুন ফাইল ==");
 const outDefault = buildRedownloadXml(SYNTH, parse, [0, 1], {
   partSel: DEFAULT_PART_SELECTION,
   renumber: true,
@@ -95,11 +95,11 @@ const outDefault = buildRedownloadXml(SYNTH, parse, [0, 1], {
 });
 ok(outDefault.includes("পানির রাসায়নিক সংকেত"), "প্রশ্ন আছে");
 ok(outDefault.includes("বাংলাদেশের রাজধানী"), "২য় প্রশ্ন আছে");
-ok(!outDefault.includes("H2O"), "অপশন নেই");
-ok(!outDefault.includes("উত্তর:"), "উত্তর নেই");
-ok(!outDefault.includes("উত্তরমালা"), "উত্তরমালা সেকশন নেই");
-ok(!outDefault.includes("পরমাণুর সমন্বয়ে"), "ব্যাখ্যা নেই");
-ok(!outDefault.includes("বোর্ড প্রশ্ন ২০২৩"), "রেফারেন্স নেই");
+ok(outDefault.includes("H2O"), "অপশন আছে (ডিফল্ট: সব ON)");
+ok(outDefault.includes("উত্তর:"), "উত্তর আছে (ডিফল্ট: সব ON)");
+ok(outDefault.includes("উত্তরমালা"), "উত্তরমালা সেকশন আছে (ডিফল্ট: সব ON)");
+ok(outDefault.includes("পরমাণুর সমন্বয়ে"), "ব্যাখ্যা আছে (ডিফল্ট: সব ON)");
+ok(outDefault.includes("বোর্ড প্রশ্ন ২০২৩"), "রেফারেন্স আছে (ডিফল্ট: সব ON)");
 ok(outDefault.includes("উচ্চ মাধ্যমিক পরীক্ষা"), "টাইটেল আছে (ব্লকের বাইরের other)");
 const defParas = parasOf(outDefault);
 ok(defParas.some((t) => t.startsWith("১.") && t.includes("পানির")), "রিনাম্বার করা নম্বর ১ + প্রশ্ন একসাথে");
@@ -179,7 +179,7 @@ const outRealDefault = buildRedownloadXml(xmlText, realParse, realParse.question
   expandAnswer: true,
 });
 const reparsedDefault = parseDocxXml(outRealDefault);
-ok(reparsedDefault.questions.length === 60, "ডিফল্ট-অংশ আউটপুট আবার পার্স → ৬০ প্রশ্ন (শুধু প্রশ্ন+সিরিয়াল)");
+ok(reparsedDefault.questions.length === 60, "ডিফল্ট-অংশ আউটপুট আবার পার্স → ৬০ প্রশ্ন (সব অংশ ON)");
 
 console.log("\n== ৮) ওয়াটারমার্ক এক্সট্র্যাকশন ==");
 const wmZip = new JSZip();

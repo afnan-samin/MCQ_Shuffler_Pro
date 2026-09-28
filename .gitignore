@@ -83,6 +83,15 @@ session-*.md
 # master prompt — local only, github e jabe na
 prompt.md
 
+# লোকাল জান্ক — লগ/নোট/টেম্প, রিপোতে যাবে না
+/*.txt
+/*.py
+/*.md.tmp
+*.tsbuildinfo
+
+# ডেলিভারেবল/আউটপুট ফোল্ডার
+download/
+
 # embedded repos
 freellmapi
 live-chunk.txt

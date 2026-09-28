@@ -8,10 +8,12 @@ export type { McqMode } from "@/lib/mcq/mode-meta";
 interface ModeTabsProps {
   mode: McqMode;
   onChange: (m: McqMode) => void;
+  /** ডিটেকশন চলছে — তাহলে তিনটা বাটনই নিষ্ক্রিয় (সব ফাইল ready হলেই খোলে) */
+  disabled?: boolean;
 }
 
 /** উপরের তিনটা মোড-বাটন — শাফল, সিরিয়াল আর রিডাউনলোডের কাজ সম্পূর্ণ আলাদা */
-export function ModeTabs({ mode, onChange }: ModeTabsProps) {
+export function ModeTabs({ mode, onChange, disabled = false }: ModeTabsProps) {
   return (
     <div
       role="tablist"
@@ -27,14 +29,19 @@ export function ModeTabs({ mode, onChange }: ModeTabsProps) {
             key={id}
             role="tab"
             aria-selected={active}
+            aria-disabled={disabled}
             aria-label={meta.ariaLabel}
             type="button"
+            disabled={disabled}
+            title={disabled ? "Detecting the uploaded file(s) — this unlocks when detection finishes" : undefined}
             onClick={() => onChange(id)}
             className={cn(
               "flex min-h-[44px] items-center gap-3 rounded-xl border-2 p-3 text-left transition-all",
               active
                 ? "border-brand-600 bg-brand-600 text-white shadow-md"
-                : "border-border bg-card hover:border-brand-400 hover:bg-brand-50/60 dark:hover:border-brand-600 dark:hover:bg-brand-950/20"
+                : "border-border bg-card hover:border-brand-400 hover:bg-brand-50/60 dark:hover:border-brand-600 dark:hover:bg-brand-950/20",
+              // ডিটেকশন চলাকালীন — হোভার/কার্সরও বন্ধ (ক্লিক হবে না)
+              disabled && "cursor-not-allowed opacity-50 hover:border-border hover:bg-card dark:hover:bg-card"
             )}
           >
             <span

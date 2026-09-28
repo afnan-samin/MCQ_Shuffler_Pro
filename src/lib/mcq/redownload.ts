@@ -81,10 +81,10 @@ export const PART_LABELS: Record<PartKind, string> = {
 export const DEFAULT_PART_SELECTION: PartSel = {
   serial: true,
   question: true,
-  reference: false,
-  options: false,
-  answer: false,
-  bekkha: false,
+  reference: true,
+  options: true,
+  answer: true,
+  bekkha: true,
 };
 
 // ---------- প্যাটার্ন ----------
