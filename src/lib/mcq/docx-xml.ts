@@ -431,6 +431,18 @@ export const ANSWER_TAIL_RE =
   /(?:Dt|DËi?t?|Cvw|wU|উঃ|উত্তর|উওর|Ans?\.?|Answer|D(?=\s*[:.]))\s*[:.]?\s*([KLMNklmnকখগঘa-dA-D1-4](?:\s*[+&,/]\s*[KLMNklmnকখগঘa-dA-D1-4])*)\s*$/;
 
 /**
+ * "D. 4" / "D. 6" — বাস্তব অপশন-লেবেল (শেষ অপশন), উত্তর-গ্লুড নয়।
+ * উত্তর-অক্ষর অক্ষর হলে ("D: K") গ্লুড ধরা হয়; সংখ্যা হলে ("D. 4")
+ * অপশন-টেক্সট — কাটা যাবে না।
+ */
+const BARE_D_MARKER_RE = /^D(?=\s*[:.])/;
+export function isGenuineAnswerGlue(m: RegExpExecArray): boolean {
+  if (!BARE_D_MARKER_RE.test(m[0])) return true;
+  const first = (m[1] ?? "")[0] ?? "";
+  return /[KLMNklmnকখগঘa-dA-D]/.test(first);
+}
+
+/**
  * অক্ষর-হীন ঝুলন্ত উত্তর-মার্কার (ফাইলের টাইপো): "…\tDt" / "…\tD: -"।
  * উত্তর-অক্ষর নেই — শুধু অপশন-টেক্সট থেকে কেটে ফেলা হয় (উত্তর null থাকে)।
  * লাইন-শুরু বা ট্যাবের পরে হতে হবে — "No Answer"-জাতীয় অপশন রক্ষা পায়।
@@ -620,6 +632,7 @@ export function scanOptions(blockText: string, serialRaw: string): { options: Op
   for (let i = regionLines.length - 1; i >= 0; i--) {
     const m = ANSWER_TAIL_RE.exec(regionLines[i]);
     if (!m) continue;
+    if (!isGenuineAnswerGlue(m)) continue;
     answer = m[1] ?? null;
     cutAnswerLine(i, m);
     break;

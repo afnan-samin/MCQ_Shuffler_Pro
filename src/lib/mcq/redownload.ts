@@ -34,6 +34,7 @@ import {
   W_NS,
   collectBlockTables,
   countOptionMarkers,
+  isGenuineAnswerGlue,
   countRunTabs,
   detectSerialPrefix,
   dpSlotRun,
@@ -1138,7 +1139,7 @@ function rowHasSingleOption(el: Element, label: string): boolean {
   if (!m) return false;
   let rest = t.slice(m[0].length);
   const tailM = ANSWER_TAIL_RE.exec(rest);
-  if (tailM) rest = rest.slice(0, tailM.index);
+  if (tailM && isGenuineAnswerGlue(tailM)) rest = rest.slice(0, tailM.index);
   return countOptionMarkers(rest) === 0;
 }
 
@@ -1153,6 +1154,7 @@ function stripAnswerTail(optClone: Element): void {
   const joined = stream.map((t) => t.textContent ?? "").join("");
   const m = ANSWER_TAIL_RE.exec(joined);
   if (!m) return;
+  if (!isGenuineAnswerGlue(m)) return;
   const prev = m.index > 0 ? joined[m.index - 1] : "";
   if (prev && !/\s/.test(prev) && !TAIL_GLUE_OK_RE.test(m[0])) return;
   replaceSpansLocal(stream, [{ start: m.index, end: joined.length, text: "" }]);
@@ -1414,6 +1416,7 @@ const TAIL_GLUE_OK_RE = /^(?:Dt|DË|D:|Cvw|উঃ|উত্তর|উওর|Ans|
 function findTailAnswer(text: string): number | null {
   const m = ANSWER_TAIL_RE.exec(text);
   if (!m) return null;
+  if (!isGenuineAnswerGlue(m)) return null;
   const prev = m.index > 0 ? text[m.index - 1] : "";
   if (prev && !/\s/.test(prev) && !TAIL_GLUE_OK_RE.test(m[0])) return null;
   return m.index;
