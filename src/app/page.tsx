@@ -103,7 +103,7 @@ import {
   isValidDocxZip,
   type PipelineProgress,
 } from "@/lib/mcq/file-pipeline";
-import { MAX_FILE_BYTES, SHUFFLE_MAX_FILES } from "@/lib/mcq/limits";
+import { MAX_FILE_BYTES, MIN_OPTIONS_PER_MCQ, SHUFFLE_MAX_FILES } from "@/lib/mcq/limits";
 import { toast } from "@/hooks/use-toast";
 import { usePersistedJson, usePersistedString } from "@/hooks/use-persisted-state";
 import { Dices, Loader2, ShieldCheck, Upload, Zap } from "lucide-react";
@@ -482,6 +482,7 @@ export default function Home() {
     let reference = 0;
     let withOptions = 0;
     let optionsTotal = 0;
+    let mcq = 0;
     let withAnswer = 0;
     let withBekkha = 0;
     for (const q of parse.questions) {
@@ -492,6 +493,9 @@ export default function Home() {
       if (q.kinds.includes("reference")) reference++;
       if (q.options.length > 0) withOptions++;
       optionsTotal += q.options.length;
+      // Total MCQ = সত্যিকারের প্রশ্ন, অর্থাৎ যেগুলোর পূর্ণ ৪টা অপশন আছে
+      // (MIN_OPTIONS_PER_MCQ) — ০-অপশন ফাইলে "১০০ MCQ" দেখিয়ে দিত না।
+      if (q.options.length >= MIN_OPTIONS_PER_MCQ) mcq++;
       if (q.answer) withAnswer++;
       if (q.bekkha) withBekkha++;
     }
@@ -502,6 +506,7 @@ export default function Home() {
       reference,
       options: withOptions,
       optionsTotal,
+      mcq,
       answer: withAnswer,
       bekkha: withBekkha,
     };

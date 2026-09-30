@@ -170,6 +170,8 @@ export interface StagedFileStats {
   reference: number;
   options: number;
   optionsTotal: number;
+  /** পূর্ণ ৪-অপশনের সত্যিকারের MCQ (questions ≠ MCQ — ০-অপশন ফাইলে প্রশ্ন থাকেও MCQ নেই) */
+  mcq: number;
   answer: number;
   bekkha: number;
 }
@@ -298,7 +300,21 @@ export function StagedFilesCard({ files, onClear, onRemoveFile, addFilesTriggerR
                       </td>
                     ) : (
                       <>
-                        <td className="px-2 py-2 text-center font-bold text-brand-700 dark:text-brand-300">{st.questions}</td>
+                        <td
+                          className="px-2 py-2 text-center font-bold"
+                          title={
+                            st.mcq > 0
+                              ? `${st.questions} question block(s) detected — ${st.mcq} of them have a full 4 options`
+                              : `No complete MCQ (question + 4 options) found. ${st.questions} question block(s) detected, but none has 4 options — the file may be an answer sheet or option-less handout.`
+                          }
+                        >
+                          <span className={st.mcq > 0 ? "text-brand-700 dark:text-brand-300" : "text-red-600 dark:text-red-400"}>
+                            {st.mcq}
+                          </span>
+                          {st.questions !== st.mcq ? (
+                            <span className="font-normal text-muted-foreground"> ({st.questions})</span>
+                          ) : null}
+                        </td>
                         <td className="px-2 py-2 text-center">{st.question}</td>
                         <td className="px-2 py-2 text-center">{st.reference}</td>
                         <td className="px-2 py-2 text-center" title={st.optionsTotal ? `${st.optionsTotal} option(s) in total` : undefined}>
@@ -334,7 +350,10 @@ export function StagedFilesCard({ files, onClear, onRemoveFile, addFilesTriggerR
           </table>
         </div>
         <p className="text-[11px] text-muted-foreground">
-          Same counting as inside every mode — <b>Total MCQ</b> = questions detected in the file; Question / Reference / Options / Answer / Expl. = in how many of those questions the part was found (Options also shows the total option count in brackets).
+          Same counting as inside every mode — <b>Total MCQ</b> = question blocks with a full set of 4
+          options (brackets = raw question blocks detected, so an option-less file shows 0 MCQ);
+          Question / Reference / Options / Answer / Expl. = in how many of those blocks the part was
+          found (Options also shows the total option count in brackets).
         </p>
       </CardContent>
     </Card>

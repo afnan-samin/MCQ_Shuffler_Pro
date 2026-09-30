@@ -17,6 +17,8 @@
 // ============================================================
 
 import {
+  BEKKHA_LINE_RE,
+  REFERENCE_PREFIX_RE,
   countOptionMarkers,
   detectSerialPrefix,
   isQuestionStart,
@@ -25,6 +27,7 @@ import {
   serialMatchSpans,
   numberToDigits,
   type DigitEnc,
+  type QuestionSection,
 } from "./docx-xml";
 import { MARKER_WINDOW_PARAS, MIN_OPTIONS_PER_MCQ } from "./limits";
 import { repackDocxRemapped, DOCX_MIME } from "./repack-docx";
@@ -269,12 +272,28 @@ export function analyzeColorDocx(xml: string): ColorAnalysis {
 
   // ---- ধাপ ২ক: প্রার্থী-ফ্ল্যাগ + ব্লক-সীমা (docx-xml-এর হুবহু ব্লক-নিয়ম) ----
   // এখানে শুধু "অভিভাবক" ডিটেকশন — সিরিয়াল-প্রিফিক্স + isQuestionStart।
+  // `section` = docx-xml/redownload-এর মতো কনটেক্সট-গার্ড: ব্যাখ্যার ভেতরে পড়া
+  // ভুল-সিরিয়াল ("2-প্রোপেনল…") যেন আলাদা প্রশ্ন না হয় — তিন ইঞ্জিন অভিন্ন।
   const candFlags: boolean[] = texts.map(() => false);
+  let section: QuestionSection = null;
   for (let k = 0; k < texts.length; k++) {
-    if (colorKeys[k]) continue; // রঙ-দেওয়া লাইন কখনো প্রশ্ন না
-    const si = detectSerialPrefix(texts[k]);
-    if (si && isQuestionStart(si, hasTabs[k], nextNonEmpty(k + 1), /^\t/.test(texts[k])))
+    if (colorKeys[k]) {
+      section = null; // রঙ-হেডার = সেকশন-সীমা (redownload-এর হুবহু)
+      continue; // রঙ-দেওয়া লাইন কখনো প্রশ্ন না
+    }
+    const t = texts[k];
+    if (isSectionSeparator(t)) {
+      section = null;
+      continue;
+    }
+    const si = detectSerialPrefix(t);
+    if (si && isQuestionStart(si, hasTabs[k], nextNonEmpty(k + 1), /^\t/.test(t), section)) {
       candFlags[k] = true;
+      section = null;
+      continue;
+    }
+    if (BEKKHA_LINE_RE.test(t)) section = "bekkha";
+    else if (REFERENCE_PREFIX_RE.test(t)) section = "reference";
   }
 
   // ব্লক = সিরিয়াল-শুরু থেকে পরের সিরিয়াল-শুরু/সেকশন-সেপারেটর পর্যন্ত
@@ -501,15 +520,30 @@ export function stripNonMcqLinesXml(xml: string): { xml: string; removed: Blocke
 
   // দ্বিতীয় পাস: কোনগুলো কাটা হবে
   const cuts: Array<{ start: number; end: number; text: string }> = [];
+  let section: QuestionSection = null;
   for (let k = 0; k < paraIdx.length; k++) {
     const t = texts[k];
-    if (!t.trim() || shaded[k]) continue;
+    if (!t.trim()) continue;
+    if (shaded[k]) {
+      section = null; // রঙ-হেডার = সেকশন-সীমা (redownload-এর হুবহু)
+      continue;
+    }
+    const sec = section;
     const si = detectSerialPrefix(t);
-    if (si && isQuestionStart(si, hasTabs[k], nextNonEmpty(k + 1))) continue;
-    if (looksOptionLed(t)) continue;
-    if (!isNonMcqText(t)) continue;
-    const ch = children[paraIdx[k]];
-    cuts.push({ start: ch.start, end: ch.end, text: t.trim() });
+    if (si && isQuestionStart(si, hasTabs[k], nextNonEmpty(k + 1), /^\t/.test(t), sec)) {
+      section = null; // নতুন প্রশ্ন — কনটেক্সট রিসেট
+      continue;
+    }
+    // ব্যাখ্যা/রেফারেন্সের ভেতরের লাইন কাটা হয় না — redownload-এ ওগুলো
+    // kind="bekkha"/"reference" হয়ে ব্লকের অংশ থাকে; এখানে কাটলে shuffle ও
+    // redownload একই লাইনে ভিন্ন আউটপুট দেবে (সেই "2-প্রোপেনল…" ফ্র্যাগমেন্ট)।
+    const cut = sec === null && !looksOptionLed(t) && isNonMcqText(t);
+    if (BEKKHA_LINE_RE.test(t)) section = "bekkha";
+    else if (REFERENCE_PREFIX_RE.test(t)) section = "reference";
+    if (cut) {
+      const ch = children[paraIdx[k]];
+      cuts.push({ start: ch.start, end: ch.end, text: t.trim() });
+    }
   }
 
   if (!cuts.length) return { xml, removed: [] };

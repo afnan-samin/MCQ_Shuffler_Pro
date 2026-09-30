@@ -31,6 +31,7 @@ import {
   ANSWER_TAIL_RE,
   CASE_FOLD,
   LABEL_FAMS,
+  REFERENCE_PREFIX_RE,
   W_NS,
   collectBlockTables,
   countOptionMarkers,
@@ -40,6 +41,7 @@ import {
   dpSlotRun,
   extractParaText,
   isSectionSeparator,
+  looksOptionLed,
   numberToDigits,
   renumberSerialParaTo,
   scanOptions,
@@ -97,6 +99,13 @@ const ANSWER_TOK = "(?:Dt|DËi?t?|Cvw|wU|উঃ|উত্তরমালা|উ�
 const LETTER_GROUP = "([KLMNklmnকখগঘa-dA-D1-4](?:\\s*[+&,/]\\s*[KLMNklmnকখগঘa-dA-D1-4])*)";
 /** লাইন-শুরুতে উত্তর-টোকেন ("উত্তর: ক", "উঃ খ", "Dt. K", "D: L + N") */
 const ANSWER_LINE_RE = new RegExp(`^\\s*${ANSWER_TOK}\\s*[:.]?`, "i");
+/** শব্দ-ভিত্তিক উত্তর-টোকেন — বেয়ার "D:" বাদ। ট্যাব-লেড সারিতে কেবল এটাই
+ *  উত্তর ধরে, কারণ "\tD: …" হলো ৪র্থ অপশন (ANSWER_LINE_RE-এর "D(?=[:.])"
+ *  বিকল্পটা ওখানে ভুল-উত্তর করত)। */
+const ANSWER_WORD_RE = new RegExp(
+  `^\\s*(?:Dt|DËi?t?|Cvw|wU|উঃ|উত্তরমালা|উত্তর|Ans?\\.?|Answer)\\s*[:.]?`,
+  "i"
+);
 /** লাইন-শেষে অক্ষর-উত্তর ("… উঃ ক" / "উত্তর: খ") */
 const ANSWER_END_RE = new RegExp(`${ANSWER_TOK}\\s*[:.]?\\s*${LETTER_GROUP}\\s*$`);
 /** পুরো লাইনটাই সিরিয়াল+অক্ষর ("১২. ক" — উত্তরমালা-স্টাইল) */
@@ -125,8 +134,7 @@ const OPTION_LEAD_RE =
   /^\s*\*?\s*(?:[KLMNklmn]\s*[.।):]|[কখগঘ]\s*[.।):]|[a-dA-D]\s*[.):]|[([]\s*[কখগঘa-dA-D]\s*[)\]])/;
 /** ব্যাখ্যা/রেফারেন্স প্রিফিক্স — Bijoy "e¨vL¨v" সহ (docx-xml BEKKHA_LINE_RE-এর সাথে একই তালিকা) */
 const BEKKHA_PREFIX_RE = /^\s*(?:e¨vL¨v|ব্যাখ্যা|সমাধান|explanation)\s*[:.\-—]?/i;
-const REFERENCE_PREFIX_RE =
-  /^\s*(?:রেফারেন্স|উদ্দীপক|reference|stimulus)\s*[:.\-—]?/i;
+// REFERENCE_PREFIX_RE — docx-xml থেকে ইমপোর্ট (নিচে) — দুই ইঞ্জিন একই রেজেক্স পড়ে
 
 function countSerialLetterPairs(t: string): number {
   const m = t.match(SERIAL_LETTER_PAIR_RE);
@@ -144,7 +152,12 @@ function countSerialLetterPairs(t: string): number {
 export function isAnswerLine(t: string): boolean {
   if (ANSWER_WHOLE_RE.test(t)) return true;
   if (SERIAL_LETTER_RE.test(t)) return true;
-  if (/^\t/.test(t) || OPTION_LEAD_RE.test(t)) return false;
+  // ট্যাব-লেড লাইন সাধারণত অপশন-সারি — কিন্তু উত্তর-টোকেন-লেড
+  // ("\tAns: will be delivered", "\tউত্তর: ৩") উত্তরই। আগে ট্যাব-ভেটো এর
+  // আগে চলত ফেলত → ওগুলো ভুলভাবে options হিসেবে গণিত হত (Weekly Exam 4
+  // (Ans): Answer ২, Options ১০১ — এখন ১০০টা ট্যাব-লেড Ans সঠিকভাবে উত্তর)।
+  if (/^\t/.test(t)) return ANSWER_WORD_RE.test(t);
+  if (OPTION_LEAD_RE.test(t)) return false;
   if (ANSWER_LINE_RE.test(t)) return true;
   if (countSerialLetterPairs(t) >= 2) return true;
   if (detectSerialPrefix(t)) return false;
@@ -344,7 +357,11 @@ function isQuestionStartPara(
   if (si.separator && /^[0-9০-৯]/.test(si.after)) return false;
   if (countSerialLetterPairs(t) >= 2) return false;
   const afterTrim = si.after.trim();
-  const nextOpt = nextText !== null && isOptionLine(nextText);
+  // পরের লাইন "কী-লেড" — docx-xml tier-২-এর হুবহু একই প্রেডিকেট (looksOptionLed)।
+  // আগে isOptionLine চলত; কিন্তু "\tAns: …" এখন উত্তর (isOptionLine → false) হয়ে
+  // এই প্রমাণ হারিয়ে যেত → পরের প্রশ্নটা (Weekly Exam 4 (Ans)-এর ৮৮ নং) আগের
+  // ব্লকে মিশে যেত। ট্যাব/অপশন/উত্তর-টোকেন-লেড সবই "পরে কাঠামো আছে"-র প্রমাণ।
+  const nextOpt = nextText !== null && looksOptionLed(nextText);
   const strongEvidence = (hasTab && afterTrim.length >= 1) || nextOpt;
   if (section === "answer" || section === "bekkha" || section === "reference" || section === "options") {
     return strongEvidence;

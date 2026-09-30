@@ -360,6 +360,11 @@ export function isSectionSeparator(text: string): boolean {
   if (!text.trim() || text.includes("\t")) return false;
   const t = text.trim();
   if (isExamTitleLine(t)) return true;
+  // ইনডেন্ট-করা সারি = বডি-কনটেন্ট, সেকশন-হেডার নয়। হেডার সবসময় বাঁ-প্রান্তে;
+  // ইনডেন্টেড সারি হলো ড্রইং/ফর্মুলা-ফ্র্যাগমেন্ট (Weekly Exam 4 (Ans)-এর
+  // "                       COOH" ও "                   OH  H   H    H") — ওগুলো
+  // হেডার ধরে ব্লক ভাঙলে আগের প্রশ্নের শেষ লাইন হারায় + সেপারেটর-রিপোর্টে ফাঁকা মাথা।
+  if (/^ /.test(text)) return false;
   if (t.length <= 3) {
     if (looksOptionLed(t)) return false;
     // শুধু ALL-CAPS ল্যাটিন সংক্ষেপ (A, I, II) হেডার — "OR"/"Yes"/"No" নয়
@@ -371,11 +376,19 @@ export function isSectionSeparator(text: string): boolean {
 /** সিরিয়ালের পরে সরাসরি ক্রমবাচক-সাফিক্স ("৪৫তম বিসিএস…" — টাইটেল, প্রশ্ন নয়) */
 const ORDINAL_AFTER_RE = /^\s*(?:তম|শে|য়|র্থ|ঠ|ই|ম(?=[\s।,]|$))/;
 
+/**
+ * প্যারা-কনটেক্সট: আগের লাইনগুলো কোন "অংশ"-এ চলে গেছে (explanation/reference)।
+ * redownload-এর `section` ভ্যারিয়েবলের হুবহু অনুরূপ — ওখানে এই স্টেটই ব্যাখ্যার
+ * ভেতরে ভুল-সিরিয়াল ধরার গার্ড চালায়, কিন্তু docx-xml/color-serial-এ ছিল না।
+ */
+export type QuestionSection = "bekkha" | "reference" | null;
+
 export function isQuestionStart(
   si: SerialPrefix,
   hasRunTab: boolean,
   nextText: string | null,
-  leadingTab = false
+  leadingTab = false,
+  section: QuestionSection = null
 ): boolean {
   // সিলিং = MAX_SERIAL_NUMBER (৪-ডিজিট, SERIAL_RE-এর {1,4}-এর সাথে সামঞ্জস্য) —
   // টেক্সট-পার্সারের (parser.ts) সাথে ইউনিফাইড; আগে এখানে 5000 ছিল (Task 21-a)
@@ -401,6 +414,17 @@ export function isQuestionStart(
   // সেপারেটরের পরে স্পেস/ট্যাব থাকে ("5.\t10% NaCl" → after="\t10%…", "5. 10%"
   // → after=" 10%…") — দুটোই এই ভেটো এড়িয়ে টিয়ারে যায়।
   if (si.separator && /^[0-9০-৯]/.test(si.after)) return false;
+  // ব্যাখ্যা/রেফারেন্সের ভিতরে পড়া সিরিয়াল-লাইন: প্রমাণ শক্ত হলেই (নিজে ট্যাব-লেড,
+  // বা পরের লাইন অপশন-লেড) প্রশ্ন — টিয়ার-৩-এর "সেপারেটর থাকলেই প্রশ্ন" ভেটো।
+  // কেন: Weekly Exam 4 (Ans)-এ ব্যাখ্যার ভেতরের IUPAC-নাম "2-প্রোপেনল…" হাইফেন-সিরিয়াল
+  // ধরে ২টা ভুল প্রশ্ন তৈরি হয়েছিল (১০২ বনাম redownload-এর ১০০)। নিয়মটা
+  // redownload-এর isQuestionStartPara-এর `section`-গার্ডের হুবহু অনুকরণ — তিন ইঞ্জিনে
+  // একই সিদ্ধান্ত, নাহলে engine-parity টেস্ট ভাঙে।
+  if (section === "bekkha" || section === "reference") {
+    const afterTrim = si.after.trim();
+    const strongEvidence = (hasRunTab && afterTrim.length >= 1) || (nextText !== null && looksOptionLed(nextText));
+    if (!strongEvidence) return false;
+  }
   // টিয়ার ১: সিরিয়ালের পরে ট্যাব আছে (ইউজারের ফরম্যাট: "32.<tab>প্রশ্ন")
   if (hasRunTab) return true;
   // টিয়ার ২: পরের নন-এম্পটি প্যারা অপশন-লেড (ট্যাব/ক খ গ ঘ মার্কার)
@@ -453,6 +477,11 @@ const ANSWER_DANGLING_RE =
 /** লাইন-শুরুর ব্যাখ্যা-মার্কার: Bijoy "e¨vL¨v:" / Unicode "ব্যাখ্যা:" / "সমাধান:" */
 export const BEKKHA_LINE_RE =
   /^\s*(?:e¨vL¨v|ব্যাখ্যা|সমাধান|explanation)\s*[:.\-—]?/i;
+
+/** লাইন-শুরুর রেফারেন্স/উদ্দীপক-মার্কার — redownload ও docx-xml দুজনই এখান থেকেই
+ * পড়ে (কনটেক্সট-গার্ড দুই ইঞ্জিনে একই রেজেক্স, ড্রিফ্টের সুযোগ নেই) */
+export const REFERENCE_PREFIX_RE =
+  /^\s*(?:রেফারেন্স|উদ্দীপক|reference|stimulus)\s*[:.\-—]?/i;
 
 /**
  * স্লট-ক্রমের DP (K→L→M→N / ক→খ→গ→ঘ / A→B→C→D) — অপশন-লেবেল টোকেনের
@@ -893,6 +922,9 @@ export function parseDocxXml(xml: string): DocxParseResult {
     questions.push(q);
   };
 
+  /** কনটেক্সট: ব্যাখ্যা/রেফারেন্সের ভিতরে আছি কি না — ভুল-সিরিয়াল গার্ড + সেপারেটর-গার্ড */
+  let section: QuestionSection = null;
+
   for (let i = 0; i < kids.length; i++) {
     const el = kids[i];
     if (el.localName === "sectPr") continue;
@@ -901,23 +933,32 @@ export function parseDocxXml(xml: string): DocxParseResult {
     let started = false;
     if (el.localName === "p") {
       const si = detectSerialPrefix(text);
-      if (si && isQuestionStart(si, hasRunTabs[i], nextNonEmptyText(i + 1), /^\t/.test(text))) {
+      if (si && isQuestionStart(si, hasRunTabs[i], nextNonEmptyText(i + 1), /^\t/.test(text), section)) {
         if (cur) cands.push(cur);
         cur = { start: i, end: i, si, texts: [text] };
         started = true;
+        section = null; // নতুন প্রশ্ন — কনটেক্সট রিসেট
       }
     }
 
     if (!started) {
-      if (!cur) {
-        if (isSectionSeparator(text)) separators.push(text.trim());
-      } else if (isSectionSeparator(text)) {
-        cands.push(cur);
-        cur = null;
+      // redownload pass-১-এর মতোই: সেপারেটর-চেক সেকশন-নির্বিশেষে চলে (সেখানে
+      // ব্যাখ্যার পরেও টাইটেল-হেডার ব্লক ভাঙে)। ভুল-সেপারেটর আসলে ইনডেন্ট-করা
+      // ফর্মুলা-লাইন থেকে আসত — সেটা isSectionSeparator-এই কাটা।
+      if (isSectionSeparator(text)) {
+        if (cur) {
+          cands.push(cur);
+          cur = null;
+        }
         separators.push(text.trim());
+        section = null;
       } else {
-        cur.end = i;
-        cur.texts.push(text);
+        if (cur) {
+          cur.end = i;
+          cur.texts.push(text);
+        }
+        if (BEKKHA_LINE_RE.test(text)) section = "bekkha";
+        else if (REFERENCE_PREFIX_RE.test(text)) section = "reference";
       }
     }
   }
