@@ -396,7 +396,10 @@ export default function Home() {
         if (q.kinds.includes("reference")) acc.withReference++;
         if (q.options.length > 0) acc.withOptions++;
         acc.optionsTotal += q.options.length;
-        if (q.answer) acc.withAnswer++;
+        // উত্তর পাওয়া = লেটার-ভ্যালু এক্সট্র্যাক্ট হয়েছে **অথবা** উত্তর-লাইন আছে।
+        // শুধু q.answer দিলে টেক্সট-উত্তর ("Ans: will be delivered") বা বেয়ার
+        // "Ans:" লাইনও ০ ধরা পড়ত — Weekly Exam 4 (Ans)-এ ১০০ উত্তর-লাইন থেকেও ২ দেখাত।
+        if (q.answer || q.kinds.includes("answer")) acc.withAnswer++;
         if (q.bekkha) acc.withBekkha++;
       }
       return acc;
@@ -496,7 +499,9 @@ export default function Home() {
       // Total MCQ = সত্যিকারের প্রশ্ন, অর্থাৎ যেগুলোর পূর্ণ ৪টা অপশন আছে
       // (MIN_OPTIONS_PER_MCQ) — ০-অপশন ফাইলে "১০০ MCQ" দেখিয়ে দিত না।
       if (q.options.length >= MIN_OPTIONS_PER_MCQ) mcq++;
-      if (q.answer) withAnswer++;
+      // উত্তর-লাইন থাকলেই "Answer found" (ভ্যালু-এক্সট্র্যাক্ট ছাড়াও) —
+      // rdFoundStats-এর হুবহু একই নিয়ম, তাই টেবিল ও মোড-ব্যাজ মিলবে।
+      if (q.answer || q.kinds.includes("answer")) withAnswer++;
       if (q.bekkha) withBekkha++;
     }
     return {

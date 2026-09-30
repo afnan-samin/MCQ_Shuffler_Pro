@@ -68,7 +68,9 @@ export function DocxDetectCard({
   const questions = parse.questions;
   const stats = useMemo(() => {
     const withOptions = questions.filter((q) => q.options.length >= 2).length;
-    const withAnswer = questions.filter((q) => q.answer).length;
+    // উত্তর-মার্কার-লাইন থাকলেই গোনা — শুধু অক্ষর-ভ্যালু ধরলে টেক্সট-উত্তরের ফাইলে
+    // ("Ans: will be delivered") ১০০ উত্তর থেকেও ২ দেখাত
+    const withAnswer = questions.filter((q) => q.answer || q.hasAnswerLine).length;
     const withBekkha = questions.filter((q) => q.bekkha).length;
     return { total: questions.length, withOptions, withAnswer, withBekkha };
   }, [questions]);

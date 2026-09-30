@@ -29,6 +29,7 @@ import { relabelOptionPara, type OptionLabelSettings } from "./option-labels";
 import { findRefTokens } from "./reference";
 import {
   ANSWER_TAIL_RE,
+  ANSWER_WORD_RE,
   CASE_FOLD,
   LABEL_FAMS,
   REFERENCE_PREFIX_RE,
@@ -99,13 +100,7 @@ const ANSWER_TOK = "(?:Dt|DËi?t?|Cvw|wU|উঃ|উত্তরমালা|উ�
 const LETTER_GROUP = "([KLMNklmnকখগঘa-dA-D1-4](?:\\s*[+&,/]\\s*[KLMNklmnকখগঘa-dA-D1-4])*)";
 /** লাইন-শুরুতে উত্তর-টোকেন ("উত্তর: ক", "উঃ খ", "Dt. K", "D: L + N") */
 const ANSWER_LINE_RE = new RegExp(`^\\s*${ANSWER_TOK}\\s*[:.]?`, "i");
-/** শব্দ-ভিত্তিক উত্তর-টোকেন — বেয়ার "D:" বাদ। ট্যাব-লেড সারিতে কেবল এটাই
- *  উত্তর ধরে, কারণ "\tD: …" হলো ৪র্থ অপশন (ANSWER_LINE_RE-এর "D(?=[:.])"
- *  বিকল্পটা ওখানে ভুল-উত্তর করত)। */
-const ANSWER_WORD_RE = new RegExp(
-  `^\\s*(?:Dt|DËi?t?|Cvw|wU|উঃ|উত্তরমালা|উত্তর|Ans?\\.?|Answer)\\s*[:.]?`,
-  "i"
-);
+// ANSWER_WORD_RE (ট্যাব-লেড শাখায় ব্যবহৃত) — docx-xml থেকে ইমপোর্ট (নিচে)।
 /** লাইন-শেষে অক্ষর-উত্তর ("… উঃ ক" / "উত্তর: খ") */
 const ANSWER_END_RE = new RegExp(`${ANSWER_TOK}\\s*[:.]?\\s*${LETTER_GROUP}\\s*$`);
 /** পুরো লাইনটাই সিরিয়াল+অক্ষর ("১২. ক" — উত্তরমালা-স্টাইল) */

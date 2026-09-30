@@ -474,6 +474,17 @@ export function isGenuineAnswerGlue(m: RegExpExecArray): boolean {
 const ANSWER_DANGLING_RE =
   /(?:^|\t)(?:Dt|DËi?t?|Cvw|wU|উঃ|উত্তর|উওর|Ans?\.?|Answer|D(?=\s*[:.]))\s*[:.]?\s*[-–—]?\s*$/;
 
+/**
+ * লাইন-শুরুর শব্দ-ভিত্তিক উত্তর-টোকেন (বেয়ার "D:" বাদ — সেটা ৪র্থ অপশন-লেবেল)।
+ * ভ্যালু এক্সট্র্যাক্ট না হলেও এই মার্কার থাকলেই প্রশ্নে "উত্তর আছে" ধরা হয়
+ * ("Ans: will be delivered" টেক্সট-উত্তর; অক্ষর-ভ্যালু ফাঁকা)। redownload-এর
+ * isAnswerLine (ট্যাব-লেড শাখা) ও UI-র "With answers" কাউন্ট এটাই পড়ে।
+ */
+export const ANSWER_WORD_RE = new RegExp(
+  `^\\s*(?:Dt|DËi?t?|Cvw|wU|উঃ|উত্তরমালা|উত্তর|Ans?\\.?|Answer)\\s*[:.]?`,
+  "i"
+);
+
 /** লাইন-শুরুর ব্যাখ্যা-মার্কার: Bijoy "e¨vL¨v:" / Unicode "ব্যাখ্যা:" / "সমাধান:" */
 export const BEKKHA_LINE_RE =
   /^\s*(?:e¨vL¨v|ব্যাখ্যা|সমাধান|explanation)\s*[:.\-—]?/i;
@@ -781,6 +792,9 @@ export interface DocxQuestion {
   qTextRuns?: ParaRun[];
   options: OptionPreview[];
   answer: string | null;
+  /** ব্লকে উত্তর-মার্কার-লাইন আছে ("Ans: …") — অক্ষর-ভ্যালু (answer) ফাঁকা হলেও।
+   *  UI-র "With answers" কাউন্ট এটা দেখে, নাহলে টেক্সট-উত্তরের ফাইলে ০/২ দেখাত। */
+  hasAnswerLine: boolean;
   /** ব্লকের ব্যাখ্যা-অংশের টেক্সট ("e¨vL¨v:"/"ব্যাখ্যা:" মার্কার বাদে) — না থাকলে null */
   bekkha: string | null;
   hasUnicode: boolean;
@@ -915,6 +929,9 @@ export function parseDocxXml(xml: string): DocxParseResult {
       qTextRuns: qRuns?.runs ?? undefined,
       options,
       answer,
+      // উত্তর-মার্কার-লাইন আছে কিনা (ভ্যালু এক্সট্র্যাক্ট ছাড়া) — প্রতি প্যারা আলাদা
+      // চেক, কারণ `answer` শুধু অক্ষর-ভ্যালু ধরে ("\tAns: will be delivered" → null)
+      hasAnswerLine: c.texts.some((p) => ANSWER_WORD_RE.test(p)),
       bekkha,
       hasUnicode: /[\u0980-\u09FF]/.test(text),
       tables: collectBlockTables(kids, c.start, c.end),
