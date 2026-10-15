@@ -48,6 +48,14 @@ const positives: Array<[string, string]> = [
   ["প্রশ্ন? [CU-A: 24-25; RU-C: 23-24]।", "[CU-A: 24-25; RU-C: 23-24]"],
   ["প্রশ্ন? (বরিশাল বোর্ড-২০১৯)", "(বরিশাল বোর্ড-২০১৯)"],
   ["[Bwe: 17-18; 12-13]", "[Bwe: 17-18; 12-13]"],
+  // লেখক-পৃষ্ঠা (Weekly Exam 6: হাসান-পৃষ্ঠা ট্যাগ)
+  ["6.\tপ্রশ্ন?\t[nvmvb-242]", "[nvmvb-242]"],
+  ["প্রশ্ন?\t\t[nvmvb-250]", "[nvmvb-250]"],
+  ["প্রশ্ন? [Hasan-242]", "[Hasan-242]"],
+  ["প্রশ্ন? (nvmvb-251)", "(nvmvb-251)"],
+  // স্ট্যান্ডঅ্যালোন সোর্স-লেবেল লাইন
+  ["Topic: B_vbj cÖ¯‘wZ (nvRvix)", "Topic: B_vbj cÖ¯‘wZ (nvRvix)"],
+  ["UwcK : nvmvb m¨vi", "UwcK : nvmvb m¨vi"],
 ];
 for (const [line, expected] of positives) {
   const toks = findRefTokens(line);
@@ -126,6 +134,9 @@ const negatives = [
   "সংখ্যা (0-5) রেঞ্জ",
   "মাঝ-লাইনের [CU-A: 22-23] টোকেন লাইনের শেষে নেই",
   "ব্র্যাকেট ছাড়া সাধারণ প্রশ্ন?",
+  "e¨vL¨v : nvRvwi ; UwcK : bvgKiY :", // মাঝ-লাইনের UwcK (ব্যাখ্যার ভেতর) — লাইন-শুরু নয়
+  "প্রশ্ন? [C-14]", // ১-অক্ষর: কার্বন-১৪ আইসোটোপ, রেফারেন্স নয়
+  "প্রশ্ন? (B-12)", // ১-অক্ষর: ভিটামিন বি-১২, রেফারেন্স নয়
 ];
 let negOk = true;
 for (const n of negatives) {

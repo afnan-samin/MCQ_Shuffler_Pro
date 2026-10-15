@@ -62,6 +62,10 @@ const ABBR_RE = /\b(?:DU|JU|CU|RU|KU|BU|BAU|AUST|NSU|BRAC|IUT|EWU|DIU|JUST|SUST|
 
 /** প্রকৃত অক্ষর (ডিজিট বাদ) — খাঁটি-সংখ্যা ব্র্যাকেট "(২০-২৫)" রেফারেন্স নয় */
 const LETTER_RE = /[A-Za-z\u00C0-\u024F\u0980-\u09E5\u09F0-\u09FF]/;
+/** লেখক-পৃষ্ঠা: "nvmvb-242" (হাসান-২৪২) / "Hasan-242" — Bijoy/Unicode নাম +
+ * হাইফেন + ১-৪ ডিজিটের পৃষ্ঠা। নাম ≥২ অক্ষর হতে হবে ("C-14" আইসোটোপ,
+ * "B-12" ভিটামিন বাঁচে — ১-অক্ষর বাদ)। */
+const AUTHOR_PAGE_RE = new RegExp(`^[A-Za-z\u0980-\u09FF]{2,}[-–—][${DIG_CL}]{1,4}$`);
 
 /**
  * ব্র্যাকেটের ভেতরের লেখা রেফারেন্স কি না।
@@ -73,6 +77,7 @@ function innerIsReference(inner: string): boolean {
   const t = inner.trim();
   if (!t || !LETTER_RE.test(t)) return false; // অন্তত ১ প্রকৃত অক্ষর
   if (YEAR_RANGE_RE.test(t)) return true; // অক্ষর থাকায় বিশুদ্ধ-রেঞ্জ আগেই বাদ
+  if (AUTHOR_PAGE_RE.test(t)) return true; // "nvmvb-242" / "Hasan-242" (লেখক-পৃষ্ঠা)
   if (COLON_CODE_RE.test(t)) return true;
   if (KEYWORD_RE.test(t) && t.length <= 40) return true;
   // একক-বছর + প্রতিষ্ঠান-অ্যাব্রেভ — "[BUET 2019]", "[ঢাবি ২০১৭]"
@@ -210,6 +215,14 @@ function findBareRefToken(line: string): RefToken | null {
 }
 
 /**
+ * স্ট্যান্ডঅ্যালোন সোর্স-লেবেল লাইন — "Topic: ...", "UwcK: ...", "উৎস: ...",
+ * "Source: ..."। পুরো প্যারা লেবেল+কনটেন্ট (বছর লাগে না)। শুধু লাইন-শুরুতে
+ * মেলে — মাঝ-লাইনের "e¨vL¨v : ... ; UwcK : ..." (ব্যাখ্যা) বা অপশন-টেক্সট
+ * কখনোই ধরা পড়ে না।
+ */
+const SOURCE_LABEL_LINE_RE = /^\s*(Topic|UwcK|উৎস|উত্স|Source|Ref|Reference)\s*:/i;
+
+/**
  * এক লাইনের রেফারেন্স টোকেনগুলো — শুধু লাইনের শেষ-প্রান্তের ব্র্যাকেট ধরে
  * (ট্রেইলিং স্পেস/ডট/দাঁড়ি সহ), পাশাপাশি স্পেস-দূরত্বে বসা চেইন
  * ("…[Xvwe: 19-20] [JU: 20-21]") ধরা হয়। মাঝ-লাইনের ব্র্যাকেট অস্পৃশ্য।
@@ -217,6 +230,12 @@ function findBareRefToken(line: string): RefToken | null {
  * লাইনে বন্ধ — অপশন-টেক্সট রক্ষা)।
  */
 export function findRefTokens(line: string): RefToken[] {
+  // সোর্স-লেবেল লাইন ("Topic: ...") — পুরো লাইনটাই এক টোকেন
+  if (SOURCE_LABEL_LINE_RE.test(line)) {
+    const t = line.trim();
+    const pad = line.length - line.trimStart().length;
+    if (t.length >= 8) return [{ start: pad, end: pad + t.length, text: t }];
+  }
   const all: Array<{ start: number; end: number; inner: string }> = [];
   REF_BRACKET_RE.lastIndex = 0;
   let m: RegExpExecArray | null;

@@ -921,7 +921,15 @@ export function buildRedownloadXml(
     if (bid < 0) {
       // ---- ব্লকের বাইরে ----
       if (kind === "other") {
-        // টাইটেল, নির্দেশনা, সাধারণ হেডার, খালি প্যারা — সবসময় থাকে
+        // টাইটেল, নির্দেশনা, সাধারণ হেডার, খালি প্যারা — সবসময় থাকে;
+        // তবে পুরো-লাইন রেফারেন্স ("Topic: ...") reference-OFF-এ বাদ।
+        if (!opts.partSel.reference) {
+          const toks = findRefTokens(extractParaText(src));
+          if (toks.length === 1) {
+            const core = extractParaText(src).trim().replace(/[.,;:।|]+$/, "").trim();
+            if (core === toks[0].text.trim().replace(/[.,;:।|]+$/, "").trim()) continue;
+          }
+        }
         body.appendChild(src.cloneNode(true));
         continue;
       }
@@ -967,6 +975,13 @@ export function buildRedownloadXml(
       const stream: Element[] = [];
       collectTsLocal(clone, stream);
       replaceSpansLocal(stream, fixSpans);
+    }
+
+    // রেফারেন্স OFF — kept-প্যারার ভেতরের টোকেন মোছা ("[nvmvb-242]", "Topic:"-লাইন);
+    // পুরো-লাইন রেফারেন্স হলে প্যারা বাদ (split-অফসেট আগেই বের করা — রেফারেন্স
+    // সবসময় টেইলে, আগের স্প্যান অক্ষত থাকে)।
+    if (!opts.partSel.reference) {
+      if (!stripRedownloadRefs(clone)) continue;
     }
 
     if (i === q.blockStart) {
@@ -1419,6 +1434,39 @@ function paraStreamText(p: Element): string {
   const els: Element[] = [];
   collectTsLocal(p, els);
   return els.map((t) => t.textContent ?? "").join("");
+}
+
+/**
+ * রেফারেন্স OFF থাকলে kept-প্যারার ভেতরের রেফারেন্স-টোকেন মোছা —
+ * "[nvmvb-242]" (প্রশ্ন-শেষের লেখক-পৃষ্ঠা) বা "Topic:"-লাইন।
+ * পুরো প্যারা রেফারেন্স হলে false (প্যারা বাদ), নইলে টোকেন-স্প্যান মুছে true।
+ * findRefTokens-এর t-স্ট্রিম-অফসেট clone-এর নিজের stream-এই প্রয়োগ হয়।
+ */
+function stripRedownloadRefs(clone: Element): boolean {
+  const stream: Element[] = [];
+  collectTsLocal(clone, stream);
+  if (!stream.length) return true;
+  const joined = stream.map((t) => t.textContent ?? "").join("");
+  const tokens = findRefTokens(joined);
+  if (!tokens.length) return true;
+  if (tokens.length === 1) {
+    const core = joined.trim().replace(/[.,;:।|]+$/, "").trim();
+    const tok = tokens[0].text.trim().replace(/[.,;:।|]+$/, "").trim();
+    if (core === tok) return false; // পুরো-লাইন রেফারেন্স → প্যারা বাদ
+  }
+  const spans = tokens.map((t) => {
+    let st = t.start;
+    while (st > 0 && /[ \t]/.test(joined[st - 1])) st--;
+    let en = t.end;
+    while (en < joined.length && /[.,;:।|\s]/.test(joined[en])) en++;
+    return { start: st, end: en, text: "" };
+  });
+  spans.sort((a, b) => a.start - b.start);
+  for (let i = 0; i < spans.length - 1; i++) {
+    if (spans[i].end > spans[i + 1].start) spans[i].end = spans[i + 1].start;
+  }
+  replaceSpansLocal(stream, spans);
+  return true;
 }
 
 /** গ্লুড (স্পেস-ছাড়া) অবস্থায় শুধু নির্দিষ্ট উত্তর-টোকেনই বিশ্বস্ত — "wU"-জাতীয়
