@@ -112,6 +112,8 @@ import { type DropzoneTrigger } from "@/components/mcq/file-dropzone";
 import { useSharedServices } from "@/hooks/useSharedServices";
 import { useStagedFiles } from "@/hooks/useStagedFiles";
 import { useShuffleMode } from "@/hooks/useShuffleMode";
+import { useSerialMode } from "@/hooks/useSerialMode";
+import { useRedownloadMode } from "@/hooks/useRedownloadMode";
 
 const MODE_KEY = "mcq-shuffler-mode";
 /** রিডাউনলোডের অপশন-লেবেল কাস্টমাইজ সেটিংস (persisted) */
@@ -177,25 +179,9 @@ function isMcqMode(raw: string): raw is McqMode {
 
 // (DocxState — useShuffleMode-এ)
 /** সিরিয়াল মোডের আলাদা স্টেট — এখন একাধিক ফাইলও থাকতে পারে (লিস্ট-ক্রমেই আউটপুট) */
-interface SerialState {
-  id: string;
-  file: File;
-  baseName: string;
-  xml: string;
-  analysis: ColorAnalysis;
-}
-
-// (ShuffleItemState — useShuffleMode-এ)
+// (SerialState — useSerialMode-এ)
 /** রিডাউনলোড মোডের আলাদা স্টেট — একাধিক ফাইল, প্রতি ফাইলের অংশ-বিশ্লেষণ */
-interface RdDocState {
-  id: string;
-  file: File;
-  baseName: string;
-  xml: string;
-  parse: RdParseResult;
-  watermark: WatermarkInfo | null;
-}
-
+// (RdDocState — useRedownloadMode-এ)
 export default function Home() {
   // ---- মোড (persisted — শেষ ব্যবহৃত মোড মনে থাকে) ----
   const [mode, setMode] = usePersistedString<McqMode>(MODE_KEY, "shuffle", isMcqMode);
@@ -236,6 +222,23 @@ export default function Home() {
   // shuffle-এর resultsRef একবার destructure — JSX `ref=`-এ member-access থাকলে
   // react-hooks/refs মডেল `shuffle` অবজেক্টকে taint করে (একই অবজেক্ট, আচরণ হুবহু)।
   const { resultsRef } = shuffle;
+  // ================== SERIAL MODE (hook — single source of truth) ==================
+  const serial = useSerialMode({
+    fontSettings, downloadFormat,
+    finalizeDownload, finalizeZipEntries,
+    nextMultiId, yieldToUI, setProcStage,
+    clearProc, pipelineReport,
+    dlFileProgress, loadersBusyRef,
+    onOpenSerial: () => { setStagedFiles(null); changeMode("serial", true); },
+  });
+  // ================== REDOWNLOAD MODE (hook — single source of truth) ==================
+  const rd = useRedownloadMode({
+    fontSettings, finalizeDownload,
+    finalizeZipEntries, nextMultiId,
+    yieldToUI, setProcStage, clearProc,
+    pipelineReport, dlFileProgress,
+    loadersBusyRef,
+  });
 
   // ---- ফ্লো-ধাপ: "select" = মোড-বাছাই (৩টা মোড-বাটন শুধু এখানেই), "work" = মোডের ভিতরে কাজ ----
   // মোডে ঢোকার পর ৩টা মোড-বাটন আর দেখানো হয় না — উপরে থাকে পেছনে + আরও-ফাইল বার
@@ -249,85 +252,16 @@ export default function Home() {
   // (shuffle results state — useShuffleMode-এ)
 
 
-  // ---- সিরিয়াল মোডের সম্পূর্ণ আলাদা স্টেট (একাধিক ফাইল সাপোর্ট) ----
-  const [serialDocs, setSerialDocs] = useState<SerialState[]>([]);
-  const [serialLoading, setSerialLoading] = useState(false);
-  const [serialBusy, setSerialBusy] = useState(false);
-  const [serialMergedBusy, setSerialMergedBusy] = useState(false);
-  const [serialZipBusy, setSerialZipBusy] = useState(false);
-  const [serialStrategy, setSerialStrategy] = useState<SerialStrategy>("per-file");
-  // প্রতি ফাইলের সিরিয়াল-স্কিম (কী = SerialState.id; ডিফল্ট একটানা — আগের আচরণ হুবহু)
-  const [serialSchemes, setSerialSchemes] = useState<Record<string, SerialScheme>>({});
-  // সিরিয়াল মোডের পেস্ট-ইনপুট — ফাইল-ফ্লোর সাথে পারস্পরিক একচেটিয়া (দুটো একসাথে অ্যাক্টিভ থাকে না)
-  const [serialPasteText, setSerialPasteText] = useState("");
-  const [serialPaste, setSerialPaste] = useState<ParseOutput | null>(null);
-  const [serialPasteBusy, setSerialPasteBusy] = useState(false);
-  const [serialPasteFixing, setSerialPasteFixing] = useState(false);
-  const [serialPasteDlBusy, setSerialPasteDlBusy] = useState(false);
-  // ঠিক ১ টা ফাইল হলে পুরনো একক-ফাইল কার্ড (রঙ-চিপসহ) — ≥২ হলে মাল্টি ডাউনলোড কার্ড
-  const serialDoc = serialDocs.length === 1 ? serialDocs[0] : null;
+  // (serial state — useSerialMode-এ)
+
 
   // (shuffle multi-file state — useShuffleMode-এ)
 
 
-  // ---- রিডাউনলোড মোডের সম্পূর্ণ আলাদা স্টেট (একাধিক .docx + অংশ-বাছাই) ----
-  const [rdDocs, setRdDocs] = useState<RdDocState[]>([]);
-  const [rdLoading, setRdLoading] = useState(false);
-  // প্রতি ফাইলে সিলেক্ট করা প্রশ্ন (কী = RdDocState.id)
-  const [rdSel, setRdSel] = useState<Record<string, Set<number>>>({});
-  // কোন অংশগুলো নতুন ফাইলে থাকবে (ডিফল্ট: ৬টাই সিলেক্ট)
-  const [rdParts, setRdParts] = useState<PartSel>(DEFAULT_PART_SELECTION);
-  const [rdRenumber, setRdRenumber] = useState(false);
-  const [optionLabels, updateOptionLabels] = usePersistedJson<OptionLabelSettings>(
-    OPTION_LABELS_KEY,
-    DEFAULT_OPTION_LABEL_SETTINGS,
-    sanitizeOptionLabelSettings
-  );
-  // লেবেল-টাইপো ফিক্স টগল — ডিফল্ট OFF (ডাউনলোডে লেবেল হুবহু)
-  const [rdFixLabels, setRdFixLabels] = usePersistedJson<boolean>(RD_FIX_LABELS_KEY, false);
-  const [rdMergedBusy, setRdMergedBusy] = useState(false);
-  const [rdZipBusy, setRdZipBusy] = useState(false);
+  // (redownload state — useRedownloadMode-এ)
 
-  // রিডাউনলোড মোডের ডেরাইভড — সব ফাইল মিলিয়ে অংশ-কাউন্ট ও সিলেকশন স্ট্যাট
-  const rdTotalCounts = rdDocs.reduce<Record<PartKind, number>>(
-    (acc, d) => {
-      for (const k of ["serial", "question", "reference", "options", "answer", "bekkha", "other"] as PartKind[]) {
-        acc[k] = (acc[k] ?? 0) + d.parse.kindCounts[k];
-      }
-      return acc;
-    },
-    { serial: 0, question: 0, reference: 0, options: 0, answer: 0, bekkha: 0, other: 0 }
-  );
-  const rdTotalQuestions = rdDocs.reduce((a, d) => a + d.parse.questions.length, 0);
-  const rdSelTotal = rdDocs.reduce((a, d) => a + (rdSel[d.id]?.size ?? 0), 0);
-  // প্রতি অংশ কয়টা প্রশ্নে পাওয়া গেছে (প্যারা-কাউন্ট নয় — গ্লুড উত্তর / এক-প্যারায় ৪ অপশনও ধরা পড়ে)
-  const rdFoundStats = rdDocs.reduce(
-    (acc, d) => {
-      for (const q of d.parse.questions) {
-        if (q.kinds.includes("reference")) acc.withReference++;
-        if (q.options.length > 0) acc.withOptions++;
-        acc.optionsTotal += q.options.length;
-        // উত্তর পাওয়া = লেটার-ভ্যালু এক্সট্র্যাক্ট হয়েছে **অথবা** উত্তর-লাইন আছে।
-        // শুধু q.answer দিলে টেক্সট-উত্তর ("Ans: will be delivered") বা বেয়ার
-        // "Ans:" লাইনও ০ ধরা পড়ত — Weekly Exam 4 (Ans)-এ ১০০ উত্তর-লাইন থেকেও ২ দেখাত।
-        if (q.answer || q.kinds.includes("answer")) acc.withAnswer++;
-        if (q.bekkha) acc.withBekkha++;
-      }
-      return acc;
-    },
-    { withReference: 0, withOptions: 0, optionsTotal: 0, withAnswer: 0, withBekkha: 0 }
-  );
-  // লেবেল-টাইপো — সব ফাইল মিলিয়ে (কার্ডে ফাইল-নামসহ দেখানো হয়)
-  const rdLabelTypos = useMemo<LabelTypoRow[]>(
-    () => rdDocs.flatMap((d) => d.parse.labelTypos.map((t) => ({ ...t, fileName: d.file.name }))),
-    [rdDocs]
-  );
-  // উত্তর-কনফ্লিক্ট (star vs Dt-tail) — সব ফাইল মিলিয়ে (warning কার্ডে)
-  const rdAnswerConflicts = useMemo<AnswerConflictRow[]>(
-    () => rdDocs.flatMap((d) => answerConflictRowsOf(d.parse.questions, d.file.name)),
-    [rdDocs]
-  );
 
+  // (redownload derived — useRedownloadMode-এ)
   // (shuffle ref-report/duplicate memos — useShuffleMode-এ)
 
 
@@ -336,9 +270,9 @@ export default function Home() {
     !!stagedFiles?.length ||
     !!shuffle.docx ||
     !!shuffle.shuffleItems ||
-    serialDocs.length > 0 ||
-    !!serialPaste ||
-    rdDocs.length > 0 ||
+    serial.serialDocs.length > 0 ||
+    !!serial.serialPaste ||
+    rd.rdDocs.length > 0 ||
     !!(shuffle.parsed && shuffle.parsed.questions.length > 0);
 
   // ---- Phase 4.1: কাজ থাকা অবস্থায় ট্যাব বন্ধ/রিফ্রেশে ব্রাউজারের "leave site?" গার্ড ----
@@ -354,8 +288,8 @@ export default function Home() {
   }, [hasAnyInput]);
 
   // ---- প্রতি মোডের ফাইল-সংখ্যা (NextModesCard-এ দেখানোর জন্য) ----
-  const serialFileCount = serialDocs.length;
-  const rdFileCount = rdDocs.length;
+  const serialFileCount = serial.serialDocs.length;
+  const rdFileCount = rd.rdDocs.length;
 
   // (স্টেজড-প্রিভিউ + stageFiles/stageMoreFiles/stagedFilesRef — useStagedFiles-এ)
 
@@ -383,12 +317,12 @@ export default function Home() {
     shuffle.setMultiRenumber({});
     shuffle.setSelected(new Set());
     shuffle.setAllowBroken(false);
-    setSerialDocs([]);
-    setSerialSchemes({});
-    setSerialPaste(null);
-    setSerialPasteText("");
-    setRdDocs([]);
-    setRdSel({});
+    serial.setSerialDocs([]);
+    serial.setSerialSchemes({});
+    serial.setSerialPaste(null);
+    serial.setSerialPasteText("");
+    rd.setRdDocs([]);
+    rd.setRdSel({});
     shuffle.resetResults();
     setFlowStep("select"); // hasAnyInput ফলস হলেই অটো ধাপ ১ (আপলোড-কার্ড) দেখাবে
   };
@@ -396,8 +330,8 @@ export default function Home() {
   /** কাজ-চলাকালীন "আরও ফাইল" — নতুন ফাইল বর্তমান মোডেই যোগ (append) হয় */
   const handleAddMoreFiles = (files: File[]) => {
     if (!files.length) return;
-    if (mode === "serial") loadSerialFiles(files, true);
-    else if (mode === "redownload") loadRedownloadFiles(files, true);
+    if (mode === "serial") serial.loadSerialFiles(files, true);
+    else if (mode === "redownload") rd.loadRedownloadFiles(files, true);
     else shuffle.handleShuffleFiles(files, true);
   };
 
@@ -408,8 +342,8 @@ export default function Home() {
     m === "shuffle"
       ? !!(shuffle.docx || shuffle.shuffleItems || (shuffle.parsed && shuffle.parsed.questions.length > 0))
       : m === "serial"
-        ? serialDocs.length > 0 || !!serialPaste
-        : rdDocs.length > 0;
+        ? serial.serialDocs.length > 0 || !!serial.serialPaste
+        : rd.rdDocs.length > 0;
 
   /** মোডে থাকা ফাইলগুলো (File অবজেক্ট) — অন্য মোডে বহনের জন্য */
   const filesOfMode = (m: McqMode): File[] =>
@@ -420,14 +354,14 @@ export default function Home() {
           ? [shuffle.docx.file]
           : []
       : m === "serial"
-        ? serialDocs.map((d) => d.file)
-        : rdDocs.map((d) => d.file);
+        ? serial.serialDocs.map((d) => d.file)
+        : rd.rdDocs.map((d) => d.file);
 
   /** ফাইল একটা মোডে লোড — প্রতিটা মোডের নিজের লোডার ব্যবহার করে */
   const loadIntoMode = (m: McqMode, files: File[]) => {
     if (m === "shuffle") shuffle.handleShuffleFiles(files);
-    else if (m === "serial") loadSerialFiles(files, false);
-    else loadRedownloadFiles(files, false);
+    else if (m === "serial") serial.loadSerialFiles(files, false);
+    else rd.loadRedownloadFiles(files, false);
   };
 
   /**
@@ -455,505 +389,9 @@ export default function Home() {
   // ================== SERIAL MODE (সম্পূর্ণ আলাদা ওয়ার্কফ্লো) ==================
 
   /** .docx লোড + রঙ-বিশ্লেষণ — একাধিক হলে লিস্টে বসে; append=false হলে লিস্ট বদলে যায় */
-  const loadSerialFiles = async (files: File[], append: boolean) => {
-    // সাইজ ক্যাপ — ৫০ ফাইল / ১০০MB per file (shuffle-এর মতোই সব মোডে)
-    const existingCount = serialDocs.length;
-    let cappedFiles = files;
-    if (existingCount + files.length > SHUFFLE_MAX_FILES) {
-      const take = Math.max(0, SHUFFLE_MAX_FILES - (append ? existingCount : 0));
-      cappedFiles = files.slice(0, take);
-      toast({
-        title: `Max ${SHUFFLE_MAX_FILES} files`,
-        description: take > 0 ? `Between 1 and ${SHUFFLE_MAX_FILES} files at a time — took the first ${take}, dropped the rest.` : `Already ${SHUFFLE_MAX_FILES} files — remove some from the list to add new ones.`,
-        variant: "destructive",
-      });
-    }
-    if (!cappedFiles.length) return;
-    // রি-এন্ট্রান্সি গার্ড — চলমান লোড থাকলে ওভারল্যাপ কল নীরবে বাদ (state নয়, ref → stale closure নেই)
-    if (loadersBusyRef.current) return;
-    loadersBusyRef.current = true;
-    setSerialLoading(true);
-    await yieldToUI();
-    try {
-      const run = await runFilePipeline(cappedFiles, {
-        report: pipelineReport,
-        yieldToUI,
-        parse: (xml) => analyzeColorDocx(xml),
-      });
-      // সাইজ-গার্ড — পাইপলাইন রিপোর্ট করে, টোস্ট এখানেই (আগের হুবহু মেসেজ)
-      for (const f of run.tooBig) toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
-      // এক্সটেনশন-গার্ডে বাদ পড়া ফাইলের ফিডব্যাক — আগে নীরবে বাদ যেত
-      if (run.notDocx.length) {
-        toast({ title: `${run.notDocx.length} file(s) skipped — only .docx is supported`, variant: "destructive" });
-      }
-      const added: SerialState[] = run.items.map((it) => ({
-        id: nextMultiId(),
-        file: it.file,
-        baseName: it.baseName,
-        xml: it.xml,
-        analysis: it.value,
-      }));
-      const errors = run.failures.map((x) => `${x.name}: ${x.message}`);
-      let colors = 0;
-      let questions = 0;
-      for (const d of added) {
-        colors += d.analysis.colors.length;
-        questions += d.analysis.questionCount;
-      }
-      setSerialDocs((prev) => (append ? [...prev, ...added] : added));
-      setSerialLoading(false);
-      if (added.length) {
-        // ফাইল আপলোড হলে পেস্ট-রেজাল্ট ক্লিয়ার — দুটো একসাথে অ্যাক্টিভ থাকবে না
-        setSerialPaste(null);
-        setSerialSchemes((prev) => {
-          const next = append ? { ...prev } : {};
-          for (const d of added) next[d.id] = { kind: "continuous" };
-          return next;
-        });
-        toast({
-          title: `${added.length} file(s) ${append ? "added" : "loaded"}`,
-          description: `${questions} question(s) in total${colors ? `, ${colors} color header(s)`: ""}.${added.length > 1 ? " Reorder from the list — merge/ZIP download below." : ""}`,
-        });
-      }
-      if (errors.length) {
-        toast({ title: "Some files could not be read", description: errors.join("\n"), variant: "destructive" });
-      }
-    } finally {
-      loadersBusyRef.current = false;
-      clearProc();
-    }
-  };
+  // (serial handlers + openInSerialMode — useSerialMode-এ)
+  // (redownload handlers — useRedownloadMode-এ)
 
-  const reorderSerialDocs = (from: number, to: number) => {
-    setSerialDocs((prev) => {
-      const next = prev.slice();
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-      return next;
-    });
-  };
-
-  const removeSerialDoc = (id: string) => {
-    setSerialDocs((prev) => prev.filter((d) => d.id !== id));
-    setSerialSchemes((prev) => {
-      if (!(id in prev)) return prev;
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-  };
-
-  const handleColorSerial = async (scheme: SerialScheme, label: string) => {
-    if (!serialDoc) return;
-    setSerialBusy(true);
-    clearProc();
-    setProcStage("Serializing file...", 0);
-    await yieldToUI();
-    try {
-      const plan = planSerialByColor(serialDoc.analysis, scheme);
-      if (plan.size === 0) {
-        toast({
-          title: "No questions found to number",
-          description: "No serial-numbered question lines inside this color's sections.",
-          variant: "destructive",
-        });
-        return;
-      }
-      // ফরম্যাট-টগল অনুযায়ী ডাউনলোড — DOCX হলে হুবহু আগের ব্লব; PDF হলে ব্রাউজারে কনভার্ট
-      await finalizeDownload(
-        await buildColorSerialDocxBlob({
-          originalFile: serialDoc.file,
-          xml: serialDoc.xml,
-          plan,
-          baseName: serialDoc.baseName,
-          schemeLabel: label,
-          fontSettings,
-          onProgress: dlFileProgress("Serializing file...", 0, 1, serialDoc.baseName),
-        })
-      );
-      toast({
-        title: `Color-serial .${downloadFormat === "pdf" ? "pdf" : "docx"} downloaded`,
-        description:
-          scheme.kind === "continuous"
-            ? `${plan.size} question(s) numbered continuously 1,2,3…. Everything else untouched.`
-            : `${plan.size} question(s) numbered from 1 per color section. Headers/equations/images intact.`,
-      });
-    } catch (e) {
-      toast({ title: "Serialing failed", description: String(e), variant: "destructive" });
-    } finally {
-      clearProc();
-      setSerialBusy(false);
-    }
-  };
-
-  // ---- মাল্টি-ফাইল সিরিয়াল ডাউনলোড (≥২ ফাইল) ----
-
-  /** প্রতিটা ফাইল সিরিয়াল করে এক .docx-এ মার্জ — ফাইলের মাঝে পেজ ব্রেক */
-  const handleSerialMultiMerged = async () => {
-    if (serialDocs.length < 2) return;
-    setSerialMergedBusy(true);
-    clearProc();
-    setProcStage("Serializing files...", 0);
-    await yieldToUI();
-    try {
-      const items: Array<{ xml: string; file: Blob }> = [];
-      let offset = 0;
-      for (let fi = 0; fi < serialDocs.length; fi++) {
-        const d = serialDocs[fi];
-        // প্রতি ফাইলের নিজের স্কিম (ডিফল্ট একটানা — আগের আচরণ হুবহু)
-        const base = planSerialByColor(d.analysis, serialSchemes[d.id] ?? { kind: "continuous" });
-        // file-by-file হলে প্রতি ফাইল ১ থেকে; global হলে আগের ফাইলের শেষ নম্বরের পর থেকে
-        const plan = serialStrategy === "global" ? offsetSerialPlan(base, offset) : base;
-        offset += base.size;
-        const xml = applyColorSerialXml(d.xml, plan);
-        items.push({ xml, file: await replaceDocumentXml(d.file, xml, undefined, dlFileProgress("Serializing files...", fi, serialDocs.length + 1, d.baseName)) });
-      }
-      const merged = await buildMergedDocxBlob(items, fontSettings, dlFileProgress("Merging files...", serialDocs.length, serialDocs.length + 1));
-      await finalizeDownload({ blob: merged, fileName: `${serialDocs[0].baseName} (merged serial).docx`});
-      toast({
-        title: `Merged .${downloadFormat === "pdf" ? "pdf" : "docx"} downloaded`,
-        description:
-          serialStrategy === "global"
-            ? "All files in order with page breaks — one continuous serial start to finish."
-            : "All files in order with page breaks — serials restart at 1 in each file.",
-      });
-    } catch (e) {
-      toast({ title: "Merging failed", description: String(e), variant: "destructive" });
-    } finally {
-      clearProc();
-      setSerialMergedBusy(false);
-    }
-  };
-
-  /** প্রতিটা ফাইল আলাদাভাবে সিরিয়াল করে এক .zip-এ বানিয়ে দেয় */
-  const handleSerialMultiZip = async () => {
-    if (serialDocs.length < 2) return;
-    setSerialZipBusy(true);
-    clearProc();
-    setProcStage("Serializing files...", 0);
-    await yieldToUI();
-    try {
-      const out: Array<{ name: string; blob: Blob }> = [];
-      for (let fi = 0; fi < serialDocs.length; fi++) {
-        const d = serialDocs[fi];
-        // প্রতি ফাইলের নিজের স্কিম (ডিফল্ট একটানা — আগের আচরণ হুবহু)
-        const plan = planSerialByColor(d.analysis, serialSchemes[d.id] ?? { kind: "continuous" });
-        const xml = applyColorSerialXml(d.xml, plan);
-        out.push({ name: `${d.baseName} (serial).docx`, blob: await replaceDocumentXml(d.file, xml, fontSettings, dlFileProgress("Serializing files...", fi, serialDocs.length + 1, d.baseName)) });
-      }
-      const zip = await buildZipBlob(await finalizeZipEntries(out), dlFileProgress("Compressing ZIP...", serialDocs.length, serialDocs.length + 1));
-      downloadBlob(zip, "MCQ-serial-files.zip");
-      toast({
-        title: "ZIP downloaded",
-        description: `${out.length} file(s), each serialized separately — all inside.`,
-      });
-    } catch (e) {
-      toast({ title: "ZIP failed", description: String(e), variant: "destructive" });
-    } finally {
-      clearProc();
-      setSerialZipBusy(false);
-    }
-  };
-
-  // ---- সিরিয়াল মোড পেস্ট-ইনপুট (ফাইল-ফ্লোর সাথে পারস্পরিক একচেটিয়া) ----
-
-  /** পেস্ট-টেক্সটে parseMcq — রেজাল্ট সেভ + ফাইল-লিস্ট/কার্ড ক্লিয়ার (দুটো একসাথে থাকবে না) */
-  const handleSerialPasteDetect = () => {
-    if (!serialPasteText.trim()) return;
-    setSerialPasteBusy(true);
-    try {
-      const result = parseMcq(serialPasteText);
-      setSerialDocs([]);
-      setSerialSchemes({});
-      setSerialPaste(result);
-      if (result.questions.length === 0) {
-        toast({
-          title: "No questions found",
-          description: "Check that questions start with a number (e.g. 1. or ১.),",
-          variant: "destructive",
-        });
-      } else if (result.serial?.status === "ok") {
-        toast({
-          title: `${result.questions.length} question(s) detected`,
-          description: "Serial is correct — the serial download button below is enabled!",
-        });
-      } else {
-        toast({
-          title: `${result.questions.length} question(s) found, but the serial has problems`,
-          description: '"Fix numbering automatically" fixes it in one click.',
-        });
-      }
-    } finally {
-      setSerialPasteBusy(false);
-    }
-  };
-
-  /** পেস্ট-টেক্সটে autoFixNumbering — টেক্সট ও রেজাল্ট দুটোই আপডেট */
-  const handleSerialPasteFix = () => {
-    if (!serialPasteText.trim()) return;
-    setSerialPasteFixing(true);
-    try {
-      const fixed = autoFixNumbering(serialPasteText, 1);
-      const result = parseMcq(fixed);
-      setSerialPasteText(fixed);
-      setSerialPaste(result);
-      toast({
-        title: "Serial fixed",
-        description: `Renumbered ${result.questions.length} question(s) starting from 1.`,
-      });
-    } finally {
-      setSerialPasteFixing(false);
-    }
-  };
-
-  /** পেস্টের প্রশ্নগুলো পজিশন-অনুযায়ী ১..N রিনাম্বার করে এক সেট .docx এক্সপোর্ট */
-  const handleSerialPasteDownload = async () => {
-    if (!serialPaste || serialPaste.questions.length === 0) return;
-    setSerialPasteDlBusy(true);
-    try {
-      const renumbered = renumberQuestionsByPosition(serialPaste.questions, 1);
-      // একক সেট → পেজ-হেডার ও সেট-টাইটেল ("সেট A") দুটোই অফ — খালি সিরিয়াল ফাইল
-      await finalizeDownload(
-        await buildSetsDocxBlob([renumbered], {
-          ...DEFAULT_EXPORT_OPTIONS,
-          includeHeader: false,
-          includeSetHeader: false,
-          fileName: `MCQ-Serial-${renumbered.length}q.docx`,
-        }, fontSettings)
-      );
-      toast({
-        title: `Serial .${downloadFormat === "pdf" ? "pdf" : "docx"} downloaded`,
-        description: `${renumbered.length} question(s) numbered 1..N by position — order and options exactly intact.`,
-      });
-    } catch (e) {
-      toast({ title: "Download failed", description: String(e), variant: "destructive" });
-    } finally {
-      setSerialPasteDlBusy(false);
-    }
-  };
-
-  /** শাফল মোডে উঠা রঙ-ফাইল সিরিয়াল মোডে খোলা (ফাইল নিজেই চলে যায়, আবার আপলোড লাগে না) */
-  const openInSerialMode = () => {
-    if (!shuffle.docx?.colorAn) return;
-    const id = nextMultiId();
-    setStagedFiles(null);
-    setSerialDocs([
-      {
-        id,
-        file: shuffle.docx.file,
-        baseName: shuffle.docx.baseName,
-        // সিরিয়াল মোডে অরিজিনাল xml লাগে — রঙ-ইনডেক্স অরিজিনাল ফাইলের সাথে মেলে
-        xml: shuffle.docx.originalXml,
-        analysis: shuffle.docx.colorAn,
-      },
-    ]);
-    setSerialSchemes({ [id]: { kind: "continuous" } });
-    setSerialPaste(null);
-    // carry বাইপাস — changeMode-এর carryToMode স্টেল serialDocs=[] পড়ে ফাইলটা আবার লোড করত (ডাবল-বিশ্লেষণ + ডাবল-টোস্ট)
-    changeMode("serial", true);
-    toast({
-      title: "File opened in Serial mode",
-      description: "Pick a color below and download the serial file.",
-    });
-  };
-
-  // (shuffle handlers — useShuffleMode-এ)
-  // ================== SHARED ==================
-
-  // (shuffle handlers — useShuffleMode-এ)
-  // (shuffle handlers — useShuffleMode-এ)
-  // ================== REDOWNLOAD MODE ==================
-
-  /** রিডাউনলোড মোডে ফাইল লোড — পার্স + অংশ-বিশ্লেষণ + ওয়াটারমার্ক এক্সট্র্যাক্ট */
-  const loadRedownloadFiles = async (files: File[], append: boolean) => {
-    const existingCount = rdDocs.length;
-    let cappedFiles = files;
-    if (existingCount + files.length > SHUFFLE_MAX_FILES) {
-      const take = Math.max(0, SHUFFLE_MAX_FILES - (append ? existingCount : 0));
-      cappedFiles = files.slice(0, take);
-      toast({
-        title: `Max ${SHUFFLE_MAX_FILES} files`,
-        description: take > 0 ? `Between 1 and ${SHUFFLE_MAX_FILES} files at a time — took the first ${take}, dropped the rest.` : `Already ${SHUFFLE_MAX_FILES} files — remove some from the list to add new ones.`,
-        variant: "destructive",
-      });
-    }
-    if (!cappedFiles.length) return;
-    // রি-এন্ট্রান্সি গার্ড — চলমান লোড থাকলে ওভারল্যাপ কল নীরবে বাদ
-    if (loadersBusyRef.current) return;
-    loadersBusyRef.current = true;
-    setRdLoading(true);
-    await yieldToUI();
-    try {
-      const run = await runFilePipeline(cappedFiles, {
-        report: pipelineReport,
-        yieldToUI,
-        parse: async (xml, file) => ({ parse: parseRedownloadXml(xml), watermark: await extractWatermark(file) }),
-      });
-      // সাইজ-গার্ড — পাইপলাইন রিপোর্ট করে, টোস্ট এখানেই (আগের হুবহু মেসেজ)
-      for (const f of run.tooBig) toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
-      // এক্সটেনশন-গার্ডে বাদ পড়া ফাইলের ফিডব্যাক — আগে নীরবে বাদ যেত
-      if (run.notDocx.length) {
-        toast({ title: `${run.notDocx.length} file(s) skipped — only .docx is supported`, variant: "destructive" });
-      }
-      const added: RdDocState[] = run.items.map((it) => ({
-        id: nextMultiId(),
-        file: it.file,
-        baseName: it.baseName,
-        xml: it.xml,
-        parse: it.value.parse,
-        watermark: it.value.watermark,
-      }));
-      const errors = run.failures.map((x) => `${x.name}: ${x.message}`);
-      setRdDocs((prev) => (append ? [...prev, ...added] : added));
-      if (added.length) {
-        // নতুন ফাইলের সব প্রশ্ন ডিফল্ট সিলেক্টেড
-        setRdSel((prev) => {
-          const next = append ? { ...prev } : {};
-          for (const d of added) next[d.id] = new Set(d.parse.questions.map((q) => q.id));
-          return next;
-        });
-        const totalQ = added.reduce((a, d) => a + d.parse.questions.length, 0);
-        toast({
-          title: `${added.length} file(s) ${append ? "added" : "loaded"}`,
-          description: `${totalQ} question(s) in total. Now pick parts and download.`,
-        });
-      }
-      if (errors.length) {
-        toast({ title: "Some files could not be read", description: errors.join("\n"), variant: "destructive" });
-      }
-    } finally {
-      loadersBusyRef.current = false;
-      clearProc();
-    }
-    setRdLoading(false);
-  };
-
-  const reorderRdDocs = (from: number, to: number) => {
-    setRdDocs((prev) => {
-      const next = prev.slice();
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-      return next;
-    });
-  };
-
-  const removeRdDoc = (id: string) => {
-    setRdDocs((prev) => prev.filter((d) => d.id !== id));
-    setRdSel((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-  };
-
-  const rdSelOf = (id: string): Set<number> => rdSel[id] ?? new Set<number>();
-
-  const toggleRdQuestion = (docId: string, qid: number) => {
-    setRdSel((prev) => {
-      const cur = new Set(prev[docId] ?? []);
-      if (cur.has(qid)) cur.delete(qid);
-      else cur.add(qid);
-      return { ...prev, [docId]: cur };
-    });
-  };
-
-  const selectAllRd = (docId: string) => {
-    const d = rdDocs.find((x) => x.id === docId);
-    if (!d) return;
-    setRdSel((prev) => ({ ...prev, [docId]: new Set(d.parse.questions.map((q) => q.id)) }));
-  };
-
-  const selectNoneRd = (docId: string) => {
-    setRdSel((prev) => ({ ...prev, [docId]: new Set<number>() }));
-  };
-
-  const selectRangeRd = (docId: string, from: number, to: number) => {
-    const d = rdDocs.find((x) => x.id === docId);
-    if (!d) return;
-    const ids = d.parse.questions.slice(from, to + 1).map((q) => q.id);
-    setRdSel((prev) => ({ ...prev, [docId]: new Set(ids) }));
-  };
-
-  /** সব ফাইলের বাছাই করা প্রশ্ন + অংশ দিয়ে রেডি XML-আইটেম (খালি-সিলেক্ট ফাইল স্কিপ) */
-  const buildRdItems = (): Array<{ xml: string; file: Blob; baseName: string; dominant: RemapDominant }> | null => {
-    const items = rdDocs
-      .map((d) => {
-        const sel = rdSelOf(d.id);
-        if (!sel.size) return null;
-        const xml = buildRedownloadXml(d.xml, d.parse, sel, {
-          partSel: rdParts,
-          renumber: rdRenumber,
-          expandAnswer: true,
-          optionLabels,
-          fixLabels: rdFixLabels,
-        });
-        return { xml, file: d.file as Blob, baseName: d.baseName, dominant: remapDominantOf(d.xml) };
-      })
-      .filter((x): x is { xml: string; file: Blob; baseName: string; dominant: RemapDominant } => x !== null);
-    return items.length ? items : null;
-  };
-
-  const handleRdMerged = async () => {
-    const items = buildRdItems();
-    if (!items) {
-      toast({ title: "Select questions", description: "Tick questions in at least one file.", variant: "destructive" });
-      return;
-    }
-    setRdMergedBusy(true);
-    clearProc();
-    setProcStage(items.length === 1 ? "Building redownload file..." : "Merging redownload files...", 0);
-    await yieldToUI();
-    try {
-      const blob =
-        items.length === 1
-          ? await replaceDocumentXml(items[0].file, items[0].xml, fontSettings, dlFileProgress("Building redownload file...", 0, 1, items[0].baseName), items[0].dominant)
-          : await buildMergedDocxBlob(items, fontSettings, dlFileProgress("Merging redownload files...", 0, 1));
-      clearProc();
-      const name =
-        items.length === 1 ? `${items[0].baseName} (redownload).docx`: "MCQ-Redownload-merged.docx";
-      await finalizeDownload({ blob, fileName: name });
-      toast({
-        title: "Redownload file created",
-        description: `Picked parts from ${items.length} file(s) in the new file — tabs, equations, watermark all intact.`,
-      });
-    } catch (e) {
-      toast({ title: "Download failed", description: String(e), variant: "destructive" });
-    } finally {
-      clearProc();
-      setRdMergedBusy(false);
-    }
-  };
-
-  const handleRdZip = async () => {
-    const items = buildRdItems();
-    if (!items) {
-      toast({ title: "Select questions", description: "Tick questions in at least one file.", variant: "destructive" });
-      return;
-    }
-    setRdZipBusy(true);
-    clearProc();
-    setProcStage("Packing redownload ZIP...", 0);
-    await yieldToUI();
-    try {
-      const files: Array<{ name: string; blob: Blob }> = [];
-      for (let i = 0; i < items.length; i++) {
-        const it = items[i];
-        const blob = await replaceDocumentXml(it.file, it.xml, fontSettings, dlFileProgress("Building redownload files...", i, items.length + 1, it.baseName), it.dominant);
-        files.push({ name: `${it.baseName} (redownload).docx`, blob });
-      }
-      const zip = await buildZipBlob(await finalizeZipEntries(files), dlFileProgress("Compressing ZIP...", items.length, items.length + 1));
-      downloadBlob(zip, "MCQ-Redownload.zip");
-      toast({
-        title: "ZIP downloaded",
-        description: `${files.length} separate file(s) — each with the picked parts.`, 
-      });
-    } catch (e) {
-      toast({ title: "ZIP failed", description: String(e), variant: "destructive" });
-    } finally {
-      clearProc();
-      setRdZipBusy(false);
-    }
-  };
 
   // (shuffle handlers — useShuffleMode-এ)
   // (shuffle handlers — useShuffleMode-এ)
@@ -1040,52 +478,52 @@ export default function Home() {
               onBack={backToHome}
               onModeChange={changeMode}
               onAddFiles={handleAddMoreFiles}
-              busy={shuffle.shuffleLoading || shuffle.docxLoading || serialLoading || rdLoading || shuffle.detecting || shuffle.shuffling || shuffle.multiShuffling || shuffle.multiMergedBusy || shuffle.multiZipBusy || shuffle.setsFileBusy !== null || shuffle.multiSetsZipBusy || serialBusy || serialMergedBusy || serialZipBusy || serialPasteBusy || serialPasteFixing || serialPasteDlBusy || rdMergedBusy || rdZipBusy || shuffle.fixing}
+              busy={shuffle.shuffleLoading || shuffle.docxLoading || serial.serialLoading || rd.rdLoading || shuffle.detecting || shuffle.shuffling || shuffle.multiShuffling || shuffle.multiMergedBusy || shuffle.multiZipBusy || shuffle.setsFileBusy !== null || shuffle.multiSetsZipBusy || serial.serialBusy || serial.serialMergedBusy || serial.serialZipBusy || serial.serialPasteBusy || serial.serialPasteFixing || serial.serialPasteDlBusy || rd.rdMergedBusy || rd.rdZipBusy || shuffle.fixing}
               filesCount={mode === "shuffle" ? shuffle.shuffleFileCount : mode === "serial" ? serialFileCount : rdFileCount}
               maxFiles={SHUFFLE_MAX_FILES}
             />
         {mode === "redownload" ? (
           <>
             <RedownloadInputCard
-              loading={rdLoading}
-              items={rdDocs.map((d) => ({
+              loading={rd.rdLoading}
+              items={rd.rdDocs.map((d) => ({
                 id: d.id,
                 name: d.file.name,
                 status: "ready" as const,
                 questionCount: d.parse.questions.length,
               }))}
-              onReorder={reorderRdDocs}
-              onRemove={removeRdDoc}
+              onReorder={rd.reorderRdDocs}
+              onRemove={rd.removeRdDoc}
             />
 
-            {rdDocs.length > 0 && (
+            {rd.rdDocs.length > 0 && (
               <>
                 <RedownloadPartsCard
-                  counts={rdTotalCounts}
-                  sel={rdParts}
-                  onChange={(k, v) => setRdParts((p) => ({ ...p, [k]: v }))}
-                  renumber={rdRenumber}
-                  onRenumberChange={setRdRenumber}
-                  filesCount={rdDocs.length}
-                  questionsCount={rdTotalQuestions}
-                  found={rdFoundStats}
+                  counts={rd.rdTotalCounts}
+                  sel={rd.rdParts}
+                  onChange={(k, v) => rd.setRdParts((p) => ({ ...p, [k]: v }))}
+                  renumber={rd.rdRenumber}
+                  onRenumberChange={rd.setRdRenumber}
+                  filesCount={rd.rdDocs.length}
+                  questionsCount={rd.rdTotalQuestions}
+                  found={rd.rdFoundStats}
                   onApplyPreset={(parts, ren) => {
-                    setRdParts(parts);
-                    setRdRenumber(ren);
+                    rd.setRdParts(parts);
+                    rd.setRdRenumber(ren);
                     toast({ title: "Preset applied", description: "Part selection and renumber toggle restored." });
                   }}
                 />
 
                 <RedownloadQuestionsCard
-                  files={rdDocs.map((d) => ({
+                  files={rd.rdDocs.map((d) => ({
                     id: d.id,
                     fileName: d.file.name,
                     questions: d.parse.questions,
-                    selected: rdSelOf(d.id),
-                    onToggle: (qid) => toggleRdQuestion(d.id, qid),
-                    onSelectAll: () => selectAllRd(d.id),
-                    onSelectNone: () => selectNoneRd(d.id),
-                    onSelectRange: (f, t) => selectRangeRd(d.id, f, t),
+                    selected: rd.rdSelOf(d.id),
+                    onToggle: (qid) => rd.toggleRdQuestion(d.id, qid),
+                    onSelectAll: () => rd.selectAllRd(d.id),
+                    onSelectNone: () => rd.selectNoneRd(d.id),
+                    onSelectRange: (f, t) => rd.selectRangeRd(d.id, f, t),
                     watermark: d.watermark,
                     dominant: null,
                   }))}
@@ -1093,31 +531,31 @@ export default function Home() {
 
                 {/* লেবেল-টাইপো কার্ড — সবসময় দেখায় (টাইপো থাকলে লাল, না থাকলে সবুজ "none found") */}
                 <LabelTyposCard
-                  typos={rdLabelTypos}
-                  checked={rdFixLabels}
-                  onCheckedChange={setRdFixLabels}
+                  typos={rd.rdLabelTypos}
+                  checked={rd.rdFixLabels}
+                  onCheckedChange={rd.setRdFixLabels}
                 />
 
                 {/* উত্তর-কনফ্লিক্ট কার্ড — star-উত্তর আর Dt-tail উত্তর ভিন্ন হলে লাল */}
-                <AnswerConflictsCard conflicts={rdAnswerConflicts} />
+                <AnswerConflictsCard conflicts={rd.rdAnswerConflicts} />
 
-                <OptionLabelsCard settings={optionLabels} onChange={updateOptionLabels} />
+                <OptionLabelsCard settings={rd.optionLabels} onChange={rd.updateOptionLabels} />
 
                 <FontSettingsCard settings={fontSettings} onChange={updateFontSettings} />
 
                 <MultiDownloadCard
-                  title={rdDocs.length === 1 ? "4. Download — new file from picked parts" : "4. Download — picked parts of all files"}
+                  title={rd.rdDocs.length === 1 ? "4. Download — new file from picked parts" : "4. Download — picked parts of all files"}
                   description={
-                    rdDocs.length === 1
+                    rd.rdDocs.length === 1
                       ? "A new .docx from the ticked questions' picked parts — tabs, equations, watermark all intact."
                       : "All files in order in one .docx (page breaks between files) or download them separately in a ZIP."
                   }
-                  stats={`${rdDocs.length} file(s) • ${rdSelTotal} question(s) selected`}
-                  onDownloadMerged={handleRdMerged}
-                  onDownloadZip={handleRdZip}
-                  mergedBusy={rdMergedBusy}
-                  zipBusy={rdZipBusy}
-                  fileCount={rdDocs.length}
+                  stats={`${rd.rdDocs.length} file(s) • ${rd.rdSelTotal} question(s) selected`}
+                  onDownloadMerged={rd.handleRdMerged}
+                  onDownloadZip={rd.handleRdZip}
+                  mergedBusy={rd.rdMergedBusy}
+                  zipBusy={rd.rdZipBusy}
+                  fileCount={rd.rdDocs.length}
                   format={downloadFormat}
                   onFormatChange={updateDownloadFormat}
                 />
@@ -1129,36 +567,36 @@ export default function Home() {
         ) : mode === "serial" ? (
           <>
             <SerialInputCard
-              loading={serialLoading}
-              items={serialDocs.map((d) => ({
+              loading={serial.serialLoading}
+              items={serial.serialDocs.map((d) => ({
                 id: d.id,
                 name: d.file.name,
                 status: "ready" as const,
                 questionCount: d.analysis.questionCount,
               }))}
-              onReorder={reorderSerialDocs}
-              onRemove={removeSerialDoc}
+              onReorder={serial.reorderSerialDocs}
+              onRemove={serial.removeSerialDoc}
             />
 
             {/* আউটপুট ফাইলের ফন্ট-রিম্যাপ কার্ড — সিঙ্গেল (রঙ-সিরিয়াল/কন্টিনিউয়াস) ও মাল্টি (মার্জ/ZIP) ডাউনলোড দুই পাথেই প্রয়োগ হয় */}
             <FontSettingsCard settings={fontSettings} onChange={updateFontSettings} />
 
             {/* ঠিক ১ টা ফাইল — পুরনো রঙ-চিপ কার্ড */}
-            {serialDocs.length === 1 && serialDoc ? (
-              serialDoc.analysis.colors.length > 0 ? (
+            {serial.serialDocs.length === 1 && serial.serialDoc ? (
+              serial.serialDoc.analysis.colors.length > 0 ? (
                 <ColorSerialCard
-                  analysis={serialDoc.analysis}
-                  fileName={serialDoc.file.name}
-                  busy={serialBusy}
-                  onSerial={handleColorSerial}
+                  analysis={serial.serialDoc.analysis}
+                  fileName={serial.serialDoc.file.name}
+                  busy={serial.serialBusy}
+                  onSerial={serial.handleColorSerial}
                   format={downloadFormat}
                   onFormatChange={updateDownloadFormat}
                 />
               ) : (
                 <NoColorSerialCard
-                  questionCount={serialDoc.analysis.questionCount}
-                  busy={serialBusy}
-                  onContinuous={() => handleColorSerial({ kind: "continuous" }, "continuous")}
+                  questionCount={serial.serialDoc.analysis.questionCount}
+                  busy={serial.serialBusy}
+                  onContinuous={() => serial.handleColorSerial({ kind: "continuous" }, "continuous")}
                   format={downloadFormat}
                   onFormatChange={updateDownloadFormat}
                 />
@@ -1166,25 +604,25 @@ export default function Home() {
             ) : null}
 
             {/* ≥২ ফাইল — প্রতি ফাইলের সিরিয়াল-স্কিম + মার্জ (.docx) / ZIP ডাউনলোড */}
-            {serialDocs.length >= 2 && (
+            {serial.serialDocs.length >= 2 && (
               <>
                 <MultiSerialSchemeCard
-                  docs={serialDocs.map((d) => ({ id: d.id, name: d.file.name, analysis: d.analysis }))}
-                  schemes={serialSchemes}
-                  onSchemeChange={(id, scheme) => setSerialSchemes((prev) => ({ ...prev, [id]: scheme }))}
+                  docs={serial.serialDocs.map((d) => ({ id: d.id, name: d.file.name, analysis: d.analysis }))}
+                  schemes={serial.serialSchemes}
+                  onSchemeChange={(id, scheme) => serial.setSerialSchemes((prev) => ({ ...prev, [id]: scheme }))}
                 />
                 <MultiDownloadCard
                   title="Serial all files together"
                   description="Color headers, equations and images stay intact. Files with colored headers can restart at 1 per section (scheme card above); files without colors always run continuous 1,2,3…"
-                  stats={`${serialDocs.length} file(s) • ${serialDocs.reduce((a, d) => a + d.analysis.questionCount, 0)} question(s) in total`}
+                  stats={`${serial.serialDocs.length} file(s) • ${serial.serialDocs.reduce((a, d) => a + d.analysis.questionCount, 0)} question(s) in total`}
                   showSerialChoice
-                  serialStrategy={serialStrategy}
-                  onSerialStrategyChange={setSerialStrategy}
-                  onDownloadMerged={handleSerialMultiMerged}
-                  onDownloadZip={handleSerialMultiZip}
-                  mergedBusy={serialMergedBusy}
-                  zipBusy={serialZipBusy}
-                  fileCount={serialDocs.length}
+                  serialStrategy={serial.serialStrategy}
+                  onSerialStrategyChange={serial.setSerialStrategy}
+                  onDownloadMerged={serial.handleSerialMultiMerged}
+                  onDownloadZip={serial.handleSerialMultiZip}
+                  mergedBusy={serial.serialMergedBusy}
+                  zipBusy={serial.serialZipBusy}
+                  fileCount={serial.serialDocs.length}
                   format={downloadFormat}
                   onFormatChange={updateDownloadFormat}
                 />
@@ -1193,7 +631,7 @@ export default function Home() {
             )}
 
             {/* ঠিক ১ ফাইল — ডাউনলোড-কার্ডের নিচেই বাকি মোডে ফাইল নিয়ে যাওয়ার বাটন */}
-            {serialDocs.length === 1 && (
+            {serial.serialDocs.length === 1 && (
               <NextModesCard current="serial" filesCount={serialFileCount} onOpen={changeMode} />
             )}
           </>
@@ -1303,7 +741,7 @@ export default function Home() {
                     analysis={shuffle.docx.colorAn}
                     headersStripped={shuffle.docx.headersStripped}
                     fileName={shuffle.docx.file.name}
-                    onOpenSerial={openInSerialMode}
+                    onOpenSerial={() => serial.openInSerialMode(shuffle.docx)}
                   />
                 )}
 
