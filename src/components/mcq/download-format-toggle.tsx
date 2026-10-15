@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
 import type { DownloadFormat } from "@/lib/mcq/pdf-export";
 
 interface DownloadFormatToggleProps {
@@ -21,6 +22,11 @@ interface DownloadFormatToggleProps {
 export function DownloadFormatToggle({ value, onChange, disabled = false, className }: DownloadFormatToggleProps) {
   const base =
     "flex-1 min-w-[76px] px-3 py-1.5 text-xs font-semibold rounded-md transition-colors disabled:cursor-not-allowed";
+  // PDF temporarily unavailable — legacy "pdf" choice falls back to DOCX display
+  const effectiveValue: DownloadFormat = value === "pdf" ? "docx" : value;
+  const handlePdfClick = () => {
+    toast({ title: "This feature is coming soon..." });
+  };
   return (
     <div
       data-testid="download-format"
@@ -35,12 +41,12 @@ export function DownloadFormatToggle({ value, onChange, disabled = false, classN
         <button
           type="button"
           data-testid="format-docx"
-          aria-pressed={value === "docx"}
+          aria-pressed={effectiveValue === "docx"}
           disabled={disabled}
           onClick={() => onChange("docx")}
           className={cn(
             base,
-            value === "docx"
+            effectiveValue === "docx"
               ? "bg-brand-600 text-white shadow-sm hover:bg-brand-700"
               : "text-muted-foreground hover:bg-background hover:text-foreground"
           )}
@@ -50,26 +56,19 @@ export function DownloadFormatToggle({ value, onChange, disabled = false, classN
         <button
           type="button"
           data-testid="format-pdf"
-          aria-pressed={value === "pdf"}
+          aria-pressed={false}
+          aria-disabled="true"
           disabled={disabled}
-          title="PDF is rendered in your browser (best effort)"
-          onClick={() => onChange("pdf")}
+          title="PDF — coming soon"
+          onClick={handlePdfClick}
           className={cn(
             base,
-            value === "pdf"
-              ? "bg-brand-600 text-white shadow-sm"
-              : "text-muted-foreground hover:bg-background hover:text-foreground"
+            "cursor-not-allowed opacity-50 text-muted-foreground hover:bg-background hover:text-foreground"
           )}
         >
           PDF
         </button>
       </div>
-      {value === "pdf" && (
-        <span className="text-[11px] text-muted-foreground">
-          PDF is rendered in your browser (best effort) — large files are split
-          into multiple &ldquo;-partN.pdf&rdquo; files.
-        </span>
-      )}
     </div>
   );
 }

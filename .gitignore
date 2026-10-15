@@ -113,3 +113,9 @@ worklog.md
 
 # phasewise planning file - local only
 mcq-shuffler-pro-phasewise-plan.md
+
+# agent backup files (*.bak-*) - local only, GitHub-e jabe na
+*.bak-*
+
+# golden test snapshots (verify/golden-test output) - local only
+golden/

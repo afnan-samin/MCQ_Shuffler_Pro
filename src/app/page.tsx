@@ -198,10 +198,10 @@ const DOWNLOAD_FORMAT_KEY = "mcq-download-format";
 function isMcqMode(raw: string): raw is McqMode {
   return raw === "shuffle" || raw === "serial" || raw === "redownload";
 }
-/** "Download as" ফরম্যাট-ভ্যালুর গার্ড — Phase 5.1-এ PDF চালু, তাই docx + pdf দুটোই গ্রহণ করে
- * (অজানা/ভাঙা ভ্যালু এলে ডিফল্ট docx-এ fallback হয়)। */
+/** "Download as" ফরম্যাট-ভ্যালুর গার্ড — PDF coming-soon, তাই আপাতত শুধু docx
+ * (পুরনো সেভ-এ "pdf" থাকলে ডিফল্ট docx-এ fallback হয়)। */
 function isDownloadFormat(raw: string): raw is DownloadFormat {
-  return raw === "docx" || raw === "pdf";
+  return raw === "docx";
 }
 // মাল্টি-ফাইল লিস্টের আইটেম-id (reorder/remove-এর জন্য স্টেবল কী দরকার)
 let multiIdCounter = 0;

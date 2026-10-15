@@ -133,7 +133,12 @@ const BEKKHA_PREFIX_RE = /^\s*(?:e¨vL¨v|ব্যাখ্যা|সমাধ�
 
 function countSerialLetterPairs(t: string): number {
   const m = t.match(SERIAL_LETTER_PAIR_RE);
-  return m ? m.length : 0;
+  if (!m) return 0;
+  // অনুপাত-গার্ড (Weekly Exam 6 Q22: "22. m I 3m ... 2:1 ..."):
+  // "2:1"/"3:2" জাতীয় digit-colon-digit অনুপাত সিরিয়াল+উত্তর-জোড়া নয় —
+  // কোলন-সেপারেটরে অক্ষর-অংশ ডিজিট (1-4/০-৯/Bijoy) হলে ওই ম্যাচ বাদ।
+  // "1: K" (অক্ষর-উত্তর) এখনো গোনা হয়, শুধু "2:1" (সংখ্যা-অনুপাত) বাদ।
+  return m.filter((s) => !/:\s*[0-9০-৯ø«ˆµ∏Ï¾˜Ùœ]\s*$/.test(s)).length;
 }
 
 /**
