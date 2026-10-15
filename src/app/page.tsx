@@ -109,21 +109,17 @@ import { usePersistedJson, usePersistedString } from "@/hooks/use-persisted-stat
 import { Dices, Loader2, ShieldCheck, Upload, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { type DropzoneTrigger } from "@/components/mcq/file-dropzone";
+import { useSharedServices } from "@/hooks/useSharedServices";
+import { useStagedFiles } from "@/hooks/useStagedFiles";
 
 const STORAGE_KEY = "mcq-shuffler-text";
 const MODE_KEY = "mcq-shuffler-mode";
-/** আউটপুট ফাইলের ফন্ট-রিম্যাপ সেটিংস — সব মোডের ডাউনলোডে এক সেটিংস (persisted) */
-const FONT_SETTINGS_KEY = "mcq-font-settings";
 /** রিডাউনলোডের অপশন-লেবেল কাস্টমাইজ সেটিংস (persisted) */
 const OPTION_LABELS_KEY = "mcq-option-labels";
 /** অপশন-লেবেল টাইপো অটো-ফিক্স (ডিফল্ট OFF — ডাউনলোড হুবহু) */
 const RD_FIX_LABELS_KEY = "mcq-rd-fix-labels";
 
 // ---------- প্রসেস-ওভারলে (বড় ফাইলের লোড/ডাউনলোডে "hang"-চেহারা আটকায়) ----------
-
-/** ওভারলে আপডেটের সর্বনিম্ন ব্যবধান (ms) — JSZip কলব্যাক প্রতি-চাংকে আসে,
- *  প্রতিবার setState করলে 80MB ফাইলে হাজার-হাজার রি-রেন্ডার হত */
-const PROC_REPORT_MIN_MS = 120;
 
 export interface ProcState {
   active: boolean;
@@ -134,8 +130,6 @@ export interface ProcState {
   fileTotal?: number;
   name?: string;
 }
-
-export const PROC_IDLE: ProcState = { active: false, stage: "", pct: null };
 
 /** ফুল-স্ক্রিন "processing" ওভারলে — প্রগতি-বারসহ। determinate % জানা থাকলে
  * (মাল্টি-ফাইল "File 2/5"), না থাকলে অ্যানিমেটেড pulse। সব মোডের লোড পথ ব্যবহার করে। */
@@ -175,37 +169,11 @@ function ProcessOverlay({ proc }: { proc: ProcState }) {
   );
 }
 
-/**
- * Persisted ফন্ট-সেটিংস হাইড্রেশন-গার্ড — FONT_CHOICES-এ নেই এমন ভ্যালু
- * (পুরনো সেভ/হাতে-এডিট localStorage) ড্রপ করে ওই স্লটের ডিফল্টে ফেরায়,
- * নাহলে Radix Select খালি ভ্যালু রেন্ডার করে ভেঙে পড়ে।
- */
-function sanitizeFontSettings(raw: unknown): FontSettings {
-  const r = (raw ?? {}) as Partial<FontSettings>;
-  /** তালিকায় থাকলে ভ্যালু, নাহলে ওই স্লটের ডিফল্ট */
-  const pick = (v: string | undefined, list: readonly string[], fallback: string): string =>
-    typeof v === "string" && list.includes(v) ? v : fallback;
-  return {
-    englishFont: pick(r.englishFont, FONT_CHOICES.english, DEFAULT_FONT_REMAP_SETTINGS.englishFont),
-    bijoyFont: pick(r.bijoyFont, FONT_CHOICES.bijoy, DEFAULT_FONT_REMAP_SETTINGS.bijoyFont),
-    unicodeFont: pick(r.unicodeFont, FONT_CHOICES.unicode, DEFAULT_FONT_REMAP_SETTINGS.unicodeFont),
-    enabled: typeof r.enabled === "boolean" ? r.enabled : DEFAULT_FONT_REMAP_SETTINGS.enabled,
-  };
-}
-/** "Download as" ফরম্যাট-টগলের শেষ পছন্দ (DOCX ডিফল্ট — অনুপস্থিত/ভাঙা মানে DOCX) */
-const DOWNLOAD_FORMAT_KEY = "mcq-download-format";
 /** localStorage থেকে আসা মোড-ভ্যালুর গার্ড — অজানা ভ্যালু এলে ডিফল্ট "shuffle" থাকে */
 function isMcqMode(raw: string): raw is McqMode {
   return raw === "shuffle" || raw === "serial" || raw === "redownload";
 }
-/** "Download as" ফরম্যাট-ভ্যালুর গার্ড — PDF coming-soon, তাই আপাতত শুধু docx
- * (পুরনো সেভ-এ "pdf" থাকলে ডিফল্ট docx-এ fallback হয়)। */
-function isDownloadFormat(raw: string): raw is DownloadFormat {
-  return raw === "docx";
-}
-// মাল্টি-ফাইল লিস্টের আইটেম-id (reorder/remove-এর জন্য স্টেবল কী দরকার)
-let multiIdCounter = 0;
-const nextMultiId = () => `mf-${++multiIdCounter}-${Date.now().toString(36)}`;
+// ("Download as" ফরম্যাট-গার্ড + multi-id কাউন্টার — useSharedServices-এ)
 
 interface DocxState {
   file: File;
@@ -259,13 +227,21 @@ export default function Home() {
   // ---- মোড (persisted — শেষ ব্যবহৃত মোড মনে থাকে) ----
   const [mode, setMode] = usePersistedString<McqMode>(MODE_KEY, "shuffle", isMcqMode);
 
-  // ---- স্টেজড ফাইল — আপলোড হয়েছে, কিন্তু এখনো কোনো মোডে খোলা হয়নি ----
-  // ইউজার যেকোনো মোডে ক্লিক করলে এই ফাইলগুলো ওই মোডে লোড হয়ে যায়।
-  // প্রতিটা ফাইলের ডিটেকশন-সংখ্যা (প্রশ্ন/৬-অংশ) staging-সময়েই একবার গুনে রাখা হয় —
-  // মোড-লোডাররা পরে নিজেদের পার্স চালায়; এটা শুধু "files ready" টেবিলের প্রিভিউ।
-  const [stagedFiles, setStagedFiles] = useState<StagedFile[] | null>(null);
-  /** staging-পার্সের রান-আইডি — পুরনো রানের দেরিতে-আসা রেজাল্ট নতুন লিস্টে মিশবে না */
-  const stagedRunRef = useRef(0);
+  // ---- স্টেজড ফাইল-স্লাইস + শেয়ার্ড সার্ভিস — hooks (single source of truth) ----
+  // নিচের নামগুলো আগের inline state/handler-এর হুবহু একই — বাকি কোডে কোনো পরিবর্তন নেই।
+  const {
+    stagedFiles, setStagedFiles,
+    stagedDzTrigger,
+    stageFiles, stageMoreFiles,
+  } = useStagedFiles();
+  const {
+    fontSettings, updateFontSettings,
+    downloadFormat, updateDownloadFormat,
+    finalizeDownload, finalizeZipEntries,
+    nextMultiId,
+    yieldToUI, setProcStage, clearProc, pipelineReport, dlReport, dlFileProgress,
+    proc,
+  } = useSharedServices();
 
   // ---- ফ্লো-ধাপ: "select" = মোড-বাছাই (৩টা মোড-বাটন শুধু এখানেই), "work" = মোডের ভিতরে কাজ ----
   // মোডে ঢোকার পর ৩টা মোড-বাটন আর দেখানো হয় না — উপরে থাকে পেছনে + আরও-ফাইল বার
@@ -294,19 +270,7 @@ export default function Home() {
   // রেফারেন্স-ট্যাগ ([CU-A: 22-23] স্টাইল) কী করা হবে — ডিফল্ট রাখা
   const [refMode, setRefMode] = useState<RefMode>("keep");
 
-  // ---- আউটপুট ফাইলের ফন্ট-রিম্যাপ (persisted) — ডাউনলোডের সময় document.xml (+styles.xml)-এ প্রয়োগ হয় ----
-  const [fontSettings, updateFontSettings] = usePersistedJson<FontSettings>(
-    FONT_SETTINGS_KEY,
-    DEFAULT_FONT_REMAP_SETTINGS,
-    sanitizeFontSettings
-  );
-
-  // ---- "Download as" ফরম্যাট (persisted — DOCX ডিফল্ট) — সব মোডের সব ডাউনলোডে এক পছন্দ ----
-  const [downloadFormat, updateDownloadFormat] = usePersistedString<DownloadFormat>(
-    DOWNLOAD_FORMAT_KEY,
-    "docx",
-    isDownloadFormat
-  );
+  // (আউটপুট ফন্ট-রিম্যাপ + "Download as" ফরম্যাট — useSharedServices-এ)
 
   // ---- রেজাল্ট ----
   const [sets, setSets] = useState<McqQuestion[][] | null>(null);
@@ -466,251 +430,15 @@ export default function Home() {
   const serialFileCount = serialDocs.length;
   const rdFileCount = rdDocs.length;
 
-  const stagedDzTrigger = useRef<DropzoneTrigger | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   /** লোডার রি-এন্ট্রান্সি গার্ড — state নয়, ref (stale-closure এড়াতে); চলমান লোড থাকলে নতুন কল নীরবে বাদ */
   const loadersBusyRef = useRef(false);
 
-  /**
-   * স্টেজড ফাইলের ডিটেকশন-প্রিভিউ — মোডে ঢোকার আগেই "files ready" টেবিলে
-   * প্রশ্ন/৬-অংশের সংখ্যা দেখানোর জন্য। parseRedownloadXml-এর নিজস্ব সংখ্যা
-   * (প্রতি প্রশ্নে kinds → found-স্ট্যাট) — মোড-ভেতরের RedownloadPartsCard-এর
-   * ব্যাজ-হিসাবের (rdFoundStats) হুবহু একই নিয়ম, তাই সংখ্যা মিলবে।
-   */
-  const previewStagedStats = useCallback(async (xml: string): Promise<StagedFileStats> => {
-    const { parseRedownloadXml } = await import("@/lib/mcq/redownload");
-    const parse = parseRedownloadXml(xml);
-    let serial = 0;
-    let question = 0;
-    let reference = 0;
-    let withOptions = 0;
-    let optionsTotal = 0;
-    let mcq = 0;
-    let withAnswer = 0;
-    let withBekkha = 0;
-    for (const q of parse.questions) {
-      // Serial = প্রশ্নে নিজে লেখা নম্বর আছে কিনা (kinds "serial" শুধু একক-সিরিয়াল-লাইনে বসে —
-      // ইনলাইন "1. প্রশ্ন…" হলে কিন্তু প্রতি প্রশ্নের নম্বর থাকে — তাই serialDigits ধরি)
-      if (q.serialDigits.length > 0) serial++;
-      if (q.kinds.includes("question")) question++;
-      if (q.kinds.includes("reference")) reference++;
-      if (q.options.length > 0) withOptions++;
-      optionsTotal += q.options.length;
-      // Total MCQ = সত্যিকারের প্রশ্ন, অর্থাৎ যেগুলোর পূর্ণ ৪টা অপশন আছে
-      // (MIN_OPTIONS_PER_MCQ) — ০-অপশন ফাইলে "১০০ MCQ" দেখিয়ে দিত না।
-      if (q.options.length >= MIN_OPTIONS_PER_MCQ) mcq++;
-      // উত্তর-লাইন থাকলেই "Answer found" (ভ্যালু-এক্সট্র্যাক্ট ছাড়াও) —
-      // rdFoundStats-এর হুবহু একই নিয়ম, তাই টেবিল ও মোড-ব্যাজ মিলবে।
-      if (q.answer || q.kinds.includes("answer")) withAnswer++;
-      if (q.bekkha) withBekkha++;
-    }
-    return {
-      questions: parse.questions.length,
-      serial,
-      question,
-      reference,
-      options: withOptions,
-      optionsTotal,
-      mcq,
-      answer: withAnswer,
-      bekkha: withBekkha,
-    };
-  }, []);
+  // (স্টেজড-প্রিভিউ + stageFiles/stageMoreFiles/stagedFilesRef — useStagedFiles-এ)
 
-  /**
-   * স্টেজিং-সময় .docx ভ্যালিডেশন (F3) — প্রতিটা .docx-এর হালকা JSZip চেক
-   * (zip খোলা যায় + word/document.xml আছে; XML পার্স নয়)। ব্যর্থ ফাইল বাদ +
-   * English টোস্ট; সবগুলো ব্যর্থ হলে স্টেজই হয় না (আপলোড-কার্ডেই থাকে)।
-   * ভ্যালিড ফাইলগুলোর ডিটেকশন-সংখ্যা ব্যাকগ্রাউন্ডে গুনে টেবিলে বসে।
-   */
-  const stageFiles = useCallback(
-    async (files: File[]) => {
-      const valid: File[] = [];
-      for (const f of files) {
-        if (await isValidDocxZip(f)) {
-          valid.push(f);
-        } else {
-          toast({
-            title: "Could not read the file",
-            description: `${f.name} is not a valid .docx`,
-            variant: "destructive",
-          });
-        }
-      }
-      // সব ব্যর্থ → স্টেজ নয় — আপলোড-কার্ডেই থাকে ("files ready" ভুল ইঙ্গিত নয়)
-      if (!valid.length) return;
-      const runId = ++stagedRunRef.current;
-      setStagedFiles(valid.map((file) => ({ file, status: "parsing" as const })));
-      // ডিটেকশন-প্রিভিউ — একটা একটা করে (বড় ফাইলে UI ব্লক হয় না); রান বদলে গেলে থামে
-      for (let i = 0; i < valid.length; i++) {
-        if (stagedRunRef.current !== runId) return;
-        const f = valid[i];
-        try {
-          const { loadDocxXml } = await import("@/lib/mcq/docx-xml");
-          const xml = await loadDocxXml(f);
-          if (stagedRunRef.current !== runId) return;
-          const stats = await previewStagedStats(xml);
-          if (stagedRunRef.current !== runId) return;
-          setStagedFiles((prev) =>
-            prev === null
-              ? prev
-              : prev.map((s, j) => (j === i ? { ...s, status: "ready" as const, stats } : s))
-          );
-        } catch {
-          if (stagedRunRef.current !== runId) return;
-          setStagedFiles((prev) =>
-            prev === null
-              ? prev
-              : prev.map((s, j) =>
-                  j === i ? { ...s, status: "error" as const, error: "Could not read the file" } : s
-                )
-          );
-        }
-      }
-    },
-    [previewStagedStats]
-  );
-  /** মোড-বাছাই ধাপে "Add files" — স্টেজড লিস্টের শেষে যোগ হয় (replace নয়) */
-  const stageMoreFiles = useCallback(
-    async (files: File[]) => {
-      if (!files.length) return;
-      const valid: File[] = [];
-      for (const f of files) {
-        if (await isValidDocxZip(f)) {
-          valid.push(f);
-        } else {
-          toast({
-            title: "Could not read the file",
-            description: `${f.name} is not a valid .docx`,
-            variant: "destructive",
-          });
-        }
-      }
-      if (!valid.length) return;
-      const runId = ++stagedRunRef.current;
-      const base = (stagedFilesRef.current ?? []).length;
-      setStagedFiles((prev) => [...(prev ?? []), ...valid.map((file) => ({ file, status: "parsing" as const }))]);
-      for (let k = 0; k < valid.length; k++) {
-        if (stagedRunRef.current !== runId) return;
-        const idx = base + k;
-        const f = valid[k];
-        try {
-          const { loadDocxXml } = await import("@/lib/mcq/docx-xml");
-          const xml = await loadDocxXml(f);
-          if (stagedRunRef.current !== runId) return;
-          const stats = await previewStagedStats(xml);
-          if (stagedRunRef.current !== runId) return;
-          setStagedFiles((prev) =>
-            prev === null
-              ? prev
-              : prev.map((s, j) => (j === idx ? { ...s, status: "ready" as const, stats } : s))
-          );
-        } catch {
-          if (stagedRunRef.current !== runId) return;
-          setStagedFiles((prev) =>
-            prev === null
-              ? prev
-              : prev.map((s, j) =>
-                  j === idx ? { ...s, status: "error" as const, error: "Could not read the file" } : s
-                )
-          );
-        }
-      }
-    },
-    [previewStagedStats]
-  );
-  /** stageMoreFiles-এর base-ইনডেক্সের জন্য স্টেজড-লিস্টের লাইভ রেফ (stale-closure এড়াতে) */
-  const stagedFilesRef = useRef<StagedFile[] | null>(null);
-  useEffect(() => {
-    stagedFilesRef.current = stagedFiles;
-  }, [stagedFiles]);
+  // (proc/yieldToUI/pipeline/dl-helpers — useSharedServices-এ)
 
-  // ---- প্রসেস-ওভারলে — বড় ফাইলের লোডে "hang"-চেহারা আটকায় (সব মোডে) ----
-  const [proc, setProc] = useState<ProcState>({ active: false, stage: "", pct: null });
-  /** UI-থ্রেডে শ্বাস-নেওয়ার জায়গা — ওভারলে/বার রিপেইন্ট হয় */
-  const yieldToUI = () => new Promise<void>((r) => setTimeout(r, 1));
-  const setProcStage = (stage: string, pct: number | null, fileNo?: number, fileTotal?: number, name?: string) =>
-    setProc({ active: true, stage, pct, fileNo: fileNo || undefined, fileTotal: fileTotal || undefined, name });
-  const clearProc = () => {
-    procReportLastRef.current = 0;
-    setProc(PROC_IDLE);
-  };
-  /** ওভারলে-থ্রটলড রিপোর্ট — একই stage-এ 120ms-এর ভিতরে repeat setState বাদ
-   *  (JSZip-এর per-chunk কলব্যাক + parse-লুপ মিলিয়ে সেকেন্ডে শত-শত কল আসে) */
-  const procReportLastRef = useRef(0);
-  const pipelineReport = (p: PipelineProgress) => {
-    const now = Date.now();
-    const done = p.pct != null && p.pct >= 1;
-    if (!done && now - procReportLastRef.current < PROC_REPORT_MIN_MS) return;
-    procReportLastRef.current = now;
-    setProcStage(p.stage, p.pct, p.fileNo, p.fileTotal, p.name);
-  };
-
-  /** ডাউনলোড-পথের থ্রটলড রিপোর্ট — replaceDocumentXml/buildZipBlob-এর onProgress এখানেই যায় */
-  const dlReportLastRef = useRef(0);
-  const dlReport = (stage: string, pct: number | null, fileNo?: number, fileTotal?: number, name?: string) => {
-    const now = Date.now();
-    const done = pct != null && pct >= 1;
-    if (!done && now - dlReportLastRef.current < PROC_REPORT_MIN_MS) return;
-    dlReportLastRef.current = now;
-    setProcStage(stage, pct, fileNo, fileTotal, name);
-  };
-  /**
-   * n-ফাইল লুপের ওজন-ভাগ করা onProgress — ফাইল i (0-based)-এর 0..1 ফ্র্যাককে
-   * [i/n, (i+1)/n] উইন্ডোতে ম্যাপ করে; stage-এ "File k of n" যোগ হয়।
-   */
-  const dlFileProgress = (
-    stage: string,
-    i: number,
-    n: number,
-    name?: string,
-  ): ((frac: number) => void) | undefined => {
-    if (n <= 1) return (frac) => dlReport(stage, frac, undefined, undefined, name);
-    return (frac) => dlReport(stage, (i + Math.max(0, Math.min(1, frac))) / n, i + 1, n, name);
-  };
-
-  // মোড / ফন্ট-সেটিংস / অপশন-লেবেল / ডাউনলোড-ফরম্যাট — use-persisted-state হুকে
-  // হাইড্রেট + কমিট হয় (updateFontSettings / updateOptionLabels /
-  // updateDownloadFormat এখন হুকের setter — JSX-এ কোনো পরিবর্তন নেই)।
-
-  /**
-   * ফরম্যাট-টগল অনুযায়ী চূড়ান্ত ডাউনলোড — DOCX হলে হুবহু আগের ব্লব+নাম
-   * (বাইট-অভিন্ন আচরণ); PDF হলে docx-ব্লবটা ব্রাউজারেই PDF-এ কনভার্ট হয়ে
-   * একই base নামের .pdf হিসেবে নামে (fontSettings আগেই docx-এ প্রয়োগ হয়ে যায়)।
-   */
-  const finalizeDownload = async (docxOut: { blob: Blob; fileName: string }) => {
-    if (downloadFormat === "pdf") {
-      // Phase 3 #8 — পেজ-সীমা ছাড়ালে একাধিক PDF-এ auto-split (আগে error ছিল)
-      const parts = await docxBlobToPdfParts(docxOut.blob, docxOut.fileName);
-      for (let i = 0; i < parts.length; i++) {
-        if (i > 0) await new Promise((r) => setTimeout(r, 600)); // multi-download ব্লক এড়াতে
-        downloadBlob(parts[i].blob, parts[i].name);
-      }
-      if (parts.length > 1) {
-        toast({
-          title: `Split into ${parts.length} PDF files`,
-          description: `The document exceeded the 300-page per-file limit — sequential parts were downloaded (part 1 of ${parts.length} first).`,
-        });
-      }
-    } else {
-      downloadBlob(docxOut.blob, docxOut.fileName);
-    }
-  };
-
-  /** ZIP-এর এন্ট্রি-লিস্ট — DOCX হলে হুবহু আগেরটা; PDF হলে প্রতিটা এন্ট্রি .pdf-এ কনভার্ট
-   * (নামের base একই; বড় এন্ট্রি auto-split-এ একাধিক "-partN.pdf" হয়) — ZIP-এর
-   * নিজের নাম/কনভেনশন অপরিবর্তিত থাকে */
-  const finalizeZipEntries = async (entries: Array<{ name: string; blob: Blob }>) => {
-    if (downloadFormat !== "pdf") return entries;
-    const out: Array<{ name: string; blob: Blob }> = [];
-    for (const e of entries) {
-      for (const p of await docxBlobToPdfParts(e.blob, e.name)) {
-        out.push({ name: p.name, blob: p.blob });
-      }
-    }
-    return out;
-  };
-
+  // (finalizeDownload/finalizeZipEntries — useSharedServices-এ)
   /** skipCarry=true → carry-over বাইপাস (openInSerialMode নিজেই স্টেট সাজিয়ে রাখে — দুইবার লোড/টোস্ট ঠেকাতে) */
   const changeMode = (m: McqMode, skipCarry = false) => {
     setMode(m); // persisted — localStorage-এও লেখে
