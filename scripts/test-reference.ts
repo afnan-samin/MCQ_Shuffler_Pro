@@ -53,6 +53,8 @@ const positives: Array<[string, string]> = [
   ["প্রশ্ন?\t\t[nvmvb-250]", "[nvmvb-250]"],
   ["প্রশ্ন? [Hasan-242]", "[Hasan-242]"],
   ["প্রশ্ন? (nvmvb-251)", "(nvmvb-251)"],
+  ["26. প্রশ্ন?\t[AH: P282]", "[AH: P282]"],
+  ["প্রশ্ন? [Hasan: 242]", "[Hasan: 242]"],
   // স্ট্যান্ডঅ্যালোন সোর্স-লেবেল লাইন
   ["Topic: B_vbj cÖ¯‘wZ (nvRvix)", "Topic: B_vbj cÖ¯‘wZ (nvRvix)"],
   ["UwcK : nvmvb m¨vi", "UwcK : nvmvb m¨vi"],
@@ -137,6 +139,7 @@ const negatives = [
   "e¨vL¨v : nvRvwi ; UwcK : bvgKiY :", // মাঝ-লাইনের UwcK (ব্যাখ্যার ভেতর) — লাইন-শুরু নয়
   "প্রশ্ন? [C-14]", // ১-অক্ষর: কার্বন-১৪ আইসোটোপ, রেফারেন্স নয়
   "প্রশ্ন? (B-12)", // ১-অক্ষর: ভিটামিন বি-১২, রেফারেন্স নয়
+  "সময় [12:30] বাজে", // সংখ্যা-শুরু: সময়, রেফারেন্স নয়
 ];
 let negOk = true;
 for (const n of negatives) {

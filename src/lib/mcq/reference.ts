@@ -66,6 +66,12 @@ const LETTER_RE = /[A-Za-z\u00C0-\u024F\u0980-\u09E5\u09F0-\u09FF]/;
  * হাইফেন + ১-৪ ডিজিটের পৃষ্ঠা। নাম ≥২ অক্ষর হতে হবে ("C-14" আইসোটোপ,
  * "B-12" ভিটামিন বাঁচে — ১-অক্ষর বাদ)। */
 const AUTHOR_PAGE_RE = new RegExp(`^[A-Za-z\u0980-\u09FF]{2,}[-–—][${DIG_CL}]{1,4}$`);
+/** লেখক-কোলন-পৃষ্ঠা: "AH: P282" / "Hasan: 242" — নাম + কোলন + (P?) + পৃষ্ঠা।
+ * COLON_CODE-এর ফাঁক (কোলন-পরে অক্ষর থাকলে) ভরে ("AH: P282"-এর "P")।
+ * নাম ≥২ অক্ষর ("C: 14" বাঁচে); সংখ্যা দিয়ে শুরু হলে নয় ("12:30" সময় বাঁচে)। */
+const AUTHOR_COLON_PAGE_RE = new RegExp(
+  `^[A-Za-z\u0980-\u09FF]{2,}[^:${DIG_CL}]{0,30}:\\s*(?:[Pp]\\s*\\.?\\s*)?[${DIG_CL}]{1,4}(?:\\s*[,/&+]\\s*(?:[Pp]\\s*\\.?\\s*)?[${DIG_CL}]{1,4})*$`
+);
 
 /**
  * ব্র্যাকেটের ভেতরের লেখা রেফারেন্স কি না।
@@ -78,6 +84,7 @@ function innerIsReference(inner: string): boolean {
   if (!t || !LETTER_RE.test(t)) return false; // অন্তত ১ প্রকৃত অক্ষর
   if (YEAR_RANGE_RE.test(t)) return true; // অক্ষর থাকায় বিশুদ্ধ-রেঞ্জ আগেই বাদ
   if (AUTHOR_PAGE_RE.test(t)) return true; // "nvmvb-242" / "Hasan-242" (লেখক-পৃষ্ঠা)
+  if (AUTHOR_COLON_PAGE_RE.test(t)) return true; // "AH: P282" / "Hasan: 242"
   if (COLON_CODE_RE.test(t)) return true;
   if (KEYWORD_RE.test(t) && t.length <= 40) return true;
   // একক-বছর + প্রতিষ্ঠান-অ্যাব্রেভ — "[BUET 2019]", "[ঢাবি ২০১৭]"
