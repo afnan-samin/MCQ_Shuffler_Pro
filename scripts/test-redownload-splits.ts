@@ -169,8 +169,18 @@ const outStarOn = buildRedownloadXml(F2, parse2, [0, 1], {
   renumber: false,
   expandAnswer: false,
 });
-ok(outStarOn.includes("Ans: C") && outStarOn.includes("Ans: A"), "`*`-উত্তর লাইন জেনারেট (English → Ans:)");
-ok(!outStarOn.includes("*"), "জেনারেটেও `*` নেই");
+// অপশন+উত্তর দুটোই ON → সোর্সের `*`-ই উত্তর-চিহ্ন, হুবহু থাকে; আলাদা লাইন নয় (Rule #1)
+ok(outStarOn.includes("*"), "অপশন+উত্তর ON → `*`-মার্কার রাখা");
+ok(!outStarOn.includes("Ans: C") && !outStarOn.includes("Ans: A"), "আলাদা `Ans:` লাইন বানানো হয়নি");
+
+// অপশন OFF + উত্তর ON → `*`-উত্তর থেকে "Ans:" লাইন জেনারেট
+const outStarGen = buildRedownloadXml(F2, parse2, [0, 1], {
+  partSel: PARTS_QA,
+  renumber: false,
+  expandAnswer: false,
+});
+ok(outStarGen.includes("Ans: C") && outStarGen.includes("Ans: A"), "অপশন OFF → `*`-উত্তর লাইন জেনারেট (English → Ans:)");
+ok(!outStarGen.includes("*"), "জেনারেট আউটপুটে `*` নেই");
 
 // ---- ফিক্সচার ৩: DËit (Chemistry Set-C) + D: L + N (multipart) ----
 // (MCQ-শর্ত: প্রতিটা প্রশ্নে ৪ অপশন-মার্কার — নাহলে আগের MCQ-এর অংশ হয়)

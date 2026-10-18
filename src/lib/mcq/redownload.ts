@@ -30,9 +30,11 @@ import { findRefTokens } from "./reference";
 import {
   ANSWER_TAIL_RE,
   ANSWER_WORD_RE,
+  BEKKHA_LINE_RE as BEKKHA_PREFIX_RE,
   CASE_FOLD,
   LABEL_FAMS,
   REFERENCE_PREFIX_RE,
+  TOPIC_LABEL_KEYWORDS,
   W_NS,
   collectBlockTables,
   countOptionMarkers,
@@ -67,10 +69,12 @@ export type PartKind =
   | "options"
   | "answer"
   | "bekkha"
+  | "topic"
   | "other";
 
-/** ব্যবহারকারী যে ছয়টা অংশ টিক দিয়ে বাছাই করে ("other" অংশ টিক-নির্ভর নয়) */
-export type PartSel = Record<Exclude<PartKind, "other">, boolean>;
+/** ব্যবহারকারী যে ছয়টা অংশ টিক দিয়ে বাছাই করে ("other"/"topic" অংশ টিক-নির্ভর নয় —
+ * "topic" আলাদা "Topic & Header" সুইচ দিয়ে নিয়ন্ত্রিত) */
+export type PartSel = Record<Exclude<PartKind, "other" | "topic">, boolean>;
 
 export const PART_LABELS: Record<PartKind, string> = {
   serial: "Serial (number)",
@@ -79,6 +83,7 @@ export const PART_LABELS: Record<PartKind, string> = {
   options: "Options (ক খ গ ঘ)",
   answer: "Answer",
   bekkha: "Explanation",
+  topic: "Topic & Header",
   other: "Other",
 };
 
@@ -103,6 +108,19 @@ const ANSWER_LINE_RE = new RegExp(`^\\s*${ANSWER_TOK}\\s*[:.]?`, "i");
 // ANSWER_WORD_RE (ট্যাব-লেড শাখায় ব্যবহৃত) — docx-xml থেকে ইমপোর্ট (নিচে)।
 /** লাইন-শেষে অক্ষর-উত্তর ("… উঃ ক" / "উত্তর: খ") */
 const ANSWER_END_RE = new RegExp(`${ANSWER_TOK}\\s*[:.]?\\s*${LETTER_GROUP}\\s*$`);
+/**
+ * লাইন-শেষ উত্তর-টোকেন আসলে উত্তর কি না — টোকেনের আগের অক্ষরটা যদি
+ * শব্দ-অক্ষর হয় (স্পেস/যতিচিহ্ন নয়) তাহলে বাদ। নাহলে বিজয়-শব্দের শেষ
+ * "…wUb" ("প্রোটিন" = †cÖvwUb) ভুল করে "wU"(উঃ)+"b"(খ) উত্তর হয়ে যেত →
+ * ব্যাখ্যা-লাইন answer-কাইন্ডে চলে যেত (set-10 bekkha-লিকের কারণ)।
+ */
+function answerEndMatch(text: string): RegExpExecArray | null {
+  const m = ANSWER_END_RE.exec(text);
+  if (!m) return null;
+  const before = m.index > 0 ? text[m.index - 1] : "";
+  if (before && /[A-Za-z0-9\u0980-\u09FF]/.test(before)) return null;
+  return m;
+}
 /** পুরো লাইনটাই সিরিয়াল+অক্ষর ("১২. ক" — উত্তরমালা-স্টাইল) */
 const ALL_DIGITS_CLASS = "0-9০-৯ø«ˆµ∏Ï¾˜Ùœ";
 const SERIAL_LETTER_RE = new RegExp(
@@ -127,9 +145,13 @@ const SERIAL_LETTER_PAIR_RE = new RegExp(
  * `*`-প্রিফিক্স = B-টাইমার ফরম্যাটের উত্তর-মার্কড অপশন-লাইন ("*A. টেক্সট") */
 const OPTION_LEAD_RE =
   /^\s*\*?\s*(?:[KLMNklmn]\s*[.।):]|[কখগঘ]\s*[.।):]|[a-dA-D]\s*[.):]|[([]\s*[কখগঘa-dA-D]\s*[)\]])/;
-/** ব্যাখ্যা/রেফারেন্স প্রিফিক্স — Bijoy "e¨vL¨v" সহ (docx-xml BEKKHA_LINE_RE-এর সাথে একই তালিকা) */
-const BEKKHA_PREFIX_RE = /^\s*(?:e¨vL¨v|ব্যাখ্যা|সমাধান|explanation)\s*[:.\-—]?/i;
+// BEKKHA_PREFIX_RE — docx-xml BEKKHA_LINE_RE থেকে ইমপোর্ট (উপরে, alias) —
+// দুই ইঞ্জিন একই রেজেক্স পড়ে, ড্রিফ্টের সুযোগ নেই
 // REFERENCE_PREFIX_RE — docx-xml থেকে ইমপোর্ট (নিচে) — দুই ইঞ্জিন একই রেজেক্স পড়ে
+/** স্ট্যান্ডঅ্যালোন টপিক/উৎস-লেবেল লাইন — "Topic: …", "UwcK: …", "উৎস: …",
+ * "Source: …"। কীওয়ার্ড-তালিকা docx-xml TOPIC_LABEL_KEYWORDS (শেয়ার্ড);
+ * "Ref/Reference" বাদ (সেগুলো reference-অংশেই থাকে) — "Topic & Header" সুইচ আলাদা। */
+const TOPIC_LABEL_RE = new RegExp(`^\\s*(?:${TOPIC_LABEL_KEYWORDS})\\s*:`, "i");
 
 function countSerialLetterPairs(t: string): number {
   const m = t.match(SERIAL_LETTER_PAIR_RE);
@@ -161,7 +183,7 @@ export function isAnswerLine(t: string): boolean {
   if (ANSWER_LINE_RE.test(t)) return true;
   if (countSerialLetterPairs(t) >= 2) return true;
   if (detectSerialPrefix(t)) return false;
-  if (ANSWER_END_RE.test(t)) return true;
+  if (answerEndMatch(t)) return true;
   return false;
 }
 
@@ -415,8 +437,9 @@ export function parseRedownloadXml(xml: string): RdParseResult {
         section = sk;
         lastKind = sk;
       } else {
-        // সাধারণ রঙ-হেডার (অধ্যায়/টাইটেল) — সেকশন-কনটেক্সট রিসেট
-        kinds[i] = "other";
+        // সাধারণ রঙ-হেডার (অধ্যায়/টাইটেল) — সেকশন-কনটেক্সট রিসেট।
+        // "topic" কাইন্ড — "Topic & Header" সুইচ OFF হলে বাদ যাবে।
+        kinds[i] = "topic";
         section = null;
         lastKind = null;
       }
@@ -425,6 +448,13 @@ export function parseRedownloadXml(xml: string): RdParseResult {
 
     if (!trim) {
       kinds[i] = "other"; // খালি প্যারা — ধারাবাহিকতা ভাঙে না
+      continue;
+    }
+
+    // স্ট্যান্ডঅ্যালোন টপিক/উৎস-লেবেল লাইন ("Topic: …" / "UwcK: …" / "উৎস: …")
+    // — reference-এর অংশ নয়; "topic" কাইন্ড, ধারাবাহিকতা বদলায় না।
+    if (TOPIC_LABEL_RE.test(t)) {
+      kinds[i] = "topic";
       continue;
     }
 
@@ -795,6 +825,7 @@ export function parseRedownloadXml(xml: string): RdParseResult {
     options: 0,
     answer: 0,
     bekkha: 0,
+    topic: 0,
     other: 0,
   };
   for (const k of kinds) kindCounts[k]++;
@@ -852,6 +883,9 @@ export interface RedownloadOptions {
   optionLabels?: OptionLabelSettings | null;
   /** অপশন-লেবেল টাইপো অটো-ফিক্স (K,L,L,N → K,L,M,N) — ডিফল্ট OFF */
   fixLabels?: boolean;
+  /** "Topic & Header" অংশ রাখা (ডিফল্ট true) — OFF হলে "Topic:"/"UwcK:" লাইন
+   * ও রঙ-হেডার/টাইটেল বাদ যায়; reference-অংশ অক্ষত থাকে */
+  topicHeader?: boolean;
 }
 
 /**
@@ -883,6 +917,12 @@ export function buildRedownloadXml(
   selIds.forEach((qid, idx) => outPos.set(qid, idx + 1));
 
   const expandActive = opts.expandAnswer && !opts.partSel.options && opts.partSel.answer;
+  // "Topic & Header" — ডিফল্ট true (পুরোনো আউটপুট অপরিবর্তিত)
+  const keepTopic = opts.topicHeader !== false;
+  // B-টাইমার `*`-উত্তর-মার্কার — অপশন ও উত্তর দুটোই থাকলে সোর্সের `*` হুবহু
+  // রাখা হয় (`*` নিজেই উত্তর-চিহ্ন; আলাদা "Ans:" লাইন বানানো হয় না)।
+  // উত্তর OFF হলে `*` বাদ (উত্তর-ফাঁস), আর অপশন OFF হলে জেনারেট উত্তর-লাইনই দেখায়।
+  const keepStar = opts.partSel.options && opts.partSel.answer;
 
   // স্প্লিট/স্টার-প্ল্যান + প্রতি প্রশ্নের শেষ অপশন-প্যারা (`*`-উত্তর লাইন এখানেই বসবে)
   const splitByPara = new Map(parse.splits.map((s) => [s.para, s]));
@@ -920,6 +960,11 @@ export function buildRedownloadXml(
 
     if (bid < 0) {
       // ---- ব্লকের বাইরে ----
+      if (kind === "topic") {
+        // "Topic & Header" OFF হলে বাদ; ON হলে হুবহু থাকে (reference-নিরপেক্ষ)
+        if (keepTopic) body.appendChild(src.cloneNode(true));
+        continue;
+      }
       if (kind === "other") {
         // টাইটেল, নির্দেশনা, সাধারণ হেডার, খালি প্যারা — সবসময় থাকে;
         // তবে পুরো-লাইন রেফারেন্স ("Topic: ...") reference-OFF-এ বাদ।
@@ -953,7 +998,8 @@ export function buildRedownloadXml(
     const q = byId.get(bid)!;
     if (!selSet.has(bid)) continue;
     const split = splitByPara.get(i);
-    const keep = kind === "other" ? opts.partSel.question : opts.partSel[kind];
+    const keep =
+      kind === "other" ? opts.partSel.question : kind === "topic" ? keepTopic : opts.partSel[kind];
 
     const clone = src.cloneNode(true) as Element;
 
@@ -968,7 +1014,7 @@ export function buildRedownloadXml(
     const stars = starStripByPara.get(i);
     const labFix = labelFixByPara.get(i);
     const fixSpans = [
-      ...(stars ?? []).map((s) => ({ ...s, text: "" })),
+      ...(!keepStar ? (stars ?? []).map((s) => ({ ...s, text: "" })) : []),
       ...(labFix ?? []),
     ];
     if (fixSpans.length) {
@@ -980,7 +1026,7 @@ export function buildRedownloadXml(
     // রেফারেন্স OFF — kept-প্যারার ভেতরের টোকেন মোছা ("[nvmvb-242]", "Topic:"-লাইন);
     // পুরো-লাইন রেফারেন্স হলে প্যারা বাদ (split-অফসেট আগেই বের করা — রেফারেন্স
     // সবসময় টেইলে, আগের স্প্যান অক্ষত থাকে)।
-    if (!opts.partSel.reference) {
+    if (!opts.partSel.reference && kind !== "topic") {
       if (!stripRedownloadRefs(clone)) continue;
     }
 
@@ -1012,7 +1058,8 @@ export function buildRedownloadXml(
     }
 
     // `*`-উত্তর-লাইন জেনারেট — শেষ অপশন-প্যারার ঠিক পরে "Dt X" (+বিস্তার থাকলে "Dt 100")
-    if (q.answerFromStar && opts.partSel.answer && lastOptPara.get(bid) === i) {
+    // (অপশন ON থাকলে জেনারেট নয় — সোর্সের `*`-ই উত্তর-চিহ্ন হিসেবে থাকে)
+    if (q.answerFromStar && opts.partSel.answer && !opts.partSel.options && lastOptPara.get(bid) === i) {
       const starPara = makeStarAnswerPara(doc, src, q.answer ?? "");
       if (expandActive) {
         expandAnswerPara(starPara, q, kids, parse, opts.optionLabels ?? null);
@@ -1109,7 +1156,7 @@ function expandAnswerPara(
     const joined = stream.map((t) => t.textContent ?? "").join("");
     let letterSpan: { start: number; end: number } | null = null;
 
-    const endM = ANSWER_END_RE.exec(joined);
+    const endM = answerEndMatch(joined);
     if (endM && letterIndex(endM[1]) === answerIdx) {
       const start = endM.index + endM[0].length - endM[1].length;
       letterSpan = { start, end: start + endM[1].length };
@@ -1277,49 +1324,6 @@ function stripOptionLabelPrefix(optClone: Element, label: string): void {
   const m = new RegExp(`^\\s*${labelEsc}\\s*[.।):]\\s*`).exec(joined);
   if (!m) return;
   replaceSpansLocal(stream, [{ start: m.index, end: m.index + m[0].length, text: "" }]);
-}
-
-/**
- * star-জেনারেটেড "Ans: "-রানের ইংরেজি ফন্ট (Times New Roman)। সোর্সে প্রিফিক্স
- * নেই বলে এটুকু নতুন-বানানো — ফাইলের নিজের "Dt "/"উত্তর: " কখনো বদলায় না।
- */
-const ANS_FONT = "Times New Roman";
-
-/** w:r-এর rPr (না থাকলে FIRST child হিসেবে বানানো) */
-function getOrCreateRPr(run: Element): Element | null {
-  for (const c of Array.from(run.children)) {
-    if (c.localName === "rPr") return c as Element;
-  }
-  const doc = run.ownerDocument;
-  if (!doc) return null;
-  const rPr = doc.createElementNS(W_NS, "w:rPr");
-  run.insertBefore(rPr, run.firstChild);
-  return rPr;
-}
-
-/** w:rPr-এ ইংরেজি ফন্ট বসানো (rFonts না থাকলে FIRST child হিসেবে বানানো;
- * থিম-অ্যাট্রিবিউট সরানো — নাহলে Word থিম-ফন্টকে প্রাধান্য দিত) */
-function setRunEnglishFont(rPr: Element | null, font = ANS_FONT): void {
-  if (!rPr) return;
-  const doc = rPr.ownerDocument;
-  let rFonts: Element | null = null;
-  for (const c of Array.from(rPr.children)) {
-    if (c.localName === "rFonts") {
-      rFonts = c as Element;
-      break;
-    }
-  }
-  if (!rFonts) {
-    if (!doc) return;
-    rFonts = doc.createElementNS(W_NS, "w:rFonts");
-    rPr.insertBefore(rFonts, rPr.firstChild);
-  }
-  for (const a of ["ascii", "hAnsi", "cs", "eastAsia"]) {
-    rFonts.setAttributeNS(W_NS, `w:${a}`, font);
-  }
-  for (const a of ["asciiTheme", "hAnsiTheme", "csTheme", "eastAsiaTheme"]) {
-    if (rFonts.getAttributeNS(W_NS, a) != null) rFonts.removeAttributeNS(W_NS, a);
-  }
 }
 
 /** ব্লকের ভিতরে অপশন-টেক্সটের ফন্ট-সোর্স রান — লেবেল-রানের পরের টেক্সট-রান
@@ -1724,8 +1728,8 @@ function makeStarAnswerPara(doc: Document, srcPara: Element, letter: string): El
     ? Array.from(firstRun.children).find((c) => c.localName === "rPr") ?? null
     : null;
   if (srcRPr) r.appendChild(srcRPr.cloneNode(true));
-  // "Ans: " ইংরেজি ফন্টে — ক্লোন করা SutonnyMJ-rPr থাকলে Word বাংলা-গিবারিশ দেখাত
-  if (prefix === "Ans: ") setRunEnglishFont(getOrCreateRPr(r));
+  // সোর্স-অপশনের নিজের ফন্টই as-is (বাইরের "Times New Roman" বসানো হয় না —
+  // নাহলে options OFF-এ নতুন ফন্ট-ফ্যামিলি ঢুকে ফন্ট-চেক ভাঙে; Rule #2)
   const t = doc.createElementNS(W_NS, "w:t");
   t.setAttribute("xml:space", "preserve");
   t.textContent = `${prefix}${letter}`;

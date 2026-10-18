@@ -52,6 +52,8 @@ import { answerConflictRowsOf, type AnswerConflictRow } from "@/components/mcq/a
 const OPTION_LABELS_KEY = "mcq-option-labels";
 /** অপশন-লেবেল টাইপো অটো-ফিক্স (ডিফল্ট OFF — ডাউনলোড হুবহু) (persisted — REDOWNLOAD-ONLY) */
 const RD_FIX_LABELS_KEY = "mcq-rd-fix-labels";
+/** "Topic & Header" টগল (ডিফল্ট ON — "Topic:"/"UwcK:" লাইন ও রঙ-হেডার থাকে) (persisted) */
+const RD_TOPIC_KEY = "mcq-rd-topic-header";
 
 /** রিডাউনলোড মোডের আলাদা স্টেট — একাধিক ফাইল, প্রতি ফাইলের অংশ-বিশ্লেষণ */
 export interface RdDocState {
@@ -116,18 +118,20 @@ export function useRedownloadMode(deps: RedownloadDeps) {
   );
   // লেবেল-টাইপো ফিক্স টগল — ডিফল্ট OFF (ডাউনলোডে লেবেল হুবহু)
   const [rdFixLabels, setRdFixLabels] = usePersistedJson<boolean>(RD_FIX_LABELS_KEY, false);
+  // "Topic & Header" টগল — ডিফল্ট ON (পুরোনো আউটপুট অপরিবর্তিত)
+  const [rdTopicHeader, setRdTopicHeader] = usePersistedJson<boolean>(RD_TOPIC_KEY, true);
   const [rdMergedBusy, setRdMergedBusy] = useState(false);
   const [rdZipBusy, setRdZipBusy] = useState(false);
 
   // রিডাউনলোড মোডের ডেরাইভড — সব ফাইল মিলিয়ে অংশ-কাউন্ট ও সিলেকশন স্ট্যাট
   const rdTotalCounts = rdDocs.reduce<Record<PartKind, number>>(
     (acc, d) => {
-      for (const k of ["serial", "question", "reference", "options", "answer", "bekkha", "other"] as PartKind[]) {
+      for (const k of ["serial", "question", "reference", "options", "answer", "bekkha", "topic", "other"] as PartKind[]) {
         acc[k] = (acc[k] ?? 0) + d.parse.kindCounts[k];
       }
       return acc;
     },
-    { serial: 0, question: 0, reference: 0, options: 0, answer: 0, bekkha: 0, other: 0 }
+    { serial: 0, question: 0, reference: 0, options: 0, answer: 0, bekkha: 0, topic: 0, other: 0 }
   );
   const rdTotalQuestions = rdDocs.reduce((a, d) => a + d.parse.questions.length, 0);
   const rdSelTotal = rdDocs.reduce((a, d) => a + (rdSel[d.id]?.size ?? 0), 0);
@@ -283,6 +287,7 @@ export function useRedownloadMode(deps: RedownloadDeps) {
           expandAnswer: true,
           optionLabels,
           fixLabels: rdFixLabels,
+          topicHeader: rdTopicHeader,
         });
         return { xml, file: d.file as Blob, baseName: d.baseName, dominant: remapDominantOf(d.xml) };
       })
@@ -361,6 +366,7 @@ export function useRedownloadMode(deps: RedownloadDeps) {
     rdRenumber, setRdRenumber,
     optionLabels, updateOptionLabels,
     rdFixLabels, setRdFixLabels,
+    rdTopicHeader, setRdTopicHeader,
     rdMergedBusy, rdZipBusy,
     // derived
     rdTotalCounts, rdTotalQuestions, rdSelTotal, rdFoundStats,

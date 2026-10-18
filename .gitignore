@@ -119,3 +119,14 @@ mcq-shuffler-pro-phasewise-plan.md
 
 # golden test snapshots (verify/golden-test output) - local only
 golden/
+
+
+# এজেন্ট/QA লোকাল আর্টিফ্যাক্ট — রিপোতে যাবে না
+/qa/
+/qa-kit/
+/.playwright-mcp/
+/opencode.json
+/reports/
+
+# QA matrix runner — লোকাল QA টুল, GitHub-e dorkar nai
+scripts/_qa-redownload-matrix.ts

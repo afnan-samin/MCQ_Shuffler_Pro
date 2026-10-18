@@ -494,6 +494,13 @@ export const BEKKHA_LINE_RE =
 export const REFERENCE_PREFIX_RE =
   /^\s*(?:রেফারেন্স|উদ্দীপক|reference|stimulus)\s*[:.\-—]?/i;
 
+/** স্ট্যান্ডঅ্যালোন টপিক/উৎস-লেবেল কীওয়ার্ড — "Topic: …", "UwcK: …",
+ * "উৎস: …", "Source: …"। redownload-এর TOPIC_LABEL_RE ও reference.ts-এর
+ * SOURCE_LABEL_LINE_RE দুজনেই এই তালিকা থেকেই বানায় (ড্রিফ্টের সুযোগ নেই)।
+ * reference-ই "Ref/Reference" যোগ করে (redownload-এ ওগুলো reference-অংশেই
+ * থাকে, "Topic & Header" সুইচ আলাদা)। */
+export const TOPIC_LABEL_KEYWORDS = "Topic|UwcK|উৎস|উত্স|Source";
+
 /**
  * স্লট-ক্রমের DP (K→L→M→N / ক→খ→গ→ঘ / A→B→C→D) — অপশন-লেবেল টোকেনের
  * সেরা রান। প্রতিটা টোকেন নিজের লেবেল-স্লট অথবা টাইপো-রিপিটে ঠিক পরের

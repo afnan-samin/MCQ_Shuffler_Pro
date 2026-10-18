@@ -109,7 +109,7 @@ import { usePersistedJson, usePersistedString } from "@/hooks/use-persisted-stat
 import { Dices, Loader2, ShieldCheck, Upload, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { type DropzoneTrigger } from "@/components/mcq/file-dropzone";
-import { useSharedServices } from "@/hooks/useSharedServices";
+import { useSharedServices, type ProcState } from "@/hooks/useSharedServices";
 import { useStagedFiles } from "@/hooks/useStagedFiles";
 import { useShuffleMode } from "@/hooks/useShuffleMode";
 import { useSerialMode } from "@/hooks/useSerialMode";
@@ -122,16 +122,7 @@ const OPTION_LABELS_KEY = "mcq-option-labels";
 const RD_FIX_LABELS_KEY = "mcq-rd-fix-labels";
 
 // ---------- প্রসেস-ওভারলে (বড় ফাইলের লোড/ডাউনলোডে "hang"-চেহারা আটকায়) ----------
-
-export interface ProcState {
-  active: boolean;
-  stage: string;
-  /** 0..1 determinate; null = indeterminate animated pulse */
-  pct: number | null;
-  fileNo?: number;
-  fileTotal?: number;
-  name?: string;
-}
+// ProcState — useSharedServices থেকে ইমপোর্ট (একক সোর্স, গুলিয়ে-যাওয়া বন্ধ)
 
 /** ফুল-স্ক্রিন "processing" ওভারলে — প্রগতি-বারসহ। determinate % জানা থাকলে
  * (মাল্টি-ফাইল "File 2/5"), না থাকলে অ্যানিমেটেড pulse। সব মোডের লোড পথ ব্যবহার করে। */
@@ -504,6 +495,8 @@ export default function Home() {
                   onChange={(k, v) => rd.setRdParts((p) => ({ ...p, [k]: v }))}
                   renumber={rd.rdRenumber}
                   onRenumberChange={rd.setRdRenumber}
+                  topicHeader={rd.rdTopicHeader}
+                  onTopicHeaderChange={rd.setRdTopicHeader}
                   filesCount={rd.rdDocs.length}
                   questionsCount={rd.rdTotalQuestions}
                   found={rd.rdFoundStats}

@@ -9,6 +9,7 @@
 // ============================================================
 
 import {
+  TOPIC_LABEL_KEYWORDS,
   W_NS,
   collectParaTs,
   replaceJoinedSpans,
@@ -227,7 +228,10 @@ function findBareRefToken(line: string): RefToken | null {
  * মেলে — মাঝ-লাইনের "e¨vL¨v : ... ; UwcK : ..." (ব্যাখ্যা) বা অপশন-টেক্সট
  * কখনোই ধরা পড়ে না।
  */
-const SOURCE_LABEL_LINE_RE = /^\s*(Topic|UwcK|উৎস|উত্স|Source|Ref|Reference)\s*:/i;
+const SOURCE_LABEL_LINE_RE = new RegExp(
+  `^\\s*(?:${TOPIC_LABEL_KEYWORDS}|Ref|Reference)\\s*:`,
+  "i"
+);
 
 /**
  * এক লাইনের রেফারেন্স টোকেনগুলো — শুধু লাইনের শেষ-প্রান্তের ব্র্যাকেট ধরে

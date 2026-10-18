@@ -284,7 +284,7 @@ const outStarOn = buildRedownloadXml(STAR_DOC, starParse, [0], {
 });
 const starOpt = parasOf(outStarOn).find((t) => t.includes("দুই")) ?? "";
 ok(starOpt.length > 0, "অপশন-প্যারা আউটপুটে আছে");
-ok(!starOpt.includes("*"), "স্টার-মার্কার সরানো হয়েছে");
+ok(starOpt.includes("*"), "স্টার-মার্কার রাখা হয়েছে (অপশন+উত্তর দুটোই ON)");
 ok(starOpt.includes("গ. তিন"), "স্টার থাকলেও ফিক্স সঠিক জায়গায় (খ. তিন → গ. তিন)");
 ok(!starOpt.includes("খ. তিন"), "ভুল লেবেল আর নেই (অফসেট-শিফট নেই)");
 ok(starOpt.includes("ঘ. চার"), "পরের অপশন অক্ষত");

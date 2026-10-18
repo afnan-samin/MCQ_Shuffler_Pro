@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PART_LABELS, type PartKind, type PartSel } from "@/lib/mcq/redownload";
-import { FileCheck2, Hash, Save, Sparkles, X } from "lucide-react";
+import { FileCheck2, Hash, Heading, Save, Sparkles, X } from "lucide-react";
 
 export interface RedownloadFoundStats {
   withReference: number;
@@ -26,6 +26,9 @@ export interface RedownloadPartsCardProps {
   onChange: (kind: PartKind, v: boolean) => void;
   renumber: boolean;
   onRenumberChange: (v: boolean) => void;
+  /** "Topic & Header" টগল — OFF হলে "Topic:"/"UwcK:" লাইন ও রঙ-হেডার বাদ */
+  topicHeader: boolean;
+  onTopicHeaderChange: (v: boolean) => void;
   filesCount: number;
   questionsCount: number;
   /** কয়টা প্রশ্নে কোন অংশ পাওয়া গেছে — ব্যাজে এটাই দেখায় */
@@ -156,7 +159,7 @@ function RdPresetsBar({
 
 const KIND_ORDER: PartKind[] = ["serial", "question", "reference", "options", "answer", "bekkha"];
 
-const KIND_HINTS: Record<Exclude<PartKind, "other">, string> = {
+const KIND_HINTS: Record<Exclude<PartKind, "other" | "topic">, string> = {
   serial: "Numbers kept / renumbered",
   question: "The question text itself",
   reference: "Stimulus / reference paragraph",
@@ -172,6 +175,8 @@ export function RedownloadPartsCard({
   onChange,
   renumber,
   onRenumberChange,
+  topicHeader,
+  onTopicHeaderChange,
   filesCount,
   questionsCount,
   found,
@@ -270,6 +275,25 @@ export function RedownloadPartsCard({
             </p>
           </div>
           <Switch checked={renumber} onCheckedChange={onRenumberChange} aria-label="Serial renumber toggle" />
+        </div>
+
+        {/* "Topic & Header" সুইচ */}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/40 p-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <Heading className="h-4 w-4 text-brand-700 dark:text-brand-400" />
+              Topic &amp; Header
+            </div>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Keep &quot;Topic:&quot;/&quot;UwcK:&quot; lines and coloured section headers/titles. Off = those are removed (references stay).
+            </p>
+          </div>
+          <Switch
+            checked={topicHeader}
+            onCheckedChange={onTopicHeaderChange}
+            aria-label="Topic and header toggle"
+            data-testid="rd-topic-header"
+          />
         </div>
 
         {/* উত্তর-বিস্তার হিন্ট */}
