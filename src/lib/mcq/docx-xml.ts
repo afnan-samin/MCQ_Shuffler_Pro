@@ -467,6 +467,26 @@ export function isGenuineAnswerGlue(m: RegExpExecArray): boolean {
 }
 
 /**
+ * গ্লুড (স্পেস-ছাড়া) অবস্থায় শুধু নির্দিষ্ট উত্তর-টোকেনই বিশ্বস্ত — "wU"-জাতীয়
+ * বিজয়-শব্দ-প্রত্যয় ভুল করে উত্তর হয়ে যাওয়া আটকায় ("…wbDwU K" রক্ষা,
+ * "…‡qwUb" = wU+b ভুয়া-উত্তর বাদ)। redownload.findTailAnswer ও scanOptions
+ * দুই ইঞ্জিনেই একই তালিকা ব্যবহৃত (ড্রিফ্টের সুযোগ নেই)।
+ */
+export const TAIL_GLUE_OK_RE = /^(?:Dt|DË|D:|Cvw|উঃ|উত্তর|উওর|Ans|Answer)/;
+
+/**
+ * লাইন-শেষের উত্তর-টোকেন সত্যিই gglue-উত্তর কি না — `isGenuineAnswerGlue` +
+ * glue-guard (টোকেনের আগের অক্ষর শব্দ-অক্ষর হলে, অর্থাৎ শব্দের ভেতরে থাকলে, টোকেন
+ * বিশ্বস্ত না হলে বাদ)। দুই ইঞ্জিনেই একই নিয়ম।
+ */
+export function isRealAnswerTail(m: RegExpExecArray, line: string): boolean {
+  if (!isGenuineAnswerGlue(m)) return false;
+  const prev = m.index > 0 ? line[m.index - 1] : "";
+  if (prev && !/\s/.test(prev) && !TAIL_GLUE_OK_RE.test(m[0])) return false;
+  return true;
+}
+
+/**
  * অক্ষর-হীন ঝুলন্ত উত্তর-মার্কার (ফাইলের টাইপো): "…\tDt" / "…\tD: -"।
  * উত্তর-অক্ষর নেই — শুধু অপশন-টেক্সট থেকে কেটে ফেলা হয় (উত্তর null থাকে)।
  * লাইন-শুরু বা ট্যাবের পরে হতে হবে — "No Answer"-জাতীয় অপশন রক্ষা পায়।
@@ -679,7 +699,7 @@ export function scanOptions(blockText: string, serialRaw: string): { options: Op
   for (let i = regionLines.length - 1; i >= 0; i--) {
     const m = ANSWER_TAIL_RE.exec(regionLines[i]);
     if (!m) continue;
-    if (!isGenuineAnswerGlue(m)) continue;
+    if (!isRealAnswerTail(m, regionLines[i])) continue;
     answer = m[1] ?? null;
     cutAnswerLine(i, m);
     break;

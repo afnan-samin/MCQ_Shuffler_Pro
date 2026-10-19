@@ -39,6 +39,7 @@ import {
   collectBlockTables,
   countOptionMarkers,
   isGenuineAnswerGlue,
+  isRealAnswerTail,
   countRunTabs,
   detectSerialPrefix,
   dpSlotRun,
@@ -1233,9 +1234,7 @@ function stripAnswerTail(optClone: Element): void {
   const joined = stream.map((t) => t.textContent ?? "").join("");
   const m = ANSWER_TAIL_RE.exec(joined);
   if (!m) return;
-  if (!isGenuineAnswerGlue(m)) return;
-  const prev = m.index > 0 ? joined[m.index - 1] : "";
-  if (prev && !/\s/.test(prev) && !TAIL_GLUE_OK_RE.test(m[0])) return;
+  if (!isRealAnswerTail(m, joined)) return;
   replaceSpansLocal(stream, [{ start: m.index, end: joined.length, text: "" }]);
 }
 
@@ -1473,10 +1472,6 @@ function stripRedownloadRefs(clone: Element): boolean {
   return true;
 }
 
-/** গ্লুড (স্পেস-ছাড়া) অবস্থায় শুধু নির্দিষ্ট উত্তর-টোকেনই বিশ্বস্ত — "wU"-জাতীয়
- * বিজয়-শব্দ-প্রত্যয় ভুল করে উত্তর হয়ে যাওয়া আটকায় ("…wbDwU K" রক্ষা) */
-const TAIL_GLUE_OK_RE = /^(?:Dt|DË|D:|Cvw|উঃ|উত্তর|উওর|Ans|Answer)/;
-
 /**
  * অপশন-প্যারার শেষে গ্লুড উত্তর — "…Dt K" / "…DËit M" / "…উঃ খ" / "…Ans: C" /
  * "…D: L + N" (docx-xml-এর ANSWER_TAIL_RE reuse — $-অ্যাঙ্করড, লেটার-গ্রুপসহ)।
@@ -1485,9 +1480,7 @@ const TAIL_GLUE_OK_RE = /^(?:Dt|DË|D:|Cvw|উঃ|উত্তর|উওর|Ans|
 function findTailAnswer(text: string): number | null {
   const m = ANSWER_TAIL_RE.exec(text);
   if (!m) return null;
-  if (!isGenuineAnswerGlue(m)) return null;
-  const prev = m.index > 0 ? text[m.index - 1] : "";
-  if (prev && !/\s/.test(prev) && !TAIL_GLUE_OK_RE.test(m[0])) return null;
+  if (!isRealAnswerTail(m, text)) return null;
   return m.index;
 }
 
