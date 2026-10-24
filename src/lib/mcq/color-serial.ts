@@ -105,16 +105,23 @@ function decodeXmlEntities(s: string): string {
   });
 }
 
-/** প্যারা-সাবস্ট্রিংয়ের ভিতরের প্লেইন টেক্সট: w:t + m:t (ক্রমে), <w:tab/> = \t */
-const PARA_TEXT_RE = /<w:t(?=[\s>])[^>]*>([^<]*)<\/w:t>|<m:t(?=[\s>])[^>]*>([^<]*)<\/m:t>|<w:tab\/>/g;
+/**
+ * প্যারা-সাবস্ট্রিংয়ের ভিতরের প্লেইন টেক্সট: w:t + m:t (ক্রমে), <w:tab/> = \t,
+ * <w:br/>/<w:cr/> = স্পেস — DOM-ভার্সন `extractParaText`-এর হুবহু (docx-xml)।
+ * br বাদ দিলে এক প্যারার ভিতরের লাইন-ব্রেক-বিভক্ত অপশন জোড়া লেগে যায়
+ * ("…short.D.") আর মার্কার-গণনা কমে আসল প্রশ্ন MCQ-শর্তে বাদ পড়ে (Monthly Exam 2)।
+ */
+const PARA_TEXT_RE =
+  /<w:t(?=[\s>])[^>]*>([^<]*)<\/w:t>|<m:t(?=[\s>])[^>]*>([^<]*)<\/m:t>|<w:tab\s*\/>|<w:(?:br|cr)(?=[\s/>])[^>]*\/>/g;
 
 function paraTextOf(sub: string): string {
   let out = "";
   PARA_TEXT_RE.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = PARA_TEXT_RE.exec(sub))) {
-    if (m[0] === "<w:tab/>") out += "\t";
-    else out += decodeXmlEntities(m[1] ?? m[2] ?? "");
+    if (m[1] === undefined && m[2] === undefined) {
+      out += m[0].startsWith("<w:tab") ? "\t" : " ";
+    } else out += decodeXmlEntities(m[1] ?? m[2] ?? "");
   }
   return out;
 }
