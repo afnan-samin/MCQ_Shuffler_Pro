@@ -737,8 +737,10 @@ export function scanOptions(blockText: string, serialRaw: string): { options: Op
   const SEPS = new Set([".", "।", ")", ":"]);
   interface Tok { at: number; ch: string; slot: string }
   const toks: Tok[] = [];
+  let seenNewline = false;
   for (let i = 0; i < region.length; i++) {
     const ch = region[i];
+    if (ch === "\n") { seenNewline = true; continue; }
     const slot = (CASE_FOLD as Record<string, string>)[ch];
     if (!slot) continue;
     // বাউন্ডারি: আগে লাইন-শুরু/স্পেস/ট্যাব/ব্র্যাকেট/`*`
@@ -753,7 +755,8 @@ export function scanOptions(blockText: string, serialRaw: string): { options: Op
     // ডটলেস-লেবেল (টাইপো-সহনশীল): ট্যাব-লেড/লাইন-শুরুতে "A ivB"/"K text"
     // — অক্ষরের পরে স্পেস/ট্যাব/নিউলাইন। শব্দের ভিতরের অক্ষর নয়
     // (সেপারেটর-হীন "Credit" ইত্যাদি বাদ থাকে), মিড-লাইন "5000 A"ও নয়।
-    if ((prev === "\t" || prev === "\n" || prev === "*") && /[\s\t\n]/.test(sep)) {
+    // শুধু প্রথম নিউলাইনের পর — প্রশ্ন-লাইনের "A person…"-এর "A" লেবেল নয় (W7 Q1)।
+    if (seenNewline && (prev === "\t" || prev === "*" || prev === "\n") && /[\s\t\n]/.test(sep)) {
       toks.push({ at: i, ch, slot });
     }
   }
@@ -784,7 +787,35 @@ export function scanOptions(blockText: string, serialRaw: string): { options: Op
       options.push({ label: atLabel, text });
     }
   }
-  return { options, answer, qText, bekkha };
+
+  // ---- ④ এক-অপশনের ভিতরে আরও লেবেল-লাইন (DP মাঝের স্লট হারালে) ----
+  // যেমন "K. Malvaceae  L. Brassicaceae \n\tN. Solanaceae  N. Liliaceae" —
+  // DP K,L পায়, বাকিটা L-এর টেক্সটে মিশে যায়। লাইন/ট্যাব-শুরুতে লেবেল
+  // থাকলে ভেঙে আলাদা অপশন — উত্তর-বিস্তার/প্রিভিউ দুটোই ঠিক হয়।
+  const expandedOpts: OptionPreview[] = [];
+  for (const o of options) expandedOpts.push(...splitEmbeddedOptions(o));
+  return { options: expandedOpts, answer, qText, bekkha };
+}
+
+/** একটি অপশনের টেক্সটে লুকানো লেবেল-লাইন ("\n\tN. …") ভেঙে আলাদা অপশন */
+function splitEmbeddedOptions(o: OptionPreview): OptionPreview[] {
+  const text = o.text ?? "";
+  const re = /(?:\n|\t)\s*([KLMNklmnকখগঘa-dA-D])\s*[.)।:]\s*/g;
+  const marks: Array<{ index: number; label: string; end: number }> = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    marks.push({ index: m.index, label: m[1], end: m.index + m[0].length });
+  }
+  if (!marks.length) return [o];
+  const firstText = text.slice(0, marks[0].index).trim();
+  const out: OptionPreview[] = [];
+  // প্রথম অংশ খালি হলে (অপশনের টেক্সটই লেবেল দিয়ে শুরু) ভুয়া empty option নয়
+  if (firstText) out.push({ label: o.label, text: firstText });
+  for (let i = 0; i < marks.length; i++) {
+    const end = i + 1 < marks.length ? marks[i + 1].index : text.length;
+    out.push({ label: marks[i].label, text: text.slice(marks[i].end, end).trim() });
+  }
+  return out;
 }
 
 // ---------- প্রশ্ন মডেল ----------

@@ -871,6 +871,23 @@ function letterIndex(ch: string): number {
   return typeof v === "number" ? v : -1;
 }
 
+/**
+ * উত্তর-অক্ষরের স্লট দিয়ে অপশন খোঁজা। সরাসরি না পেলে (সোর্সে লেবেল-টাইপো,
+ * যেমন "K. L. N. N." — ৩য়টি M হওয়ার কথা) ওই স্লটের ordinal অপশনটি নেওয়া
+ * হয়, কেবল যদি তার লেবেল-স্লট অন্য একটা অপশনের সাথে ডুপ্লিকেট হয়
+ * (ডুপ্লিকেট = নিশ্চিত টাইপো)। সন্দেহজনক হলে null।
+ */
+function findOptionBySlot(q: RdQuestion, slot: number): OptionPreview | null {
+  const direct = q.options.find((o) => letterIndex(o.label) === slot);
+  if (direct) return direct;
+  const cand = q.options[slot];
+  if (!cand) return null;
+  const cs = letterIndex(cand.label);
+  if (cs < 0 || cs === slot) return null;
+  const dup = q.options.filter((o) => letterIndex(o.label) === cs).length > 1;
+  return dup ? cand : null;
+}
+
 // ---------- এক্সপোর্ট ----------
 
 export interface RedownloadOptions {
@@ -946,9 +963,17 @@ export function buildRedownloadXml(
   }
   const lastOptPara = new Map<number, number>();
   for (const q of parse.questions) {
+    let lastLabeled = -1;
+    let lastAny = -1;
     for (let j = q.blockStart; j <= q.blockEnd; j++) {
-      if (parse.kinds[j] === "options") lastOptPara.set(q.id, j);
+      if (parse.kinds[j] !== "options") continue;
+      lastAny = j;
+      // Ref-only/কনটিনিউয়েশন লাইন (লেবেল নেই) বাদ — নাহলে ওই প্যারা
+      // reference-OFF-এ বাদ পড়লে star-answer লাইনও হারিয়ে যেত (W7 Q39)।
+      if (OPTION_LEAD_RE.test(extractParaText(kids[j]))) lastLabeled = j;
     }
+    if (lastLabeled >= 0) lastOptPara.set(q.id, lastLabeled);
+    else if (lastAny >= 0) lastOptPara.set(q.id, lastAny);
   }
 
   while (body.firstChild) body.removeChild(body.firstChild);
@@ -1132,40 +1157,52 @@ function expandAnswerPara(
   labelSettings: OptionLabelSettings | null = null
 ): void {
   if (!q.answer) return;
-  const answerIdx = letterIndex(q.answer);
-  if (answerIdx < 0) return;
-  const targetOpt = q.options.find((o) => letterIndex(o.label) === answerIdx);
-  if (!targetOpt) return;
+  // উত্তর একাধিক অক্ষরও হতে পারে ("Dt L, N" / "উত্তর: ক, খ") — সব অক্ষর বিস্তার
+  const letters = q.answer.match(/[KLMNklmnকখগঘa-dA-D1-4]/g) ?? [];
+  if (!letters.length) return;
+  const slotIdxs = letters.map((ch) => letterIndex(ch));
+  if (slotIdxs.some((v) => v < 0)) return;
+  const targets = slotIdxs.map((si) => findOptionBySlot(q, si));
+  if (targets.some((t) => !t)) return;
+  const multi = letters.length > 1;
+  const firstLabel = targets[0]!.label;
+  const textBySlot = new Map<number, string>();
+  letters.forEach((ch, i) => textBySlot.set(slotIdxs[i], targets[i]!.text));
 
-  // মিলে-যাওয়া অপশন-প্যারা খোঁজা (ব্লকের ভিতরে, options-কাইন্ড, লেবেল দিয়ে শুরু)
+  // মিলে-যাওয়া অপশন-প্যারা খোঁজা (শুধু একক-উত্তরে verbatim-এর জন্য)
   let optionEl: Element | null = null;
-  for (let j = q.blockStart; j <= q.blockEnd; j++) {
-    if (parse.kinds[j] !== "options") continue;
-    const t = (extractParaText(kids[j]) ?? "").trimStart();
-    const labelEsc = targetOpt.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const m = new RegExp(`^${labelEsc}\\s*[.।):]`).exec(t);
-    if (m) {
-      optionEl = kids[j];
-      break;
+  if (!multi) {
+    for (let j = q.blockStart; j <= q.blockEnd; j++) {
+      if (parse.kinds[j] !== "options") continue;
+      const t = (extractParaText(kids[j]) ?? "").trimStart();
+      const labelEsc = firstLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      if (new RegExp(`^${labelEsc}\\s*[.।):]`).test(t)) {
+        optionEl = kids[j];
+        break;
+      }
     }
   }
 
-  // উত্তর-প্যারার টেক্সট-স্ট্রিমে অক্ষর-স্প্যান বের করে মুছা
+  // উত্তর-প্যারার টেক্সট-স্ট্রিমে অক্ষর-স্প্যান (multipart = পুরো গ্রুপ) বের করে মুছা
   const stream: Element[] = [];
   collectTsLocal(answerClone, stream);
+  let groupText = "";
   if (stream.length) {
     const joined = stream.map((t) => t.textContent ?? "").join("");
     let letterSpan: { start: number; end: number } | null = null;
-
     const endM = answerEndMatch(joined);
-    if (endM && letterIndex(endM[1]) === answerIdx) {
-      const start = endM.index + endM[0].length - endM[1].length;
-      letterSpan = { start, end: start + endM[1].length };
+    const grp = endM?.[1] ?? "";
+    const grpOk = grp !== "" && [...grp].every((ch) => letterIndex(ch) < 0 || textBySlot.has(letterIndex(ch)));
+    if (endM && grpOk) {
+      const start = endM.index + endM[0].length - grp.length;
+      letterSpan = { start, end: start + grp.length };
+      groupText = grp;
     } else {
       const slM = SERIAL_LETTER_RE.exec(joined);
-      if (slM) {
+      if (slM && textBySlot.has(letterIndex(slM[1]))) {
         const start = slM.index + slM[0].length - slM[1].length;
         letterSpan = { start, end: start + slM[1].length };
+        groupText = slM[1];
       }
     }
     if (letterSpan) {
@@ -1178,11 +1215,21 @@ function expandAnswerPara(
     trimParaLeading(answerClone);
   }
 
+  // প্রতি অক্ষরের জায়গায় তার অপশনের লেখা (multipart-এ separator অটুট)
+  const replacement = groupText
+    ? [...groupText]
+        .map((ch) => {
+          const si = letterIndex(ch);
+          return si >= 0 && textBySlot.has(si) ? textBySlot.get(si)! : ch;
+        })
+        .join("")
+    : targets[0]!.text;
+
   // ① অপশন-প্যারা একক-অপশনের (আর কোনো লেবেল/উত্তর-টোকেন নেই) হলে verbatim —
   // লেবেল-প্রিফিক্স কেটে ওই সারির রান (ফরম্যাট/ছবি/ইকুয়েশনসহ) জোড়া
-  if (optionEl && rowHasSingleOption(optionEl, targetOpt.label)) {
+  if (!multi && optionEl && rowHasSingleOption(optionEl, firstLabel)) {
     const optClone = optionEl.cloneNode(true) as Element;
-    stripOptionLabelPrefix(optClone, targetOpt.label);
+    stripOptionLabelPrefix(optClone, firstLabel);
     stripAnswerTail(optClone);
     stripStarMarkers(optClone);
     trimParaEdges(optClone);
@@ -1201,9 +1248,9 @@ function expandAnswerPara(
   // ফন্ট অপশন-টেক্সটের নিজের রানেরটা (অপশন ফাইলে যে ফন্টে — Bangla/English/mixed as-is)
   appendPlainTextRun(
     answerClone,
-    findOptionFontRun(q, kids, parse, targetOpt.label),
+    findOptionFontRun(q, kids, parse, firstLabel),
     optionEl ?? kids[q.blockStart],
-    targetOpt.text
+    replacement
   );
 }
 
