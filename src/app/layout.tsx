@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Noto_Sans_Bengali, Noto_Serif_Bengali } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
+import { DesktopOnlyGate } from "@/components/mcq/desktop-only-gate";
 import { PwaRegistrar } from "@/components/mcq/pwa";
 import { Toaster } from "@/components/ui/toaster";
 import { themeCss } from "@/config/theme-css";
@@ -72,6 +73,8 @@ export default function RootLayout({
             src/config/theme.ts, the ONE place that controls the whole look. */}
         <style dangerouslySetInnerHTML={{ __html: themeCss }} />
         {children}
+        {/* মোবাইল/ট্যাবলেট ব্লক — শুধু ডেস্কটপ/ল্যাপটপ (CSS-only) */}
+        <DesktopOnlyGate />
         <Toaster />
         {/* PWA/offline — service worker register (Phase 3 #11) */}
         <PwaRegistrar />

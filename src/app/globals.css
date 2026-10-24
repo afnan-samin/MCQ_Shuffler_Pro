@@ -293,3 +293,11 @@ input[type="number"] {
   display: inline-block;
   width: 3rem;
 }
+
+/* মোবাইল/ট্যাবলেট ব্লক (DesktopOnlyGate) — breakpoint overlay-এর `lg`-এর সাথে মিলিয়ে */
+@media (max-width: 1023.98px) {
+  html,
+  body {
+    overflow: hidden;
+  }
+}
