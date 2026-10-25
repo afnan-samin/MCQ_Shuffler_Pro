@@ -138,13 +138,13 @@ function RdFileBody({ section }: { section: RdFileSectionProps }) {
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            value={search}
+            value={searchInput}
             onChange={(e) => changeSearch(e.target.value)}
             className="h-9 pl-8"
             placeholder="Search questions — type any text from the question or options"
             data-testid="rd-question-search"
           />
-          {search.trim() && (
+          {searchInput.trim() && (
             <button
               type="button"
               aria-label="Clear search"
