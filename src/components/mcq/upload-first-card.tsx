@@ -208,25 +208,7 @@ export function StagedFilesCard({ files, onClear, onRemoveFile, addFilesTriggerR
     }
   };
   return (
-    <Card
-      className="border-brand-300 bg-brand-50/60 dark:border-brand-800 dark:bg-brand-950/20"
-      onDragOver={(e) => {
-        if (!onAddFiles) return;
-        e.preventDefault();
-        e.currentTarget.classList.add("ring-2", "ring-brand-500");
-      }}
-      onDragLeave={(e) => {
-        e.currentTarget.classList.remove("ring-2", "ring-brand-500");
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        e.currentTarget.classList.remove("ring-2", "ring-brand-500");
-        if (!onAddFiles || addFilesDisabled) return;
-        const files = Array.from(e.dataTransfer?.files ?? []);
-        if (!files.length) return;
-        onAddFiles(files, { notAccepted: [], tooBig: [], overMax: [] });
-      }}
-    >
+    <Card className="border-brand-300 bg-brand-50/60 dark:border-brand-800 dark:bg-brand-950/20">
       <CardHeader className="pb-2">
         <div className="flex min-w-0 items-center gap-2">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-100 text-brand-700 dark:bg-brand-950/50 dark:text-brand-400">
