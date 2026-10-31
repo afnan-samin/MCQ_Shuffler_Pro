@@ -93,12 +93,14 @@ const BN_RE = /[\u0980-\u09FF\u0964-\u0965]/;
  * SutonnyMJ টাইপ করা বাংলায় খুব কমন।
  * Latin-1 Supplement-এর অক্ষর-রেঞ্জ (À–Ö, Ø–ö, ø–ÿ) + µ ¶ « » ¼½¾ ¨ © +
  * ` (U+0060 — SutonnyMJ যুক্তবর্ণ/হসন্ত-মার্কার, যেমন "evsjv`k") +
- * † ‡ ‗ … Œ œ কার্লি-কোট।
+ * † ‡ ‗ Œ œ।
+ * Curly quotes and the ellipsis are deliberately not markers: MS Word
+ * inserts them into plain English text as well.
  * (ট্রেড-অফ: é-জাতীয় French অক্ষরও ধরা পড়ে — এই অ্যাপের ডোমেইনে
  * বাংলা-পরীক্ষার ডকুমেন্টে তা নগণ্য; encoding.ts-এও একই সিদ্ধান্ত।)
  */
 const BIJOY_STRONG_RE =
-  /[\u0060\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF\u00A8\u00A9\u00B5\u00B6\u00AB\u00BB\u00BC-\u00BE\u0152\u0153\u2017\u2018\u2019\u201C\u201D\u2020\u2021\u2026]/;
+  /[\u0060\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF\u00A8\u00A9\u00B5\u00B6\u00AB\u00BB\u00BC-\u00BE\u0152\u0153\u2017\u2020\u2021]/;
 
 /**
  * WEAK মার্কার — গণিত/সিম্বলেও দেখা যায় (× ÷ ± ™), তাই ASCII অক্ষরসহ

@@ -130,3 +130,4 @@ golden/
 
 # QA matrix runner — লোকাল QA টুল, GitHub-e dorkar nai
 scripts/_qa-redownload-matrix.ts
+reply/

@@ -142,6 +142,41 @@ ok(classifyRunText("wefxK", "bijoy") === "bijoy", "হিন্ট bijoy: খা
 ok(classifyRunText("12.5", "bijoy") === "latin", "হিন্ট bijoy: সংখ্যা থেকে যায় latin");
 ok(classifyRunText("Physics", null) === "latin", "হিন্ট null: ASCII → latin");
 
+console.log("\n── classifyRunText — curly punctuation in English runs ──");
+{
+  // MS Word autocorrects straight quotes into curly punctuation, so plain
+  // English runs contain these characters; they must not select Bijoy.
+  const APOS = "\u2019";
+  const LDQ = "\u201C";
+  const RDQ = "\u201D";
+  const ELL = "\u2026";
+  ok(
+    classifyRunText(`don${APOS}t`, "unicode-bengali", "Times New Roman") === "latin" &&
+      classifyRunText(`What is ${LDQ}this${RDQ}?`, null, "Calibri") === "latin" &&
+      classifyRunText(`Rate${ELL} slow`, null, "Georgia") === "latin",
+    "English with curly punctuation + Latin run font -> latin"
+  );
+  ok(
+    classifyRunText(`don${APOS}t`, "unicode-bengali") === "latin" &&
+      classifyRunText(`What is ${LDQ}this${RDQ}?`, "unicode-bengali") === "latin" &&
+      classifyRunText(`Rate${ELL} slow`, "unicode-bengali") === "latin",
+    "English with curly punctuation, no run font, unicode-bengali dominant -> latin"
+  );
+  ok(
+    classifyRunText(`${LDQ}Avgvi wbd\u2021\u00efhv${RDQ}`, null, null) === "bijoy",
+    "Bijoy sentence with curly quotes and other Bijoy markers -> bijoy"
+  );
+  {
+    // Run font is the ground truth: a SutonnyMJ run stays Bijoy even when
+    // its text is only a curly quote.
+    const doc = wrapDoc(
+      `<w:p><w:r><w:rPr><w:rFonts w:ascii="SutonnyMJ" w:hAnsi="SutonnyMJ"/></w:rPr><w:t>${LDQ}</w:t></w:r></w:p>`
+    );
+    const out = applyFontRemapXml(doc, S);
+    ok(out.includes(`w:ascii="Shibly"`), "SutonnyMJ run whose text is only a curly quote -> bijoy font");
+  }
+}
+
 // ---------- ২. applyFontRemapXml — ইউনিট ----------
 
 console.log("\n── applyFontRemapXml — রান-লেভেল ইউনিট ──");

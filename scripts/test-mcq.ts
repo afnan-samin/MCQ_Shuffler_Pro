@@ -116,6 +116,7 @@ check("Bijoy strong মার্কার (†)", classifyWord("Av‡i", null) =
 check("Bijoy strong মার্কার (µ)", classifyWord("Pµ", null) === "bijoy");
 check("Bijoy ASCII + bijoy কনটেক্সট", classifyWord("evsjv", "bijoy") === "bijoy");
 check("ASCII + কনটেক্সট নেই = english", classifyWord("evsjv", null) === "english");
+check("curly apostrophe is not a Bijoy marker", classifyWord("don\u2019t", null) === "english");
 
 const encBn = analyzeText("১. বাংলাদেশের রাজধানী কোনটি?");
 check("ইউনিকোড ডক: dominant=unicode", encBn.dominant === "unicode");
