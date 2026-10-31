@@ -177,6 +177,29 @@ console.log("\n── classifyRunText — curly punctuation in English runs ─�
   }
 }
 
+console.log("\n── classifyRunText — punctuation-only curly runs stay Bijoy ──");
+{
+  // Letterless fragments are Bangla glyphs in SutonnyMJ ("\u00AF\u2018" is
+  // a conjunct, "\u2026" a standalone glyph), so runs without ASCII
+  // letters still count them as Bijoy evidence; English runs (which have
+  // letters) must not.
+  const APOS = "\u2019";
+  const LDQ = "\u201C";
+  const RDQ = "\u201D";
+  const ELL = "\u2026";
+  ok(classifyRunText("\u00AF \u2018", null, null) === "bijoy", "macron + left curly quote, no letters -> bijoy");
+  ok(classifyRunText("\u00AF \u2018", "unicode-bengali", null) === "bijoy", "macron + left curly quote, unicode-bengali dominant -> bijoy");
+  ok(classifyRunText(ELL, null, null) === "bijoy", "lone ellipsis -> bijoy");
+  ok(classifyRunText(LDQ, null, null) === "bijoy", "lone left double quote -> bijoy");
+  ok(classifyRunText("e\u00AF\u2018y", null, null) === "bijoy", "letters + macron + curly quote (weak-marker path) -> bijoy");
+  ok(
+    classifyRunText(`don${APOS}`, null, null) === "latin" &&
+      classifyRunText(`What is ${LDQ}this${RDQ}?`, null, null) === "latin" &&
+      classifyRunText(`Rate${ELL} slow`, null, null) === "latin",
+    "English with curly punctuation, no font, no dominant -> latin"
+  );
+}
+
 // ---------- ২. applyFontRemapXml — ইউনিট ----------
 
 console.log("\n── applyFontRemapXml — রান-লেভেল ইউনিট ──");

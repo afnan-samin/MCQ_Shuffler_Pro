@@ -94,13 +94,22 @@ const BN_RE = /[\u0980-\u09FF\u0964-\u0965]/;
  * Latin-1 Supplement-এর অক্ষর-রেঞ্জ (À–Ö, Ø–ö, ø–ÿ) + µ ¶ « » ¼½¾ ¨ © +
  * ` (U+0060 — SutonnyMJ যুক্তবর্ণ/হসন্ত-মার্কার, যেমন "evsjv`k") +
  * † ‡ ‗ Œ œ।
- * Curly quotes and the ellipsis are deliberately not markers: MS Word
- * inserts them into plain English text as well.
+ * Curly quotes and the ellipsis are Bijoy evidence only in runs without
+ * ASCII letters (CURLY_PUNCT_RE below), because fragments like "\u00AF \u2018"
+ * and "\u2026" are Bangla glyphs in SutonnyMJ, while in English text
+ * (which has letters) they are ordinary punctuation.
  * (ট্রেড-অফ: é-জাতীয় French অক্ষরও ধরা পড়ে — এই অ্যাপের ডোমেইনে
  * বাংলা-পরীক্ষার ডকুমেন্টে তা নগণ্য; encoding.ts-এও একই সিদ্ধান্ত।)
  */
 const BIJOY_STRONG_RE =
   /[\u0060\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF\u00A8\u00A9\u00B5\u00B6\u00AB\u00BB\u00BC-\u00BE\u0152\u0153\u2017\u2020\u2021]/;
+
+/**
+ * Curly quotes + ellipsis — Bangla glyphs in SutonnyMJ (e.g. "\u00AF\u2018"
+ * is a conjunct), but ordinary punctuation in English text; counted as
+ * Bijoy evidence only in runs without ASCII letters (see classifyRunText).
+ */
+const CURLY_PUNCT_RE = /[\u2018\u2019\u201C\u201D\u2026]/;
 
 /**
  * WEAK মার্কার — গণিত/সিম্বলেও দেখা যায় (× ÷ ± ™), তাই ASCII অক্ষরসহ
@@ -140,7 +149,11 @@ export function classifyRunText(
   runFont?: string | null
 ): RunScriptClass {
   if (!text) return "latin";
-  const strong = countChars(text, BIJOY_STRONG_RE);
+  // Letterless runs: curly quotes/ellipsis are Bangla glyphs in
+  // SutonnyMJ, so they count as Bijoy evidence there (CURLY_PUNCT_RE).
+  const strong =
+    countChars(text, BIJOY_STRONG_RE) +
+    (/[A-Za-z]/.test(text) ? 0 : countChars(text, CURLY_PUNCT_RE));
   const weak = countChars(text, BIJOY_WEAK_RE);
   const bn = countChars(text, BN_RE);
   const hasBn = bn > 0;
