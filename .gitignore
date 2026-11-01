@@ -73,6 +73,7 @@ scripts/test-export.docx
 
 # ইউজারের raw ফাইল (বড় + প্রাইভেসি — রিপোতে যাবে না)
 Format/
+reply/
 
 # dev-server artifacts (*.log আগেই ignored, .err বাকি ছিল)
 *.err
