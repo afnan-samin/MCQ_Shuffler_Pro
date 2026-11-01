@@ -1006,8 +1006,10 @@ export function buildRedownloadXml(
       }
       const sp = splitByPara.get(i) ?? null;
       if (!opts.partSel[kind] && !(sp && opts.partSel[sp.kind])) continue;
+      // both head and tail parts selected -> keep the original paragraph unsplit
+      const keepWhole = !!sp && opts.partSel[kind] && opts.partSel[sp.kind];
       const clone = src.cloneNode(true) as Element;
-      const tail = sp ? splitParaAtOffset(clone, sp.start) : null;
+      const tail = sp && !keepWhole ? splitParaAtOffset(clone, sp.start) : null;
       // উত্তরমালা-স্টাইল লাইন ("১২. ক") — সিরিয়াল নম্বর দিয়ে প্রশ্ন খুঁজে বিস্তার
       if (kind === "answer" && expandActive) {
         expandAnswerBySerial(clone, parse, kids);
@@ -1030,7 +1032,11 @@ export function buildRedownloadXml(
     const clone = src.cloneNode(true) as Element;
 
     // স্প্লিট আগে — renumber/strip হেডের লেখা বদলায়, অফসেট সরে যেত
-    const tail = split ? splitParaAtOffset(clone, split.start) : null;
+    // both head and tail parts selected -> no cut, the original paragraph stays
+    const tail =
+      split && !(keep && opts.partSel[split.kind])
+        ? splitParaAtOffset(clone, split.start)
+        : null;
 
     // `*`-মার্কার + লেবেল-ফিক্স — এক replaceSpansLocal-এ; দুই স্প্যান-সেটই
     // প্যারার অরিজিনাল w:t-জয়েন্ট অফসেটে (আলাদা কলে প্রথম এডিটেই অফসেট
