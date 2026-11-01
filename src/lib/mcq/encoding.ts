@@ -32,8 +32,10 @@ const BN_RE = /[\u0980-\u09FF]/;
  * Bijoy/ANSI লিগ্যাসি এনকোডিংয়ের STRONG মার্কার —
  * এই ক্যারেক্টারগুলো English/Unicode MCQ টেক্সটে প্রায় কখনোই আসে না,
  * কিন্তু Bijoy (SutonnyMJ) টাইপ করা বাংলায় খুব কমন (কার-চিহ্ন, যুক্তবর্ণ ইত্যাদি)।
+ * Curly quotes and the ellipsis are deliberately not markers: MS Word
+ * inserts them into plain English text as well.
  */
-const BIJOY_STRONG = /[†‡Öµ¶¼½¾«»ßàáâãäåæçèéêëìíîïðñòóôõöùúûüýþÿÐÑÒÓÔÕŒœ“”‘’‗…]/;
+const BIJOY_STRONG = /[†‡Öµ¶¼½¾«»ßàáâãäåæçèéêëìíîïðñòóôõöùúûüýþÿÐÑÒÓÔÕŒœ‗]/;
 
 /**
  * WEAK মার্কার — গণিত/সিম্বলেও দেখা যায় (×, ÷, ±), তাই শুধু
