@@ -237,7 +237,7 @@ const outExp = buildRedownloadXml(F1, parse1, [0], {
   renumber: false,
   expandAnswer: true,
 });
-ok(outExp.includes("Dt") && outExp.includes("দূরত্ব"), "টেইল-উত্তরেও বিস্তার কাজ করে");
+ok(outExp.includes("Ans:") && outExp.includes("M. দূরত্ব") && !outExp.includes("Dt"), "tail answer rewritten: tab + Ans: + label + verbatim text");
 ok(!outExp.includes("K. বেগ"), "অপশন নেই");
 
 // ---- ফিক্সচার ৬: renumber + স্প্লিট (অফসেট-নিরাপত্তা) ----
@@ -274,17 +274,19 @@ const out7 = buildRedownloadXml(F7, parse7, [0], {
   expandAnswer: true,
 });
 const doc7 = new DOMParser().parseFromString(out7, "application/xml");
-const runs7: Array<{ font: string; text: string }> = [];
+const runs7: Array<{ font: string; text: string; bold: boolean }> = [];
 for (const r of Array.from(doc7.getElementsByTagNameNS(WNS, "r"))) {
   const rf = (r as Element).getElementsByTagNameNS(WNS, "rFonts")[0];
   const font = rf ? rf.getAttributeNS(WNS, "ascii") ?? "?" : "?";
   const t = Array.from((r as Element).getElementsByTagNameNS(WNS, "t"))
     .map((x) => x.textContent ?? "")
     .join("");
-  if (t) runs7.push({ font: font ?? "?", text: t });
+  const bold = (r as Element).getElementsByTagNameNS(WNS, "b").length > 0;
+  if (t) runs7.push({ font: font ?? "?", text: t, bold });
 }
-const ansRun7 = runs7.find((x) => x.text === "Dt ");
-ok(ansRun7?.font === "Times New Roman", `"Dt " প্রিফিক্স as-is (সারির Times ফন্ট) — "Ans: " বানানো হয় না (পেয়েছি ${ansRun7?.font})`);
+const ansRun7 = runs7.find((x) => x.text === "Ans: ");
+ok(ansRun7?.font === "Times New Roman", `"Ans: " run uses the document Latin font (got ${ansRun7?.font})`);
+ok(!!ansRun7?.bold, '"Ans: " run is bold');
 const gammaRun7 = runs7.find((x) => x.text.includes("Gamma"));
 ok(gammaRun7?.font === "Times New Roman", "উত্তর-লেখা অপশনের নিজের ফন্টে (Times), প্রশ্নের SutonnyMJ-তে নয়");
 
@@ -435,6 +437,180 @@ ok(
     ["1.নিচের কোনটি সঠিক?", "A. কোশ", "B. ক্লোরোফিল", "C. প্লাসমডেসমা", "D. মিউটেশন"]
   ),
   "answer OFF -> star stripped and glued tail cut"
+);
+
+// ---- answer line format: [tab][bold "Ans: "][label token][verbatim option runs] ----
+const AL_R = (txt: string, rPr = "") =>
+  `<w:r>${rPr ? `<w:rPr>${rPr}</w:rPr>` : ""}<w:t xml:space="preserve">${txt}</w:t></w:r>`;
+const AL_FR = (txt: string, font: string) =>
+  `<w:r><w:rPr><w:rFonts w:ascii="${font}" w:hAnsi="${font}"/></w:rPr><w:t xml:space="preserve">${txt}</w:t></w:r>`;
+const AL_TAB = `<w:r><w:tab/></w:r>`;
+const AL_SUB = `<w:vertAlign w:val="subscript"/>`;
+const AL_SUP = `<w:vertAlign w:val="superscript"/>`;
+
+interface ALRun {
+  text: string;
+  font: string;
+  bold: boolean;
+  tab: boolean;
+  va: string | null;
+}
+function alRunsOf(xml: string): ALRun[] {
+  const d = new DOMParser().parseFromString(xml, "application/xml");
+  const out: ALRun[] = [];
+  for (const r of Array.from(d.getElementsByTagNameNS(WNS, "r"))) {
+    const text = Array.from((r as Element).getElementsByTagNameNS(WNS, "t"))
+      .map((x) => x.textContent ?? "")
+      .join("");
+    const rf = (r as Element).getElementsByTagNameNS(WNS, "rFonts")[0];
+    const vaEl = (r as Element).getElementsByTagNameNS(WNS, "vertAlign")[0] ?? null;
+    out.push({
+      text,
+      font: rf ? rf.getAttributeNS(WNS, "ascii") ?? "?" : "-",
+      bold: (r as Element).getElementsByTagNameNS(WNS, "b").length > 0,
+      tab: Array.from((r as Element).children).some((c) => c.localName === "tab"),
+      va: vaEl ? vaEl.getAttributeNS(WNS, "val") ?? vaEl.getAttribute("w:val") : null,
+    });
+  }
+  return out;
+}
+
+// fixture 12: two options per paragraph + sub/superscript option text
+const F12 = [
+  W_DOC_OPEN,
+  p("1.Chemical formula of water?"),
+  `<w:p>${AL_R("A. x ")}${AL_R("B. y")}</w:p>`,
+  `<w:p>${AL_R("C. H")}${AL_R("2", AL_SUB)}${AL_R("O")}${AL_R("+", AL_SUP)}${AL_R(" D. z")}${AL_R("Dt C")}</w:p>`,
+  W_DOC_CLOSE,
+].join("");
+
+console.log("\n== 16) answer line format: verbatim runs, two options in one paragraph ==");
+const parse12 = parseRedownloadXml(F12);
+ok(
+  parse12.questions.length === 1 && parse12.questions[0].answer === "C",
+  `fixture 12 parses (answer C, got ${parse12.questions[0]?.answer})`
+);
+const out12 = buildRedownloadXml(F12, parse12, [0], { partSel: PARTS_QA, renumber: false, expandAnswer: true });
+const paras12 = parasOf(out12);
+ok(paras12.some((t) => t === "Ans: C. H2O+"), `answer line text is "Ans: C. H2O+" (got ${JSON.stringify(paras12)})`);
+const runs12 = alRunsOf(out12);
+const pre12 = runs12.find((x) => x.text === "Ans: ");
+ok(!!pre12 && pre12.tab && pre12.bold && pre12.font === "Times New Roman", `"Ans: " run: tab + bold + document Latin font`);
+ok(runs12.some((x) => x.text === "2" && x.va === "subscript"), "subscript run cloned verbatim");
+ok(runs12.some((x) => x.text === "+" && x.va === "superscript"), "superscript run cloned verbatim");
+ok(!paras12.some((t) => t.includes("D. z") || t.includes("A. x")), "only the correct option's runs are extracted");
+
+// relabel ON: the label token becomes the new style and separator
+const out12r = buildRedownloadXml(F12, parse12, [0], {
+  partSel: PARTS_QA,
+  renumber: false,
+  expandAnswer: true,
+  optionLabels: { enabled: true, style: "i", separator: ")" },
+});
+ok(
+  parasOf(out12r).some((t) => t === "Ans: iii) H2O+"),
+  `relabel ON: label token becomes "iii)" (got ${JSON.stringify(parasOf(out12r))})`
+);
+
+// fixture 13: Bijoy label keeps its SutonnyMJ run font
+const F13 = [
+  W_DOC_OPEN,
+  AL_FR("1.pristi?", "SutonnyMJ"),
+  `<w:p>${AL_FR("K. hv", "SutonnyMJ")}${AL_FR(" L. cË", "SutonnyMJ")}${AL_FR(" M. RÛ", "SutonnyMJ")}${AL_FR(" N. µg", "SutonnyMJ")}${AL_FR("Dt K", "SutonnyMJ")}</w:p>`,
+  W_DOC_CLOSE,
+].join("");
+
+console.log("\n== 17) answer line format: Bijoy label font ==");
+const parse13 = parseRedownloadXml(F13);
+ok(parse13.questions[0]?.answer === "K", `fixture 13 parses (answer K, got ${parse13.questions[0]?.answer})`);
+const out13 = buildRedownloadXml(F13, parse13, [0], { partSel: PARTS_QA, renumber: false, expandAnswer: true });
+ok(parasOf(out13).some((t) => t === "Ans: K. hv"), `answer line "Ans: K. hv" (got ${JSON.stringify(parasOf(out13))})`);
+const runs13 = alRunsOf(out13);
+const lbl13 = runs13.find((x) => x.text === "K. hv");
+ok(lbl13?.font === "SutonnyMJ", `Bijoy label run keeps its SutonnyMJ font (got ${lbl13?.font})`);
+const pre13 = runs13.find((x) => x.text === "Ans: ");
+ok(
+  pre13?.font === "Times New Roman",
+  `"Ans: " run falls back to Times New Roman with no explicit Latin run (got ${pre13?.font})`
+);
+
+// fixture 14: multi answer — first line with "Ans: ", each further answer in its own paragraph
+const F14 = [
+  W_DOC_OPEN,
+  p("1.Multi?"),
+  p("A. one B. two"),
+  p("C. three D. four"),
+  p("Ans: A, C"),
+  W_DOC_CLOSE,
+].join("");
+
+console.log("\n== 18) answer line format: multi answer ==");
+const parse14 = parseRedownloadXml(F14);
+ok(parse14.questions[0]?.answer === "A, C", `fixture 14 parses (answer A, C, got ${parse14.questions[0]?.answer})`);
+const out14 = buildRedownloadXml(F14, parse14, [0], { partSel: PARTS_QA, renumber: false, expandAnswer: true });
+const paras14 = parasOf(out14);
+const iFirst14 = paras14.indexOf("Ans: A. one");
+const iSecond14 = paras14.indexOf("C. three");
+ok(iFirst14 >= 0 && iSecond14 === iFirst14 + 1, "multi answer: first line \"Ans: A. one\", second line right after it");
+ok(iSecond14 >= 0 && !paras14[iSecond14]!.includes("Ans:"), "second answer paragraph carries no \"Ans:\" prefix");
+ok(!paras14.some((t) => t === "Ans: A, C"), "old multi-letter answer text is replaced");
+const extraRuns14 = alRunsOf(out14).filter((x) => x.tab && x.text === "");
+ok(extraRuns14.length >= 1, "second answer paragraph starts with a tab");
+
+// fixture 15: star-marked answer with expansion ON
+const F15 = [
+  W_DOC_OPEN,
+  p("1.Which is correct?"),
+  p("A. কোশ"),
+  p("B. ক্লোরোফিল"),
+  p("C. প্লাসমডেসমা*"),
+  p("D. মিউটেশন"),
+  W_DOC_CLOSE,
+].join("");
+
+console.log("\n== 19) answer line format: star-marked answer ==");
+const parse15 = parseRedownloadXml(F15);
+ok(
+  parse15.questions[0]?.answer === "C" && parse15.questions[0]?.answerFromStar,
+  "fixture 15 parses (star answer C)"
+);
+const out15 = buildRedownloadXml(F15, parse15, [0], { partSel: PARTS_QA, renumber: false, expandAnswer: true });
+ok(
+  parasOf(out15).some((t) => t === "Ans: C. প্লাসমডেসমা"),
+  `star answer generates the new-format line with the marker stripped (got ${JSON.stringify(parasOf(out15))})`
+);
+ok(!out15.includes("*"), "star marker not carried into the answer line");
+
+// fixture 16: fallback — the option text cannot be located (dotless labels)
+const F16 = [
+  W_DOC_OPEN,
+  p("1.Question?"),
+  `<w:p>${AL_TAB}${AL_R("A x")}${AL_TAB}${AL_R("B y")}${AL_TAB}${AL_R("C z")}${AL_TAB}${AL_R("D w")}</w:p>`,
+  p("Ans: C"),
+  W_DOC_CLOSE,
+].join("");
+
+console.log("\n== 20) answer line format: fallback ==");
+const parse16 = parseRedownloadXml(F16);
+ok(
+  parse16.questions[0]?.answer === "C" && parse16.questions[0]?.options.length === 4,
+  `fixture 16 parses (dotless labels, answer C, ${parse16.questions[0]?.options.length} options)`
+);
+const out16 = buildRedownloadXml(F16, parse16, [0], { partSel: PARTS_QA, renumber: false, expandAnswer: true });
+ok(
+  parasOf(out16).some((t) => t === "Ans: C"),
+  `fallback: label-only answer line when the option text cannot be located (got ${JSON.stringify(parasOf(out16))})`
+);
+
+// options ON: nothing is generated or rewritten
+console.log("\n== 21) answer line format: options ON ==");
+const out17 = buildRedownloadXml(F12, parse12, [0], { partSel: PARTS_ALL, renumber: false, expandAnswer: true });
+ok(!out17.includes("Ans: "), "options ON: no answer line generated for the glued tail");
+ok(out17.includes("Dt C"), "options ON: the file's own glued answer stays in the options row");
+const out18 = buildRedownloadXml(F14, parse14, [0], { partSel: PARTS_ALL, renumber: false, expandAnswer: true });
+ok(
+  parasOf(out18).some((t) => t === "Ans: A, C"),
+  "options ON: the file's own answer paragraph stays untouched"
 );
 
 // ---- ফলাফল ----
