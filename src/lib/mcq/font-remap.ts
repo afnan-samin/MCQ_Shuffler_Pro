@@ -316,22 +316,135 @@ function fontForClass(cls: RunScriptClass, settings: FontRemapSettings): string 
 }
 
 export interface FontRemapOptions {
-  /** ডকুমেন্ট-প্রাধান্য হিন্ট — classifyRunText-এ পাস হয় */
+  /** document-dominance hint passed to classifyRunText */
   dominant?: RemapDominant;
+  /** word/styles.xml — ground truth for the effective style font of fontless runs */
+  stylesXml?: string;
 }
 
 /**
- * রানের নিজস্ব rPr>rFonts-এর w:ascii/w:hAnsi ফন্ট (থাকলে) — মার্কারহীন
- * খাঁটি-ASCII Bijoy রান শনাক্তে ground-truth (আপলোড করা Bijoy ফাইলে
- * প্রায় সব বাংলা রানই Sutonny…/Bijoy…/Shibly… জাতীয় ফন্ট বহন করে)।
+ * Run's own rPr>rFonts w:ascii/w:hAnsi font. undefined = no rFonts element
+ * (a truly fontless run); null = rFonts present but unusable (theme-only).
  */
-function runAsciiFontOf(runInner: string): string | null {
+function runAsciiFontOf(runInner: string): string | null | undefined {
   const rprM = RPR_RE.exec(runInner);
-  if (!rprM || rprM[0].endsWith("/>")) return null;
+  if (!rprM || rprM[0].endsWith("/>")) return undefined;
   const rfM = RFIND_RE.exec(rprM[0]);
-  if (!rfM) return null;
+  if (!rfM) return undefined;
   const am = rfM[0].match(/(?:\sw:ascii|\sw:hAnsi)="([^"]*)"/);
   return am ? am[1] : null;
+}
+
+// ---------- style-font ground truth (fontless runs) ----------
+
+// A run without its own w:rFonts inherits its font from styles.xml:
+// rStyle -> pStyle (default paragraph style when none), each via its
+// basedOn chain (max 10 hops), then docDefaults rPrDefault. w:ascii with
+// w:hAnsi as fallback; theme-only rFonts and anything unresolved stay
+// unresolved (the run keeps today's text+dominant behaviour).
+interface StyleFontEntry {
+  basedOn: string | null;
+  // undefined = no rFonts in this style (inherit from basedOn)
+  // null = rFonts present but no usable ascii/hAnsi (theme-only, empty)
+  // string = resolved font value
+  font: string | null | undefined;
+}
+
+interface StyleFontTable {
+  styles: Map<string, StyleFontEntry>;
+  defaultParaStyleId: string | null;
+  docDefaultsFont: string | null | undefined;
+}
+
+const STYLE_BLOCK_RE = /<w:style(?:\s[^>]*)?>[\s\S]*?<\/w:style>/g;
+const STYLE_PPR_G_RE = /<w:pPr(?:\s[^>]*)?>[\s\S]*?<\/w:pPr>/g;
+const GENERIC_RPR_RE = /<w:rPr(?:\s[^>]*)?>[\s\S]*?<\/w:rPr>/;
+const DOCDEFAULTS_RE = /<w:docDefaults(?:\s[^>]*)?>[\s\S]*?<\/w:docDefaults>/;
+const RPRDEFAULT_RE = /<w:rPrDefault(?:\s[^>]*)?>([\s\S]*?)<\/w:rPrDefault>/;
+
+/** Font from an rPr's rFonts: w:ascii, else w:hAnsi; theme-only/empty -> null */
+function rFontsFontOf(rprXml: string): string | null | undefined {
+  const rfM = RFIND_RE.exec(rprXml);
+  if (!rfM) return undefined; // no rFonts element here
+  const ascii = rfM[0].match(/\sw:ascii="([^"]*)"/)?.[1] ?? "";
+  const hAnsi = rfM[0].match(/\sw:hAnsi="([^"]*)"/)?.[1] ?? "";
+  const v = ascii || hAnsi;
+  return v ? v : null;
+}
+
+/** styles.xml -> style table (basedOn + font + default paragraph style + docDefaults) */
+function buildStyleFontTable(stylesXml: string): StyleFontTable {
+  const table: StyleFontTable = { styles: new Map(), defaultParaStyleId: null, docDefaultsFont: undefined };
+  const ddM = DOCDEFAULTS_RE.exec(stylesXml);
+  if (ddM) {
+    const rprdM = RPRDEFAULT_RE.exec(ddM[0]);
+    const rprM = rprdM ? GENERIC_RPR_RE.exec(rprdM[1]) : null;
+    if (rprM) table.docDefaultsFont = rFontsFontOf(rprM[0]);
+  }
+  for (const sm of stylesXml.matchAll(STYLE_BLOCK_RE)) {
+    const open = sm[0].slice(0, sm[0].indexOf(">") + 1);
+    const id = open.match(/ w:styleId="([^"]*)"/)?.[1];
+    if (!id) continue;
+    // the style's own rPr only — the paragraph-mark rPr inside pPr is excluded
+    const body = sm[0].slice(open.length).replace(STYLE_PPR_G_RE, "");
+    const rprM = GENERIC_RPR_RE.exec(body);
+    table.styles.set(id, {
+      basedOn: body.match(/<w:basedOn(?:\s[^>]*)?\/>/)?.[0].match(/ w:val="([^"]*)"/)?.[1] ?? null,
+      font: rprM ? rFontsFontOf(rprM[0]) : undefined,
+    });
+    const type = open.match(/ w:type="([^"]*)"/)?.[1] ?? "";
+    const isDefault = open.match(/ w:default="(1|true)"/)?.[1] != null;
+    if (type === "paragraph" && isDefault && table.defaultParaStyleId == null) table.defaultParaStyleId = id;
+  }
+  return table;
+}
+
+/** Walk one style chain: string = resolved, null = theme-unresolved, undefined = nothing found */
+function walkStyleChain(table: StyleFontTable, startId: string): string | null | undefined {
+  let id: string | null = startId;
+  for (let hops = 0; hops < 10 && id != null; hops++) {
+    const e = table.styles.get(id);
+    if (!e) return undefined;
+    if (e.font !== undefined) return e.font ?? null;
+    id = e.basedOn;
+  }
+  return undefined;
+}
+
+/** Effective style font of a fontless run; null = unresolved (today's behaviour) */
+function effectiveStyleFont(table: StyleFontTable, rStyleVal: string | null, paraStyleVal: string | null): string | null {
+  if (rStyleVal) {
+    const r = walkStyleChain(table, rStyleVal);
+    if (r !== undefined) return r;
+  }
+  const pId = paraStyleVal || table.defaultParaStyleId;
+  if (pId) {
+    const p = walkStyleChain(table, pId);
+    if (p !== undefined) return p;
+  }
+  return table.docDefaultsFont ?? null;
+}
+
+const PARA_OPEN_RE = /<w:p(?![A-Za-z])[^>]*>/g;
+const PARA_RUN_RE = /<w:r(?![A-Za-z])/;
+
+/** Per paragraph { start, pStyle } — to find the containing paragraph of each run */
+function paraStyleInfos(xml: string): Array<{ start: number; pStyle: string | null }> {
+  const paras: Array<{ start: number; pStyle: string | null }> = [];
+  for (const pm of xml.matchAll(PARA_OPEN_RE)) {
+    if (pm[0].endsWith("/>")) continue; // self-closing paragraph: no children
+    const s = pm.index ?? 0;
+    const probe = xml.slice(s, Math.min(xml.length, s + 16384));
+    // pPr is the first child; cut at the first run / paragraph close
+    let cut = probe.length;
+    const rAt = probe.search(PARA_RUN_RE);
+    if (rAt !== -1) cut = Math.min(cut, rAt);
+    const cAt = probe.indexOf("</w:p>");
+    if (cAt !== -1) cut = Math.min(cut, cAt);
+    const psM = probe.slice(0, cut).match(/<w:pStyle(?:\s[^>]*)?\/>/);
+    paras.push({ start: s, pStyle: psM ? psM[0].match(/ w:val="([^"]*)"/)?.[1] ?? null : null });
+  }
+  return paras;
 }
 
 // ---------- মিশ্র-রান সেগমেন্টেশন (স্ক্রিপ্ট-বাউন্ডারিতে রান ভাঙা) ----------
@@ -410,7 +523,10 @@ export function applyFontRemapXml(
 ): string {
   if (!settings?.enabled || !xml) return xml;
   const dominant = options?.dominant ?? null;
-  return xml.replace(RUN_RE, (m: string, selfClose: string | undefined, inner: string | undefined) => {
+  const styleTable = options?.stylesXml ? buildStyleFontTable(options.stylesXml) : null;
+  const paraStyles = styleTable ? paraStyleInfos(xml) : null;
+  let paraCursor = 0;
+  return xml.replace(RUN_RE, (m: string, selfClose: string | undefined, inner: string | undefined, offset: number) => {
     if (selfClose !== undefined) return m; // self-closing run — টেক্সট নেই
     const runInner = inner ?? "";
     let text = "";
@@ -422,8 +538,26 @@ export function applyFontRemapXml(
     if (!hasT) return m; // w:t নেই — w:tab/w:br/ফিল্ড-কোড রান অস্পৃশ্য
     const openEnd = m.length - runInner.length - "</w:r>".length;
 
-    // ---- ফন্ট ground-truth: রানের নিজস্ব ফন্টই পুরো-রান শ্রেণি ঘোষণা করে ----
-    const runFont = runAsciiFontOf(runInner);
+    // ---- font ground truth: the run's own font, else the effective style font ----
+    const ownFont = runAsciiFontOf(runInner);
+    let runFont = ownFont ?? null;
+    if (ownFont === undefined && styleTable != null) {
+      // fontless run: the style font is its ground truth, like an explicit
+      // run font; unresolved (null) keeps today's text+dominant behaviour
+      let rStyleVal: string | null = null;
+      const rstM = RPR_RE.exec(runInner);
+      if (rstM && !rstM[0].endsWith("/>")) {
+        const stM = RSTYLE_RE.exec(rstM[0]);
+        if (stM) rStyleVal = stM[0].match(/ w:val="([^"]*)"/)?.[1] ?? null;
+      }
+      let paraStyleVal: string | null = null;
+      if (paraStyles != null) {
+        while (paraCursor + 1 < paraStyles.length && paraStyles[paraCursor + 1]!.start <= offset) paraCursor++;
+        const para = paraStyles.length > 0 && paraStyles[0]!.start <= offset ? paraStyles[paraCursor]! : null;
+        paraStyleVal = para ? para.pStyle : null;
+      }
+      runFont = effectiveStyleFont(styleTable, rStyleVal, paraStyleVal);
+    }
     if (runFont && LEGACY_BIJOY_FONT_VALUE_RE.test(runFont)) {
       // লিগ্যাসি-Bijoy ফন্ট — মার্কারহীন খাঁটি-ASCII বাংলা ("Avgvi"-জাতীয়) বিজয়;
       // ইউনিকোড-বাংলা অক্ষর (BN ব্লক) নিজের ক্লাসেই (unambiguous)
