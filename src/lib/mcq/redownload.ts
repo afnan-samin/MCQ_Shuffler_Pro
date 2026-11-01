@@ -74,9 +74,16 @@ export type PartKind =
   | "topic"
   | "other";
 
-/** ব্যবহারকারী যে ছয়টা অংশ টিক দিয়ে বাছাই করে ("other"/"topic" অংশ টিক-নির্ভর নয় —
- * "topic" আলাদা "Topic & Header" সুইচ দিয়ে নিয়ন্ত্রিত) */
-export type PartSel = Record<Exclude<PartKind, "other" | "topic">, boolean>;
+/** Ticked parts: the 7 MCQ parts plus header. header/topic are absent in old
+ * presets and old callers — missing means true (default on). "other" is not
+ * tick-driven: inside a block it belongs to the question, outside a block it
+ * is header. */
+export type PartSel = Record<Exclude<PartKind, "other" | "topic">, boolean> & {
+  /** every body-level element outside any MCQ block (default on) */
+  header?: boolean;
+  /** "Topic:"/"Source:" lines inside an MCQ block (default on) */
+  topic?: boolean;
+};
 
 export const PART_LABELS: Record<PartKind, string> = {
   serial: "Serial (number)",
@@ -85,17 +92,19 @@ export const PART_LABELS: Record<PartKind, string> = {
   options: "Options (ক খ গ ঘ)",
   answer: "Answer",
   bekkha: "Explanation",
-  topic: "Topic & Header",
+  topic: "Topic",
   other: "Other",
 };
 
 export const DEFAULT_PART_SELECTION: PartSel = {
+  header: true,
   serial: true,
   question: true,
   reference: true,
   options: true,
   answer: true,
   bekkha: true,
+  topic: true,
 };
 
 // ---------- প্যাটার্ন ----------
@@ -152,7 +161,7 @@ const OPTION_LEAD_RE =
 // REFERENCE_PREFIX_RE — docx-xml থেকে ইমপোর্ট (নিচে) — দুই ইঞ্জিন একই রেজেক্স পড়ে
 /** স্ট্যান্ডঅ্যালোন টপিক/উৎস-লেবেল লাইন — "Topic: …", "UwcK: …", "উৎস: …",
  * "Source: …"। কীওয়ার্ড-তালিকা docx-xml TOPIC_LABEL_KEYWORDS (শেয়ার্ড);
- * "Ref/Reference" বাদ (সেগুলো reference-অংশেই থাকে) — "Topic & Header" সুইচ আলাদা। */
+ * "Ref/Reference" বাদ (সেগুলো reference-অংশেই থাকে) — topic-অংশ আলাদা। */
 const TOPIC_LABEL_RE = new RegExp(`^\\s*(?:${TOPIC_LABEL_KEYWORDS})\\s*:`, "i");
 
 function countSerialLetterPairs(t: string): number {
@@ -305,6 +314,9 @@ export interface RdParseResult {
   /** প্রতি body-child কোন প্রশ্নের ব্লকে আছে (ব্লকের বাইরে -1) */
   blockIndex: number[];
   kindCounts: Record<PartKind, number>;
+  /** body-level element count outside any MCQ block, sectPr excluded —
+   * the Header part's line count (badges/statistics) */
+  headerCount: number;
   separators: string[];
   hasUnicode: boolean;
   /** টেইল-স্প্লিট প্ল্যান (গ্লুড উত্তর / টেইল-রেফারেন্স) */
@@ -440,7 +452,8 @@ export function parseRedownloadXml(xml: string): RdParseResult {
         lastKind = sk;
       } else {
         // সাধারণ রঙ-হেডার (অধ্যায়/টাইটেল) — সেকশন-কনটেক্সট রিসেট।
-        // "topic" কাইন্ড — "Topic & Header" সুইচ OFF হলে বাদ যাবে।
+        // kind "topic" — shaded headings always sit outside blocks, so the
+        // header tick controls them.
         kinds[i] = "topic";
         section = null;
         lastKind = null;
@@ -832,11 +845,19 @@ export function parseRedownloadXml(xml: string): RdParseResult {
   };
   for (const k of kinds) kindCounts[k]++;
 
+  // Header part count: body-level elements outside any MCQ block; sectPr is
+  // excluded (it is always kept, never a header line)
+  const headerCount = kids.reduce(
+    (a, el, i) => a + (el.localName !== "sectPr" && blockIndex[i] < 0 ? 1 : 0),
+    0
+  );
+
   return {
     questions,
     kinds,
     blockIndex,
     kindCounts,
+    headerCount,
     separators,
     hasUnicode: questions.some((q) => q.hasUnicode),
     splits,
@@ -902,16 +923,14 @@ export interface RedownloadOptions {
   optionLabels?: OptionLabelSettings | null;
   /** অপশন-লেবেল টাইপো অটো-ফিক্স (K,L,L,N → K,L,M,N) — ডিফল্ট OFF */
   fixLabels?: boolean;
-  /** "Topic & Header" অংশ রাখা (ডিফল্ট true) — OFF হলে "Topic:"/"UwcK:" লাইন
-   * ও রঙ-হেডার/টাইটেল বাদ যায়; reference-অংশ অক্ষত থাকে */
-  topicHeader?: boolean;
 }
 
 /**
  * বাছাই করা প্রশ্ন + অংশ দিয়ে নতুন document.xml।
  * কিপ করা প্রতিটা এলিমেন্ট cloneNode(true) — অরিজিনাল XML হুবহু।
- * ব্লকের ভিতর: সিলেক্টেড প্রশ্নের কিপ-করা অংশ; ব্লকের বাইরে: টাইটেল/
- * নির্দেশনা/সাধারণ হেডার সবসময়, আর ছয়-অংশের লাইনগুলো নিজের চেকবক্স অনুযায়ী।
+ * Inside a block: the selected question's kept parts. Outside any block:
+ * every element is kept or dropped together by the header tick (sectPr
+ * always stays).
  */
 export function buildRedownloadXml(
   xml: string,
@@ -938,8 +957,11 @@ export function buildRedownloadXml(
   const expandActive = opts.expandAnswer && !opts.partSel.options && opts.partSel.answer;
   // Latin font for the generated "Ans: " run — surveyed once over the source paras
   const ansLatinFont = expandActive ? dominantLatinFont(kids) : "Times New Roman";
-  // "Topic & Header" — ডিফল্ট true (পুরোনো আউটপুট অপরিবর্তিত)
-  const keepTopic = opts.topicHeader !== false;
+  // Header = every body-level element outside any MCQ block; Topic = the
+  // "Topic:"/"Source:" lines inside a block. Missing keys (old presets and
+  // old callers) default to on.
+  const keepHeader = opts.partSel.header !== false;
+  const keepTopic = opts.partSel.topic !== false;
   // B-টাইমার `*`-উত্তর-মার্কার — অপশন ও উত্তর দুটোই থাকলে সোর্সের `*` হুবহু
   // রাখা হয় (`*` নিজেই উত্তর-চিহ্ন; আলাদা "Ans:" লাইন বানানো হয় না)।
   // উত্তর OFF হলে `*` বাদ (উত্তর-ফাঁস), আর অপশন OFF হলে জেনারেট উত্তর-লাইনই দেখায়।
@@ -988,40 +1010,10 @@ export function buildRedownloadXml(
     const bid = parse.blockIndex[i];
 
     if (bid < 0) {
-      // ---- ব্লকের বাইরে ----
-      if (kind === "topic") {
-        // "Topic & Header" OFF হলে বাদ; ON হলে হুবহু থাকে (reference-নিরপেক্ষ)
-        if (keepTopic) body.appendChild(src.cloneNode(true));
-        continue;
-      }
-      if (kind === "other") {
-        // টাইটেল, নির্দেশনা, সাধারণ হেডার, খালি প্যারা — সবসময় থাকে;
-        // তবে পুরো-লাইন রেফারেন্স ("Topic: ...") reference-OFF-এ বাদ।
-        if (!opts.partSel.reference) {
-          const toks = findRefTokens(extractParaText(src));
-          if (toks.length === 1) {
-            const core = extractParaText(src).trim().replace(/[.,;:।|]+$/, "").trim();
-            if (core === toks[0].text.trim().replace(/[.,;:।|]+$/, "").trim()) continue;
-          }
-        }
-        body.appendChild(src.cloneNode(true));
-        continue;
-      }
-      const sp = splitByPara.get(i) ?? null;
-      if (!opts.partSel[kind] && !(sp && opts.partSel[sp.kind])) continue;
-      // both head and tail parts selected -> keep the original paragraph unsplit
-      const keepWhole = !!sp && opts.partSel[kind] && opts.partSel[sp.kind];
-      const clone = src.cloneNode(true) as Element;
-      const tail = sp && !keepWhole ? splitParaAtOffset(clone, sp.start) : null;
-      // উত্তরমালা-স্টাইল লাইন ("১২. ক") — সিরিয়াল নম্বর দিয়ে প্রশ্ন খুঁজে বিস্তার
-      if (kind === "answer" && expandActive) {
-        expandAnswerBySerial(clone, parse, kids);
-      }
-      if (!sp && kind === "options" && opts.optionLabels?.enabled) {
-        relabelOptionPara(clone, opts.optionLabels);
-      }
-      if (opts.partSel[kind]) body.appendChild(clone);
-      if (tail && sp && opts.partSel[sp.kind]) body.appendChild(tail);
+      // ---- ব্লকের বাইরে: সব এলিমেন্ট "Header" অংশ — এক টিকে সব থাকে/বাদ।
+      // Verbatim clone, original order and position; the old per-part switches,
+      // reference-token drops and answer-key expansion no longer apply here. ----
+      if (keepHeader) body.appendChild(src.cloneNode(true));
       continue;
     }
 

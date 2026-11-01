@@ -13,7 +13,7 @@
  *   ব্যবহার নেই (loader files-arg-এ পায় — page-এর dispatcher দেয়)।
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   buildRedownloadXml,
   DEFAULT_PART_SELECTION,
@@ -52,8 +52,21 @@ import { answerConflictRowsOf, type AnswerConflictRow } from "@/components/mcq/a
 const OPTION_LABELS_KEY = "mcq-option-labels";
 /** অপশন-লেবেল টাইপো অটো-ফিক্স (ডিফল্ট OFF — ডাউনলোড হুবহু) (persisted — REDOWNLOAD-ONLY) */
 const RD_FIX_LABELS_KEY = "mcq-rd-fix-labels";
-/** "Topic & Header" টগল (ডিফল্ট ON — "Topic:"/"UwcK:" লাইন ও রঙ-হেডার থাকে) (persisted) */
+/** Legacy "Topic & Header" toggle key (old persisted switch) — its value seeds
+ *  the new header/topic part keys; the toggle itself is gone */
 const RD_TOPIC_KEY = "mcq-rd-topic-header";
+
+/** Old "Topic & Header" value from localStorage — null when absent/corrupt */
+function readLegacyTopicHeader(): boolean | null {
+  try {
+    const raw = typeof window === "undefined" ? null : window.localStorage.getItem(RD_TOPIC_KEY);
+    if (raw == null) return null;
+    const parsed: unknown = JSON.parse(raw);
+    return typeof parsed === "boolean" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 
 /** রিডাউনলোড মোডের আলাদা স্টেট — একাধিক ফাইল, প্রতি ফাইলের অংশ-বিশ্লেষণ */
 export interface RdDocState {
@@ -108,7 +121,7 @@ export function useRedownloadMode(deps: RedownloadDeps) {
   const [rdLoading, setRdLoading] = useState(false);
   // প্রতি ফাইলে সিলেক্ট করা প্রশ্ন (কী = RdDocState.id)
   const [rdSel, setRdSel] = useState<Record<string, Set<number>>>({});
-  // কোন অংশগুলো নতুন ফাইলে থাকবে (ডিফল্ট: ৬টাই সিলেক্ট)
+  // কোন অংশগুলো নতুন ফাইলে থাকবে (ডিফল্ট: ৮টাই সিলেক্ট — header + ৭ পার্ট)
   const [rdParts, setRdParts] = useState<PartSel>(DEFAULT_PART_SELECTION);
   const [rdRenumber, setRdRenumber] = useState(false);
   const [optionLabels, updateOptionLabels] = usePersistedJson<OptionLabelSettings>(
@@ -118,10 +131,18 @@ export function useRedownloadMode(deps: RedownloadDeps) {
   );
   // লেবেল-টাইপো ফিক্স টগল — ডিফল্ট OFF (ডাউনলোডে লেবেল হুবহু)
   const [rdFixLabels, setRdFixLabels] = usePersistedJson<boolean>(RD_FIX_LABELS_KEY, false);
-  // "Topic & Header" টগল — ডিফল্ট ON (পুরোনো আউটপুট অপরিবর্তিত)
-  const [rdTopicHeader, setRdTopicHeader] = usePersistedJson<boolean>(RD_TOPIC_KEY, true);
   const [rdMergedBusy, setRdMergedBusy] = useState(false);
   const [rdZipBusy, setRdZipBusy] = useState(false);
+
+  // Old "Topic & Header" switch (legacy persisted key) seeds the new
+  // header/topic part keys once per mount; missing/invalid keeps the defaults.
+  useEffect(() => {
+    const legacy = readLegacyTopicHeader();
+    if (legacy === null) return;
+    setRdParts((p) =>
+      p.header === legacy && p.topic === legacy ? p : { ...p, header: legacy, topic: legacy }
+    );
+  }, []);
 
   // রিডাউনলোড মোডের ডেরাইভড — সব ফাইল মিলিয়ে অংশ-কাউন্ট ও সিলেকশন স্ট্যাট
   const rdTotalCounts = rdDocs.reduce<Record<PartKind, number>>(
@@ -136,8 +157,13 @@ export function useRedownloadMode(deps: RedownloadDeps) {
   const rdTotalQuestions = rdDocs.reduce((a, d) => a + d.parse.questions.length, 0);
   const rdSelTotal = rdDocs.reduce((a, d) => a + (rdSel[d.id]?.size ?? 0), 0);
   // প্রতি অংশ কয়টা প্রশ্নে পাওয়া গেছে (প্যারা-কাউন্ট নয় — গ্লুড উত্তর / এক-প্যারায় ৪ অপশনও ধরা পড়ে)
+  // + header/topic-অংশের লাইন-কাউন্ট (ব্যাজে দেখায়)
   const rdFoundStats = rdDocs.reduce(
     (acc, d) => {
+      acc.headerLines += d.parse.headerCount;
+      for (let i = 0; i < d.parse.kinds.length; i++) {
+        if (d.parse.kinds[i] === "topic" && d.parse.blockIndex[i] >= 0) acc.topicLines++;
+      }
       for (const q of d.parse.questions) {
         if (q.kinds.includes("reference")) acc.withReference++;
         if (q.options.length > 0) acc.withOptions++;
@@ -150,7 +176,7 @@ export function useRedownloadMode(deps: RedownloadDeps) {
       }
       return acc;
     },
-    { withReference: 0, withOptions: 0, optionsTotal: 0, withAnswer: 0, withBekkha: 0 }
+    { withReference: 0, withOptions: 0, optionsTotal: 0, withAnswer: 0, withBekkha: 0, headerLines: 0, topicLines: 0 }
   );
   // লেবেল-টাইপো — সব ফাইল মিলিয়ে (কার্ডে ফাইল-নামসহ দেখানো হয়)
   const rdLabelTypos = useMemo<LabelTypoRow[]>(
@@ -287,7 +313,6 @@ export function useRedownloadMode(deps: RedownloadDeps) {
           expandAnswer: true,
           optionLabels,
           fixLabels: rdFixLabels,
-          topicHeader: rdTopicHeader,
         });
         return { xml, file: d.file as Blob, baseName: d.baseName, dominant: remapDominantOf(d.xml) };
       })
@@ -366,7 +391,6 @@ export function useRedownloadMode(deps: RedownloadDeps) {
     rdRenumber, setRdRenumber,
     optionLabels, updateOptionLabels,
     rdFixLabels, setRdFixLabels,
-    rdTopicHeader, setRdTopicHeader,
     rdMergedBusy, rdZipBusy,
     // derived
     rdTotalCounts, rdTotalQuestions, rdSelTotal, rdFoundStats,
