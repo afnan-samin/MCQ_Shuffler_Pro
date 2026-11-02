@@ -37,6 +37,7 @@ import {
   REFERENCE_PREFIX_RE,
   TOPIC_LABEL_KEYWORDS,
   W_NS,
+  M_NS,
   collectBlockTables,
   countOptionMarkers,
   isGenuineAnswerGlue,
@@ -53,6 +54,7 @@ import {
   serialMatchSpans,
   zipMetaToProgress,
   type DigitEnc,
+  type DocxTableCell,
   type OptionPreview,
   type SerialPrefix,
   type ParaRun,
@@ -629,7 +631,7 @@ export function parseRedownloadXml(xml: string): RdParseResult {
     // এজ-কেস বাদে সবসময়) অফসেট-স্লাইসিং নির্ভুল; না মিললে runs বাদ, প্লেইন টেক্সটই
     const paraEls: Element[] = [];
     for (let i = c.start; i <= c.end; i++) if (kids[i].localName === "p") paraEls.push(kids[i]);
-    const parasRuns = paraEls.map(extractParaRuns);
+    const parasRuns = paraEls.map((el) => extractParaRuns(el));
     const flat = flattenParaRuns(parasRuns);
     const flatStr = runsText(flat);
     const richOk = flatStr === blockText;
@@ -871,6 +873,144 @@ function isBijoyFontElement(el: Element): boolean {
   if (!fonts.length) return false;
   const f = fonts[0].getAttribute("w:ascii") ?? fonts[0].getAttributeNS(W_NS, "ascii") ?? "";
   return /sutonny|mj|bijoy|shibly|shushree|shorif|topoji|padma|prothom/i.test(f);
+}
+
+// ---------- Removed-headers card helper ----------
+
+/** One cell of a header table — text plus rich runs and inline flags */
+export interface HeaderTableCell extends DocxTableCell {
+  /** cell contains a picture (w:drawing / w:pict / w:object) */
+  hasImage?: boolean;
+  /** cell contains an equation (m:oMath) */
+  hasEquation?: boolean;
+  /** cell shading fill (hex, no "#") — null when none */
+  shading?: string | null;
+}
+
+/** One removed header element — paragraph or table, in document order */
+export type HeaderEntry =
+  | {
+      kind: "para";
+      /** rich runs — Word formatting kept (bold/italic/colour/highlight/size/sup/sub) */
+      runs: ParaRun[];
+      /** paragraph alignment (w:jc val) — null when unset */
+      align: string | null;
+      /** paragraph shading fill (hex, no "#") — null when none */
+      shading: string | null;
+      /** paragraph contains a picture */
+      hasImage: boolean;
+      /** paragraph contains an equation */
+      hasEquation: boolean;
+    }
+  | {
+      kind: "table";
+      /** rows x cells with text, rich runs and flags */
+      rows: HeaderTableCell[][];
+    };
+
+/** shd fill under a direct pPr/tcPr child — white/auto counts as none */
+function shdFillUnder(el: Element, pr: string): string | null {
+  for (const c of Array.from(el.children)) {
+    if (c.localName !== pr) continue;
+    for (const s of Array.from(c.children)) {
+      if (s.localName === "shd") {
+        const fill = (s.getAttribute("w:fill") ?? s.getAttributeNS(W_NS, "fill") ?? "").toUpperCase();
+        if (fill && fill !== "AUTO" && fill !== "FFFFFF") return fill;
+      }
+    }
+  }
+  return null;
+}
+
+/** paragraph alignment (w:jc val) — null when unset */
+function headerAlignOf(p: Element): string | null {
+  for (const c of Array.from(p.children)) {
+    if (c.localName !== "pPr") continue;
+    for (const j of Array.from(c.children)) {
+      if (j.localName === "jc") return j.getAttribute("w:val") ?? j.getAttributeNS(W_NS, "val") ?? null;
+    }
+  }
+  return null;
+}
+
+/** element contains a picture (w:drawing / w:pict / w:object) */
+function hasPicture(el: Element): boolean {
+  return (
+    el.getElementsByTagNameNS(W_NS, "drawing").length > 0 ||
+    el.getElementsByTagNameNS(W_NS, "pict").length > 0 ||
+    el.getElementsByTagNameNS(W_NS, "object").length > 0
+  );
+}
+
+/** element contains an equation (m:oMath / m:oMathPara) */
+function hasOmath(el: Element): boolean {
+  return (
+    el.getElementsByTagNameNS(M_NS, "oMath").length > 0 ||
+    el.getElementsByTagNameNS(M_NS, "oMathPara").length > 0
+  );
+}
+
+/** one table cell — text (collectBlockTables rule) + rich runs + flags */
+function headerTableCellOf(tc: Element): HeaderTableCell {
+  const ps = tc.getElementsByTagNameNS(W_NS, "p");
+  const paraRuns: ParaRun[][] = [];
+  const parts: string[] = [];
+  for (let k = 0; k < ps.length; k++) {
+    paraRuns.push(extractParaRuns(ps[k], { rich: true }));
+    parts.push(extractParaText(ps[k]));
+  }
+  return {
+    text: parts.join("\n").replace(/\n{3,}/g, "\n\n").trim(),
+    runs: flattenParaRuns(paraRuns),
+    hasImage: hasPicture(tc),
+    hasEquation: hasOmath(tc),
+    shading: shdFillUnder(tc, "tcPr"),
+  };
+}
+
+/**
+ * Header elements (paragraph or table, in document order) that the Header
+ * tick removes — the same predicate as the engine: every body-level element
+ * outside any MCQ block, sectPr excluded. The card and the engine can never
+ * disagree because both read this one definition.
+ */
+export function collectHeaderEntries(xml: string, parse: RdParseResult): HeaderEntry[] {
+  const doc = new DOMParser().parseFromString(xml, "application/xml");
+  if (doc.getElementsByTagName("parsererror").length) return [];
+  const body = doc.getElementsByTagNameNS(W_NS, "body")[0];
+  if (!body) return [];
+  const kids = Array.from(body.children) as Element[];
+  const out: HeaderEntry[] = [];
+  for (let i = 0; i < kids.length; i++) {
+    const el = kids[i];
+    if (el.localName === "sectPr") continue;
+    if ((parse.blockIndex[i] ?? -1) >= 0) continue; // inside an MCQ block
+    if (el.localName === "tbl") {
+      const rows: HeaderTableCell[][] = [];
+      const trs = el.getElementsByTagNameNS(W_NS, "tr");
+      for (let r = 0; r < trs.length; r++) {
+        const tr = trs[r];
+        if (tr.parentNode !== el) continue; // nested tbl row — not ours
+        const cells: HeaderTableCell[] = [];
+        for (const tc of Array.from(tr.children)) {
+          if ((tc as Element).localName !== "tc") continue;
+          cells.push(headerTableCellOf(tc as Element));
+        }
+        if (cells.length) rows.push(cells);
+      }
+      out.push({ kind: "table", rows });
+      continue;
+    }
+    out.push({
+      kind: "para",
+      runs: extractParaRuns(el, { rich: true }),
+      align: headerAlignOf(el),
+      shading: shdFillUnder(el, "pPr"),
+      hasImage: hasPicture(el),
+      hasEquation: hasOmath(el),
+    });
+  }
+  return out;
 }
 
 // ---------- অক্ষর-ইনডেক্স (অপশন-ক্রম: 1ম/2য়/3য়/4র্থ) ----------

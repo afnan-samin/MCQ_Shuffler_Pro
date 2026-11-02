@@ -13,7 +13,7 @@ const dom = new JSDOM("<!doctype html><html><body></body></html>");
 (globalThis as unknown as Record<string, unknown>).XMLSerializer = dom.window.XMLSerializer;
 (globalThis as unknown as Record<string, unknown>).Node = dom.window.Node;
 
-const { parseDocxXml, renumberSerialPara, extractParaText, isSectionSeparator, W_NS } = await import(
+const { parseDocxXml, renumberSerialPara, extractParaText, extractParaRuns, runsText, isSectionSeparator, W_NS } = await import(
   "../src/lib/mcq/docx-xml"
 );
 const { YEAR_GUARD_MAX, YEAR_GUARD_MIN } = await import("../src/lib/mcq/limits");
@@ -613,6 +613,65 @@ console.log("\n== ২২) শেয়ার্ড বছর-গার্ড (15
     "২২: সেকশন-হেডার A/PHYSICS অপরিবর্তিত"
   );
 }
+}
+
+console.log("\n== 23) rich run extraction (removed-headers preview) ==");
+{
+  const docOf = (body: string) =>
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${W_NS}"><w:body>${body}</w:body></w:document>`;
+  const para = (runsXml: string) => `<w:p>${runsXml}</w:p>`;
+  const r = (text: string, rPr = "") =>
+    `<w:r>${rPr ? `<w:rPr>${rPr}</w:rPr>` : ""}<w:t xml:space="preserve">${text}</w:t></w:r>`;
+
+  // (a) one paragraph carrying every rich field
+  const docA = new DOMParser().parseFromString(
+    docOf(
+      para(
+        r("Big intro", '<w:b/><w:i/><w:u w:val="single"/><w:strike/><w:color w:val="FF0000"/><w:highlight w:val="yellow"/><w:sz w:val="48"/>') +
+          r("2", '<w:vertAlign w:val="superscript"/>') +
+          r("3", '<w:vertAlign w:val="subscript"/>') +
+          r(" cs off", '<w:b w:val="0"/><w:szCs w:val="32"/>') +
+          r(" plain tail")
+      )
+    ),
+    "application/xml"
+  );
+  const pA = docA.getElementsByTagNameNS(W_NS, "p")[0];
+  const richA = extractParaRuns(pA, { rich: true });
+  const plainA = extractParaRuns(pA);
+  ok(
+    richA[0].bold === 1 && richA[0].italic === 1 && richA[0].underline === 1 && richA[0].strike === 1,
+    "23: rich mode extracts bold, italic, underline and strike"
+  );
+  ok(
+    richA[0].color === "FF0000" && richA[0].highlight === "yellow" && richA[0].size === 48,
+    "23: rich mode extracts colour, highlight and font size"
+  );
+  ok(richA[1].sup === 1 && richA[2].sub === 1, "23: rich mode extracts superscript and subscript");
+  ok(!richA[3].bold && richA[3].size === 32, "23: w:b val=0 is off, szCs is the size fallback");
+  ok(!richA[4].bold && !richA[4].size, "23: unformatted run carries no rich flags");
+  ok(
+    runsText(richA) === runsText(plainA) && runsText(richA) === extractParaText(pA),
+    "23: rich and default modes join to the same text as extractParaText"
+  );
+  ok(
+    plainA.every((x) => x.bold === undefined && x.italic === undefined && x.color === undefined && x.size === undefined && x.sup === undefined && x.sub === undefined),
+    "23: default mode sets no rich fields (existing behaviour unchanged)"
+  );
+
+  // (b) merge behaviour: same-format runs merge, different-format runs stay split
+  const docB = new DOMParser().parseFromString(
+    docOf(para(r("one", "<w:b/>") + r("two", "<w:b/>") + r("three"))),
+    "application/xml"
+  );
+  const pB = docB.getElementsByTagNameNS(W_NS, "p")[0];
+  const richB = extractParaRuns(pB, { rich: true });
+  const plainB = extractParaRuns(pB);
+  ok(
+    richB.length === 2 && richB[0].text === "onetwo" && richB[0].bold === 1 && !richB[1].bold,
+    "23: rich mode merges equal-format runs and splits bold from plain"
+  );
+  ok(plainB.length === 3 && plainB[0].text === "one", "23: default mode run splitting unchanged");
 }
 console.log(`\n========================================`);
 console.log(`ফলাফল: ${passed} পাস, ${failed} ফেল`);
