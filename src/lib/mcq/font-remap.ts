@@ -323,16 +323,19 @@ export interface FontRemapOptions {
 }
 
 /**
- * Run's own rPr>rFonts w:ascii/w:hAnsi font. undefined = no rFonts element
- * (a truly fontless run); null = rFonts present but unusable (theme-only).
+ * Run's own rPr>rFonts w:ascii/w:hAnsi font.
+ * string = resolved; null = the run declares a font we cannot use
+ * (ascii/hAnsi slots set but empty, or set to theme fonts);
+ * undefined = the tracked slots are not set at all (no rFonts element,
+ * or rFonts carrying only cs/eastAsia) — the ascii font inherits from
+ * the style chain, exactly like a fontless run.
  */
 function runAsciiFontOf(runInner: string): string | null | undefined {
   const rprM = RPR_RE.exec(runInner);
   if (!rprM || rprM[0].endsWith("/>")) return undefined;
   const rfM = RFIND_RE.exec(rprM[0]);
   if (!rfM) return undefined;
-  const am = rfM[0].match(/(?:\sw:ascii|\sw:hAnsi)="([^"]*)"/);
-  return am ? am[1] : null;
+  return rFontsAsciiFontOf(rfM[0]);
 }
 
 // ---------- style-font ground truth (fontless runs) ----------
@@ -340,12 +343,15 @@ function runAsciiFontOf(runInner: string): string | null | undefined {
 // A run without its own w:rFonts inherits its font from styles.xml:
 // rStyle -> pStyle (default paragraph style when none), each via its
 // basedOn chain (max 10 hops), then docDefaults rPrDefault. w:ascii with
-// w:hAnsi as fallback; theme-only rFonts and anything unresolved stay
-// unresolved (the run keeps today's text+dominant behaviour).
+// w:hAnsi as fallback; rFonts whose ascii/hAnsi slots are unset (only
+// cs/eastAsia carried) inherit down the chain like no rFonts at all;
+// slots set to theme fonts and anything else unresolved stay unresolved
+// (the run keeps today's text+dominant behaviour).
 interface StyleFontEntry {
   basedOn: string | null;
-  // undefined = no rFonts in this style (inherit from basedOn)
-  // null = rFonts present but no usable ascii/hAnsi (theme-only, empty)
+  // undefined = this style says nothing about the tracked font (no rFonts,
+  // or rFonts with only cs/eastAsia) — inherit from basedOn
+  // null = rFonts declares an unusable font (empty/theme slots) — stop, unresolved
   // string = resolved font value
   font: string | null | undefined;
 }
@@ -362,14 +368,28 @@ const GENERIC_RPR_RE = /<w:rPr(?:\s[^>]*)?>[\s\S]*?<\/w:rPr>/;
 const DOCDEFAULTS_RE = /<w:docDefaults(?:\s[^>]*)?>[\s\S]*?<\/w:docDefaults>/;
 const RPRDEFAULT_RE = /<w:rPrDefault(?:\s[^>]*)?>([\s\S]*?)<\/w:rPrDefault>/;
 
-/** Font from an rPr's rFonts: w:ascii, else w:hAnsi; theme-only/empty -> null */
+/**
+ * Ascii/hAnsi font of one rFonts tag: w:ascii, else w:hAnsi.
+ * null = slots set but unusable (empty value, or theme fonts) — stops the
+ * chain, the font stays unresolved (old behaviour).
+ * undefined = slots not set at all (rFonts has only cs/eastAsia) — the
+ * ascii font inherits from basedOn/docDefaults, like no rFonts element.
+ */
+function rFontsAsciiFontOf(tag: string): string | null | undefined {
+  const ascii = tag.match(/\sw:ascii="([^"]*)"/)?.[1] ?? "";
+  const hAnsi = tag.match(/\sw:hAnsi="([^"]*)"/)?.[1] ?? "";
+  const v = ascii || hAnsi;
+  if (v) return v;
+  if (/\sw:ascii="/.test(tag) || /\sw:hAnsi="/.test(tag)) return null; // set but empty
+  if (/\sw:asciiTheme="|\sw:hAnsiTheme="/.test(tag)) return null; // set to a theme font
+  return undefined; // tracked slots unset (only cs/eastAsia) — inherit
+}
+
+/** Font from an rPr's rFonts (see rFontsAsciiFontOf) */
 function rFontsFontOf(rprXml: string): string | null | undefined {
   const rfM = RFIND_RE.exec(rprXml);
   if (!rfM) return undefined; // no rFonts element here
-  const ascii = rfM[0].match(/\sw:ascii="([^"]*)"/)?.[1] ?? "";
-  const hAnsi = rfM[0].match(/\sw:hAnsi="([^"]*)"/)?.[1] ?? "";
-  const v = ascii || hAnsi;
-  return v ? v : null;
+  return rFontsAsciiFontOf(rfM[0]);
 }
 
 /** styles.xml -> style table (basedOn + font + default paragraph style + docDefaults) */

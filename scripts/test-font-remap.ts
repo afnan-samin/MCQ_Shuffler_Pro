@@ -771,6 +771,45 @@ console.log("\n── style-font ground truth (fontless runs) ──");
       "digit-only run with Latin style font next to a SutonnyMJ run stays English"
     );
   }
+
+  // ---------- 9b. rFonts with unset ascii/hAnsi slots inherits like a fontless run ----------
+  // Only cs/eastAsia carried -> the tracked (ascii) font comes from the style chain;
+  // slots set to theme fonts stay unresolved (old behaviour).
+  console.log("\n── slot-unset rFonts (only cs/eastAsia) ──");
+  {
+    const RPR_ONLYCS = `<w:rPr><w:rFonts w:cstheme="minorBidi"/></w:rPr>`;
+    // Weekly-Exam-6 shape: Normal's own rPr carries only cstheme, docDefaults has Times New Roman
+    const STYLE_NORMAL_ONLYCS_DOCDEF = styles(
+      `<w:docDefaults><w:rPrDefault>${RPR_TNR}</w:rPrDefault></w:docDefaults>` +
+      `<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/>${RPR_ONLYCS}</w:style>`,
+    );
+    {
+      const doc = wrapDoc(`<w:p><w:r><w:rPr><w:rFonts w:cs="SutonnyMJ"/></w:rPr><w:t>Rhizome</w:t></w:r></w:p>`);
+      const out = applyFontRemapXml(doc, S, { dominant: "bijoy", stylesXml: STYLE_NORMAL_TNR });
+      ok(
+        out.includes(`w:ascii="Arial"`) && !out.includes(`w:ascii="Shibly"`),
+        "run with only-cs rFonts + Latin style font -> English font (inherits like fontless)"
+      );
+    }
+    {
+      const doc = wrapDoc(`<w:p><w:r><w:rPr><w:rFonts w:cs="Times New Roman"/></w:rPr><w:t>Avgvi</w:t></w:r></w:p>`);
+      const out = applyFontRemapXml(doc, S, { stylesXml: STYLE_NORMAL_SUT });
+      ok(out.includes(`w:ascii="Shibly"`), "run with only-cs rFonts + SutonnyMJ style font -> bijoy font");
+    }
+    {
+      const doc = wrapDoc(`<w:p><w:r><w:t>Rhizome</w:t></w:r></w:p>`);
+      const out = applyFontRemapXml(doc, S, { dominant: "bijoy", stylesXml: STYLE_NORMAL_ONLYCS_DOCDEF });
+      ok(
+        out.includes(`w:ascii="Arial"`) && !out.includes(`w:ascii="Shibly"`),
+        "only-cs style inherits past itself to docDefaults (Times New Roman) -> English font"
+      );
+    }
+    {
+      const doc = wrapDoc(`<w:p><w:r><w:rPr><w:rFonts w:asciiTheme="minorHAnsi" w:hAnsiTheme="minorHAnsi"/></w:rPr><w:t>wefxK</w:t></w:r></w:p>`);
+      const out = applyFontRemapXml(doc, S, { dominant: "bijoy", stylesXml: STYLE_NORMAL_TNR });
+      ok(out.includes(`w:ascii="Shibly"`), "run rFonts set to theme fonts -> own unusable font -> old behaviour");
+    }
+  }
 }
 
 // ---------- ফলাফল ----------
