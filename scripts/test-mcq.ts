@@ -218,5 +218,25 @@ console.log("— টেস্ট ১৭: reshuffleDistinct (Reshuffle-বাট�
   check("reshuffleDistinct — ১-আইটেম পুলে নিরাপদে একই ক্রম", reshuffleDistinct(small.slice(0, 1), []).length === 1);
 }
 
+console.log("— Test 18: decimal-leading lines are not questions (docx-xml parity) —");
+{
+  // Digit right after the separator is a decimal number, not a serial
+  const decA = parseMcq("5.3 meter length");
+  check("ASCII decimal line is not a question", decA.questions.length === 0 && decA.preamble[0] === "5.3 meter length", `questions=${decA.questions.length}`);
+  const decB = parseMcq("৫.৩ মিটার");
+  check("Bengali decimal line is not a question", decB.questions.length === 0 && decB.preamble[0] === "৫.৩ মিটার", `questions=${decB.questions.length}`);
+  check("autoFixNumbering keeps ASCII decimal text unchanged", autoFixNumbering("5.3 meter length") === "5.3 meter length");
+  check("autoFixNumbering keeps Bengali decimal text unchanged", autoFixNumbering("৫.৩ মিটার") === "৫.৩ মিটার");
+  const mixed = autoFixNumbering("5.3 meter length\n6. question");
+  check("autoFixNumbering keeps the decimal line, renumbers the real question", mixed === "5.3 meter length\n1. question\n", JSON.stringify(mixed));
+  // Controls: a space after the separator keeps serial detection
+  const ctl1 = parseMcq("5. text");
+  check("control: '5. text' is a question", ctl1.questions.length === 1 && ctl1.questions[0].originalNumber === 5, `questions=${ctl1.questions.length}`);
+  const ctl2 = parseMcq("5) text");
+  check("control: '5) text' is a question", ctl2.questions.length === 1 && ctl2.questions[0].separator === ")", `questions=${ctl2.questions.length}`);
+  const ctl3 = parseMcq("5. 3 apples");
+  check("control: '5. 3 apples' is a question", ctl3.questions.length === 1 && ctl3.questions[0].originalNumber === 5, `questions=${ctl3.questions.length}`);
+}
+
 console.log(`\n==== রেজাল্ট: ${pass} পাস, ${fail} ফেল ====`);
 process.exit(fail ? 1 : 0);
