@@ -70,5 +70,14 @@ check("Bijoy শব্দ অক্ষত (evsjv)", xml.includes("evsjv"));
 check("প্লেইন সিরিয়াল টেক্সট (1., 2.)", xml.includes("1. evsjv") || xml.includes(">1."));
 check("Original shuffle: প্রতি সেটে ৪টি প্রশ্ন", (xml.match(/evsjv/g) || []).length === 3, `evsjv count=${(xml.match(/evsjv/g) || []).length}`);
 
+// single-segment font picks in auto mode
+const autoOpts: ExportOptions = { ...DEFAULT_EXPORT_OPTIONS, fontMode: "auto" };
+const enRun = runsForLine("This is English", autoOpts)[0];
+check("auto mode: English-only line gets englishFont", enRun?.enc === "english" && enRun?.font === autoOpts.englishFont, `got font=${enRun?.font} enc=${enRun?.enc}`);
+const bjRun = runsForLine("evsjv Av‡i Pµgvb?", autoOpts)[0];
+check("auto mode: Bijoy-only line gets legacyFont", bjRun?.enc === "bijoy" && bjRun?.font === autoOpts.legacyFont, `got font=${bjRun?.font} enc=${bjRun?.enc}`);
+const uniRun = runsForLine("কোন শ্রেণী বছে", autoOpts)[0];
+check("auto mode: Unicode-only line gets unicodeFont", uniRun?.enc === "unicode" && uniRun?.font === autoOpts.unicodeFont, `got font=${uniRun?.font} enc=${uniRun?.enc}`);
+
 console.log(`\n==== এক্সপোর্ট ভেরিফিকেশন: ${pass} পাস, ${fail} ফেল ====`);
 process.exit(fail ? 1 : 0);
