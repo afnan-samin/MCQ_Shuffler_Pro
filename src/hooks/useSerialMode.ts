@@ -183,7 +183,6 @@ export function useSerialMode(deps: SerialDeps) {
         questions += d.analysis.questionCount;
       }
       setSerialDocs((prev) => (append ? [...prev, ...added] : added));
-      setSerialLoading(false);
       if (added.length) {
         // ফাইল আপলোড হলে পেস্ট-রেজাল্ট ক্লিয়ার — দুটো একসাথে অ্যাক্টিভ থাকবে না
         setSerialPaste(null);
@@ -203,6 +202,7 @@ export function useSerialMode(deps: SerialDeps) {
     } finally {
       loadersBusyRef.current = false;
       clearProc();
+      setSerialLoading(false);
     }
   };
 

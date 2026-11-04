@@ -225,8 +225,8 @@ export function useRedownloadMode(deps: RedownloadDeps) {
     } finally {
       loadersBusyRef.current = false;
       clearProc();
+      setRdLoading(false);
     }
-    setRdLoading(false);
   };
 
   const reorderRdDocs = (from: number, to: number) => {

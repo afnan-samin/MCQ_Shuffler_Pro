@@ -792,7 +792,6 @@ export function useShuffleMode(deps: ShuffleDeps) {
       setParsed(null);
       resetResults();
       setSelected(new Set());
-      setShuffleLoading(false);
       if (isAppend) {
         if (loaded.length) {
           toast({
@@ -816,6 +815,7 @@ export function useShuffleMode(deps: ShuffleDeps) {
     } finally {
       loadersBusyRef.current = false;
       clearProc();
+      setShuffleLoading(false);
     }
   };
 
