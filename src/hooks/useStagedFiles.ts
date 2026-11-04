@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FILE_TOO_BIG_MSG, isValidDocxZip } from "@/lib/mcq/file-pipeline";
+import { FILE_TOO_BIG_MSG, isValidDocxZip, loadDocxXmlCached } from "@/lib/mcq/file-pipeline";
 import { MAX_FILE_BYTES, MIN_OPTIONS_PER_MCQ } from "@/lib/mcq/limits";
 import { toast } from "@/hooks/use-toast";
 import { type DropzoneTrigger } from "@/components/mcq/file-dropzone";
@@ -99,6 +99,10 @@ export function useStagedFiles(_deps?: StagedFilesDeps) {
           toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
           continue;
         }
+        // Warm the xml cache: the same unzip feeds validation, preview and the later mode load.
+        try {
+          await loadDocxXmlCached(f);
+        } catch {}
         if (await isValidDocxZip(f)) {
           valid.push(f);
         } else {
@@ -118,8 +122,7 @@ export function useStagedFiles(_deps?: StagedFilesDeps) {
         if (stagedRunRef.current !== runId) return;
         const f = valid[i];
         try {
-          const { loadDocxXml } = await import("@/lib/mcq/docx-xml");
-          const xml = await loadDocxXml(f);
+          const xml = await loadDocxXmlCached(f);
           if (stagedRunRef.current !== runId) return;
           const stats = await previewStagedStats(xml);
           if (stagedRunRef.current !== runId) return;
@@ -153,6 +156,10 @@ export function useStagedFiles(_deps?: StagedFilesDeps) {
           toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
           continue;
         }
+        // Warm the xml cache: the same unzip feeds validation, preview and the later mode load.
+        try {
+          await loadDocxXmlCached(f);
+        } catch {}
         if (await isValidDocxZip(f)) {
           valid.push(f);
         } else {
@@ -172,8 +179,7 @@ export function useStagedFiles(_deps?: StagedFilesDeps) {
         const idx = base + k;
         const f = valid[k];
         try {
-          const { loadDocxXml } = await import("@/lib/mcq/docx-xml");
-          const xml = await loadDocxXml(f);
+          const xml = await loadDocxXmlCached(f);
           if (stagedRunRef.current !== runId) return;
           const stats = await previewStagedStats(xml);
           if (stagedRunRef.current !== runId) return;
