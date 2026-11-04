@@ -4,7 +4,7 @@
  * Phase 3-C slice 2 — COPY-ONLY extraction of serial-mode logic from src/app/page.tsx.
  *
  * - page.tsx থেকে COPY করা (কোনো line কাটা/মুছা হয়নি, page.tsx untouched — 3-D-তে wire হবে)।
- * - এই hook এখনো page.tsx-এ wire করা হয়নি — compile+unused থাকে, runtime-এ কোনো প্রভাব নেই।
+ * - Used by page.tsx.
  * - শেয়ার্ড helper (proc-overlay, finalizeDownload, font/downloadFormat persisted,
  *   nextMultiId) page.tsx থেকে PARAM-এ আসে (ShuffleDeps pattern) — hook-এর নিজের
  *   duplicate persisted instance নেই (3-B-এর stale-desync গর্ত এড়ানো)।

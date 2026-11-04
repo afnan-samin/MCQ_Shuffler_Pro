@@ -4,7 +4,7 @@
  * Phase 3-G — COPY-ONLY extraction of the staging slice from src/app/page.tsx.
  *
  * - page.tsx থেকে COPY করা (কোনো line কাটা/মুছা হয়নি, page.tsx untouched — wiring পরের task-এ)।
- * - এই hook এখনো page.tsx-এ wire করা হয়নি — compile+unused থাকে, runtime-এ কোনো প্রভাব নেই।
+ * - Used by page.tsx.
  * - Staging-এর নিজের lightweight validation path — কোনো SHARED page-instance লাগে না
  *   (proc overlay / pipeline / id-counter / persisted কিছুই ব্যবহার করে না), তাই
  *   StagedFilesDeps আপাতত খালি — wiring-phase-এর injection-point হিসেবে রাখা।

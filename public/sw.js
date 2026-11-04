@@ -74,15 +74,17 @@ async function cacheGet(req) {
 
 /* Delete old cache versions on install/upgrade.
    This runs once per SW update to reclaim space for outdated schemas. */
-self.addEventListener("install", async () => {
-  try {
-    const keys = await self.caches.keys();
-    for (const key of keys) {
-      if (typeof key === "string" && key.startsWith("mcq-shuffler-cache-") && key !== CACHE_NAME + "-" + CACHE_VERSION) {
-        await self.caches.delete(key);
+self.addEventListener("install", (event) => {
+  event.waitUntil((async () => {
+    try {
+      const keys = await self.caches.keys();
+      for (const key of keys) {
+        if (typeof key === "string" && key.startsWith("mcq-shuffler-cache-") && key !== CACHE_NAME + "-" + CACHE_VERSION) {
+          await self.caches.delete(key);
+        }
       }
+    } catch {
+      /* best-effort */
     }
-  } catch {
-    /* best-effort */
-  }
+  })());
 });
