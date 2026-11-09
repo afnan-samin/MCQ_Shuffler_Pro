@@ -128,7 +128,7 @@ export async function repackDocxRemapped(
   const remapped = applyFontRemap(
     { documentXml, stylesXml: stylesXml ?? undefined },
     fontSettings,
-    { dominant: dominantOverride ?? remapDominantOf(documentXml) },
+    { dominant: dominantOverride ?? remapDominantOf(documentXml), stylesXml: stylesXml ?? undefined },
   );
   const parts: Record<string, string | Uint8Array> = {
     "word/document.xml": remapped.documentXml,

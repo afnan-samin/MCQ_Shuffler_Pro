@@ -681,6 +681,137 @@ console.log("\n── Default (keep original) + মিশ্র-রান ──
   ok(wellFormed(outMix), "মিশ্র: XML well-formed");
 }
 
+// ---------- 9. style-font ground truth (fontless runs) ----------
+
+console.log("\n── style-font ground truth (fontless runs) ──");
+{
+  // "Normal" is the default paragraph style (w:default="1"), as in real Word files.
+  const styles = (inner: string) => `<?xml version="1.0"?><w:styles xmlns:w="${W_NS}">${inner}</w:styles>`;
+  const RPR_TNR = `<w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/></w:rPr>`;
+  const RPR_SUT = `<w:rPr><w:rFonts w:ascii="SutonnyMJ" w:hAnsi="SutonnyMJ"/></w:rPr>`;
+  const STYLE_NORMAL_TNR = styles(`<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/>${RPR_TNR}</w:style>`);
+  const STYLE_NORMAL_SUT = styles(`<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/>${RPR_SUT}</w:style>`);
+  const STYLE_NORMAL_THEME = styles(`<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:rPr><w:rFonts w:asciiTheme="minorHAnsi" w:hAnsiTheme="minorHAnsi"/></w:rPr></w:style>`);
+  const STYLE_CHARLAT_PARASUT = styles(
+    `<w:style w:type="paragraph" w:styleId="ParaSut"><w:name w:val="ParaSut"/>${RPR_SUT}</w:style>` +
+    `<w:style w:type="character" w:styleId="CharLat"><w:name w:val="CharLat"/>${RPR_TNR}</w:style>`,
+  );
+  const STYLE_BASEDON = styles(
+    `<w:style w:type="paragraph" w:styleId="StB"><w:name w:val="B"/><w:basedOn w:val="StA"/><w:rPr><w:b/></w:rPr></w:style>` +
+    `<w:style w:type="paragraph" w:styleId="StA"><w:name w:val="A"/>${RPR_TNR}</w:style>`,
+  );
+  const STYLE_DOCDEFAULTS = styles(`<w:docDefaults><w:rPrDefault>${RPR_TNR}</w:rPrDefault></w:docDefaults>`);
+  {
+    const doc = wrapDoc(`<w:p><w:r><w:t>Oedogonium</w:t></w:r></w:p>`);
+    const out = applyFontRemapXml(doc, S, { dominant: "bijoy", stylesXml: STYLE_NORMAL_TNR });
+    ok(
+      out.includes(`w:ascii="Arial"`) && !out.includes(`w:ascii="Shibly"`),
+      "style font Latin (Normal=Times) + dominant bijoy -> English font, not bijoy font"
+    );
+    ok(applyFontRemapXml(out, S, { dominant: "bijoy", stylesXml: STYLE_NORMAL_TNR }) === out, "style font: idempotent");
+  }
+  {
+    const doc = wrapDoc(`<w:p><w:r><w:t>Avgvi</w:t></w:r></w:p>`);
+    const out = applyFontRemapXml(doc, S, { stylesXml: STYLE_NORMAL_SUT });
+    ok(out.includes(`w:ascii="Shibly"`), "style font legacy Bijoy (Normal=SutonnyMJ) -> bijoy font");
+  }
+  {
+    const doc = wrapDoc(
+      `<w:p><w:pPr><w:pStyle w:val="ParaSut"/></w:pPr>` +
+      `<w:r><w:rPr><w:rStyle w:val="CharLat"/></w:rPr><w:t>wefxK</w:t></w:r></w:p>`,
+    );
+    const out = applyFontRemapXml(doc, S, { dominant: "bijoy", stylesXml: STYLE_CHARLAT_PARASUT });
+    ok(
+      out.includes(`w:ascii="Arial"`) && !out.includes(`w:ascii="Shibly"`),
+      "character style (rStyle) Latin font wins over SutonnyMJ paragraph style -> English font"
+    );
+  }
+  {
+    const doc = wrapDoc(`<w:p><w:pPr><w:pStyle w:val="StB"/></w:pPr><w:r><w:t>Oedogonium</w:t></w:r></w:p>`);
+    const out = applyFontRemapXml(doc, S, { dominant: "bijoy", stylesXml: STYLE_BASEDON });
+    ok(out.includes(`w:ascii="Arial"`), "basedOn chain: style B based on A, only A has the font -> resolved");
+  }
+  {
+    const doc = wrapDoc(`<w:p><w:r><w:t>Oedogonium</w:t></w:r></w:p>`);
+    const out = applyFontRemapXml(doc, S, { dominant: "bijoy", stylesXml: STYLE_DOCDEFAULTS });
+    ok(out.includes(`w:ascii="Arial"`), "docDefaults-only font resolves -> English font");
+  }
+  {
+    const doc = wrapDoc(`<w:p><w:r><w:t>wefxK</w:t></w:r></w:p>`);
+    const out = applyFontRemapXml(doc, S, { dominant: "bijoy", stylesXml: STYLE_NORMAL_THEME });
+    ok(out.includes(`w:ascii="Shibly"`), "theme-only style font -> unresolved -> dominant decides (old behaviour)");
+  }
+  {
+    const doc = wrapDoc(`<w:p><w:r><w:t>wefxK</w:t></w:r></w:p>`);
+    const out = applyFontRemapXml(doc, S, { dominant: "bijoy" });
+    ok(out.includes(`w:ascii="Shibly"`), "no styles.xml -> old behaviour (dominant decides)");
+  }
+  {
+    const doc = wrapDoc(
+      `<w:p><w:r><w:rPr><w:rFonts w:ascii="SutonnyMJ" w:hAnsi="SutonnyMJ"/></w:rPr><w:t>wefxK</w:t></w:r></w:p>`,
+    );
+    const out = applyFontRemapXml(doc, S, { dominant: "bijoy", stylesXml: STYLE_NORMAL_TNR });
+    ok(
+      out.includes(`w:ascii="Shibly"`) && !out.includes(`w:ascii="Arial"`),
+      "explicit run font (SutonnyMJ) wins over Latin style font -> bijoy font"
+    );
+  }
+  {
+    const doc = wrapDoc(
+      `<w:p>` +
+      `<w:r><w:rPr><w:rFonts w:ascii="SutonnyMJ" w:hAnsi="SutonnyMJ"/></w:rPr><w:t>Avgvi †Kvb</w:t></w:r>` +
+      `<w:r><w:t>2</w:t></w:r>` +
+      `</w:p>`,
+    );
+    const out = applyFontRemapXml(doc, S, { dominant: "bijoy", stylesXml: STYLE_NORMAL_TNR });
+    const digitRun = scanRunInners(out).find((r) => r.includes(">2</w:t>"));
+    const bijoyRun = scanRunInners(out).find((r) => r.includes("Avgvi"));
+    ok(
+      digitRun != null && digitRun.includes(`w:ascii="Arial"`) && bijoyRun != null && bijoyRun.includes(`w:ascii="Shibly"`),
+      "digit-only run with Latin style font next to a SutonnyMJ run stays English"
+    );
+  }
+
+  // ---------- 9b. rFonts with unset ascii/hAnsi slots inherits like a fontless run ----------
+  // Only cs/eastAsia carried -> the tracked (ascii) font comes from the style chain;
+  // slots set to theme fonts stay unresolved (old behaviour).
+  console.log("\n── slot-unset rFonts (only cs/eastAsia) ──");
+  {
+    const RPR_ONLYCS = `<w:rPr><w:rFonts w:cstheme="minorBidi"/></w:rPr>`;
+    // Weekly-Exam-6 shape: Normal's own rPr carries only cstheme, docDefaults has Times New Roman
+    const STYLE_NORMAL_ONLYCS_DOCDEF = styles(
+      `<w:docDefaults><w:rPrDefault>${RPR_TNR}</w:rPrDefault></w:docDefaults>` +
+      `<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/>${RPR_ONLYCS}</w:style>`,
+    );
+    {
+      const doc = wrapDoc(`<w:p><w:r><w:rPr><w:rFonts w:cs="SutonnyMJ"/></w:rPr><w:t>Rhizome</w:t></w:r></w:p>`);
+      const out = applyFontRemapXml(doc, S, { dominant: "bijoy", stylesXml: STYLE_NORMAL_TNR });
+      ok(
+        out.includes(`w:ascii="Arial"`) && !out.includes(`w:ascii="Shibly"`),
+        "run with only-cs rFonts + Latin style font -> English font (inherits like fontless)"
+      );
+    }
+    {
+      const doc = wrapDoc(`<w:p><w:r><w:rPr><w:rFonts w:cs="Times New Roman"/></w:rPr><w:t>Avgvi</w:t></w:r></w:p>`);
+      const out = applyFontRemapXml(doc, S, { stylesXml: STYLE_NORMAL_SUT });
+      ok(out.includes(`w:ascii="Shibly"`), "run with only-cs rFonts + SutonnyMJ style font -> bijoy font");
+    }
+    {
+      const doc = wrapDoc(`<w:p><w:r><w:t>Rhizome</w:t></w:r></w:p>`);
+      const out = applyFontRemapXml(doc, S, { dominant: "bijoy", stylesXml: STYLE_NORMAL_ONLYCS_DOCDEF });
+      ok(
+        out.includes(`w:ascii="Arial"`) && !out.includes(`w:ascii="Shibly"`),
+        "only-cs style inherits past itself to docDefaults (Times New Roman) -> English font"
+      );
+    }
+    {
+      const doc = wrapDoc(`<w:p><w:r><w:rPr><w:rFonts w:asciiTheme="minorHAnsi" w:hAnsiTheme="minorHAnsi"/></w:rPr><w:t>wefxK</w:t></w:r></w:p>`);
+      const out = applyFontRemapXml(doc, S, { dominant: "bijoy", stylesXml: STYLE_NORMAL_TNR });
+      ok(out.includes(`w:ascii="Shibly"`), "run rFonts set to theme fonts -> own unusable font -> old behaviour");
+    }
+  }
+}
+
 // ---------- ফলাফল ----------
 
 console.log(`\n${passed} passed, ${failed} failed`);
