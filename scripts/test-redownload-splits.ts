@@ -87,13 +87,19 @@ const outAll = buildRedownloadXml(F1, parse1, [0, 1], {
   expandAnswer: false,
 });
 const allParas = parasOf(outAll);
-ok(allParas.some((t) => t.trim() === "Dt M"), "টেইল-উত্তর নিজস্ব প্যারায় ('Dt M')");
-ok(allParas.some((t) => t.trim() === "(Ju: 21-22)"), "টেইল-রেফারেন্স নিজস্ব প্যারায়");
-ok(allParas.some((t) => t.trim() === "(নমুনা - 93)"), "রেফ-অনলি প্যারা আছে");
 ok(
-  allParas.some((t) => t.includes("M. দূরত্ব") && !t.includes("Dt")),
-  "অপশন-হেড পরিষ্কার (উত্তর ছাড়া)"
+  allParas.some((t) => t === "M. দূরত্ব N. সময়Dt M"),
+  "all parts ON -> options line stays one paragraph with glued answer"
 );
+ok(
+  allParas.some((t) => t === "1.আলোর বেগ কত?(Ju: 21-22)"),
+  "all parts ON -> question line stays one paragraph with glued reference"
+);
+ok(
+  !allParas.some((t) => t.trim() === "Dt M") && !allParas.some((t) => t.trim() === "(Ju: 21-22)"),
+  "all parts ON -> no standalone tail paragraphs"
+);
+ok(allParas.some((t) => t.trim() === "(নমুনা - 93)"), "রেফ-অনলি প্যারা আছে");
 {
   const d = new DOMParser().parseFromString(outAll, "application/xml");
   ok(d.getElementsByTagName("parsererror").length === 0, "আউটপুট XML well-formed");
@@ -243,8 +249,8 @@ const outRen = buildRedownloadXml(F1, parse1, [0, 1], {
 });
 const renParas = parasOf(outRen);
 ok(
-  renParas.some((t) => t.startsWith("1.") && t.includes("আলোর বেগ") && !t.includes("(Ju")),
-  "রিনাম্বার ১ + প্রশ্ন (রেফ ছাড়া) — স্প্লিট-অফসেট নিরাপদ"
+  renParas.some((t) => t === "1.আলোর বেগ কত?(Ju: 21-22)"),
+  "renumbered question keeps glued reference in one paragraph"
 );
 ok(renParas.some((t) => t.startsWith("2.") && t.includes("বল")), "রিনাম্বার ২ + প্রশ্ন");
 
@@ -281,6 +287,155 @@ const ansRun7 = runs7.find((x) => x.text === "Dt ");
 ok(ansRun7?.font === "Times New Roman", `"Dt " প্রিফিক্স as-is (সারির Times ফন্ট) — "Ans: " বানানো হয় না (পেয়েছি ${ansRun7?.font})`);
 const gammaRun7 = runs7.find((x) => x.text.includes("Gamma"));
 ok(gammaRun7?.font === "Times New Roman", "উত্তর-লেখা অপশনের নিজের ফন্টে (Times), প্রশ্নের SutonnyMJ-তে নয়");
+
+// ---- glued-tail matrix: no cut when both the head and the tail parts are selected ----
+function sameParas(actual: string[], expected: string[]): boolean {
+  return actual.length === expected.length && actual.every((t, i) => t === expected[i]);
+}
+
+// fixture 8: glued answer at the end of an options line (no reference involved)
+const F8 = [
+  W_DOC_OPEN,
+  p("1.আলোর বেগ কত?"),
+  p("K. বেগ L. ভর"),
+  p("M. দূরত্ব N. সময়Dt M"),
+  W_DOC_CLOSE,
+].join("");
+const parse8 = parseRedownloadXml(F8);
+
+console.log("\n== 11) glued answer: options x answer ==");
+ok(
+  sameParas(
+    parasOf(buildRedownloadXml(F8, parse8, [0], { partSel: { ...PARTS_Q, answer: true }, renumber: false, expandAnswer: false })),
+    ["1.আলোর বেগ কত?", "K. বেগ L. ভর", "M. দূরত্ব N. সময়Dt M"]
+  ),
+  "options ON + answer ON -> one unsplit paragraph, glued tail in place"
+);
+ok(
+  sameParas(
+    parasOf(buildRedownloadXml(F8, parse8, [0], { partSel: PARTS_Q, renumber: false, expandAnswer: false })),
+    ["1.আলোর বেগ কত?", "K. বেগ L. ভর", "M. দূরত্ব N. সময়"]
+  ),
+  "options ON + answer OFF -> head only"
+);
+ok(
+  sameParas(
+    parasOf(buildRedownloadXml(F8, parse8, [0], { partSel: PARTS_QA, renumber: false, expandAnswer: false })),
+    ["1.আলোর বেগ কত?", "Dt M"]
+  ),
+  "options OFF + answer ON -> tail as its own paragraph"
+);
+ok(
+  sameParas(
+    parasOf(buildRedownloadXml(F8, parse8, [0], { partSel: { ...PARTS_Q, options: false }, renumber: false, expandAnswer: false })),
+    ["1.আলোর বেগ কত?"]
+  ),
+  "options OFF + answer OFF -> nothing from the options line"
+);
+
+// fixture 9: glued reference at the end of a question line (no answer involved)
+const F9 = [
+  W_DOC_OPEN,
+  p("1.আলোর বেগ কত?(Ju: 21-22)"),
+  p("K. বেগ L. ভর"),
+  p("M. দূরত্ব N. সময়"),
+  W_DOC_CLOSE,
+].join("");
+const parse9 = parseRedownloadXml(F9);
+
+console.log("\n== 12) glued reference: question x reference ==");
+ok(
+  sameParas(
+    parasOf(buildRedownloadXml(F9, parse9, [0], { partSel: { ...PARTS_Q, reference: true }, renumber: false, expandAnswer: false })),
+    ["1.আলোর বেগ কত?(Ju: 21-22)", "K. বেগ L. ভর", "M. দূরত্ব N. সময়"]
+  ),
+  "question ON + reference ON -> one unsplit paragraph, glued tail in place"
+);
+ok(
+  sameParas(
+    parasOf(buildRedownloadXml(F9, parse9, [0], { partSel: PARTS_Q, renumber: false, expandAnswer: false })),
+    ["1.আলোর বেগ কত?", "K. বেগ L. ভর", "M. দূরত্ব N. সময়"]
+  ),
+  "question ON + reference OFF -> head only"
+);
+ok(
+  sameParas(
+    parasOf(buildRedownloadXml(F9, parse9, [0], { partSel: { ...PARTS_Q, question: false, reference: true }, renumber: false, expandAnswer: false })),
+    ["(Ju: 21-22)", "K. বেগ L. ভর", "M. দূরত্ব N. সময়"]
+  ),
+  "question OFF + reference ON -> tail as its own paragraph"
+);
+ok(
+  sameParas(
+    parasOf(buildRedownloadXml(F9, parse9, [0], { partSel: { ...PARTS_Q, question: false }, renumber: false, expandAnswer: false })),
+    ["K. বেগ L. ভর", "M. দূরত্ব N. সময়"]
+  ),
+  "question OFF + reference OFF -> nothing from the question line"
+);
+
+console.log("\n== 13) option relabel with an unsplit tail ==");
+ok(
+  sameParas(
+    parasOf(buildRedownloadXml(F8, parse8, [0], {
+      partSel: { ...PARTS_Q, answer: true },
+      renumber: false,
+      expandAnswer: false,
+      optionLabels: { enabled: true, style: "A", separator: "." },
+    })),
+    ["1.আলোর বেগ কত?", "A. বেগ B. ভর", "C. দূরত্ব D. সময়Dt M"]
+  ),
+  "relabel ON -> labels remapped, glued tail text untouched in one paragraph"
+);
+
+// fixture 10: renumber + both glued tail kinds (2nd question alone -> number 1)
+const F10 = [
+  W_DOC_OPEN,
+  p("1.আলোর বেগ কত?"),
+  p("K. বেগ L. ভর"),
+  p("M. দূরত্ব N. সময়"),
+  p("2.বল কাকে বলে?[DU-A: 20-21]"),
+  p("K. সংজ্ঞা L. সূত্র"),
+  p("M. নিয়ম N. সত্যDt K"),
+  W_DOC_CLOSE,
+].join("");
+const parse10 = parseRedownloadXml(F10);
+
+console.log("\n== 14) renumber with unsplit tails ==");
+ok(
+  sameParas(
+    parasOf(buildRedownloadXml(F10, parse10, [1], { partSel: PARTS_ALL, renumber: true, expandAnswer: false })),
+    ["1.বল কাকে বলে?[DU-A: 20-21]", "K. সংজ্ঞা L. সূত্র", "M. নিয়ম N. সত্যDt K"]
+  ),
+  "renumber ON -> renumbered question keeps glued reference and answer tails"
+);
+
+// fixture 11: a star-marked option plus a glued answer in the same block
+const F11 = [
+  W_DOC_OPEN,
+  p("1.নিচের কোনটি সঠিক?"),
+  p("A. কোশ"),
+  p("B. ক্লোরোফিল"),
+  p("C. প্লাসমডেসমা*"),
+  p("D. মিউটেশনDt C"),
+  W_DOC_CLOSE,
+].join("");
+const parse11 = parseRedownloadXml(F11);
+
+console.log("\n== 15) star-marked option plus glued answer ==");
+ok(
+  sameParas(
+    parasOf(buildRedownloadXml(F11, parse11, [0], { partSel: PARTS_ALL, renumber: false, expandAnswer: false })),
+    ["1.নিচের কোনটি সঠিক?", "A. কোশ", "B. ক্লোরোফিল", "C. প্লাসমডেসমা*", "D. মিউটেশনDt C"]
+  ),
+  "all parts ON -> star marker kept, glued answer stays in the options line"
+);
+ok(
+  sameParas(
+    parasOf(buildRedownloadXml(F11, parse11, [0], { partSel: PARTS_Q, renumber: false, expandAnswer: false })),
+    ["1.নিচের কোনটি সঠিক?", "A. কোশ", "B. ক্লোরোফিল", "C. প্লাসমডেসমা", "D. মিউটেশন"]
+  ),
+  "answer OFF -> star stripped and glued tail cut"
+);
 
 // ---- ফলাফল ----
 console.log(`\n${passed} passed, ${failed} failed`);
