@@ -126,6 +126,14 @@ function classifyLine(
     if (YEAR_GUARD_WORD_RE.test(head)) return { kind: "continuation" };
   }
 
+  // Decimal guard, mirrors docx-xml isQuestionStart: a separator directly
+  // followed by a digit is a decimal number, not a serial. "5. 3 apples"
+  // (space after the separator) is still a serial.
+  if (hasSep) {
+    const afterSep = line.slice(m[0].replace(/\s+$/, "").length);
+    if (/^[0-9০-৯]/.test(afterSep)) return { kind: "continuation" };
+  }
+
   if (hasSep) return { kind: "question", match: m };
 
   // সেপারেটর ছাড়া (শুধু স্পেস) — চেইন রুল:
