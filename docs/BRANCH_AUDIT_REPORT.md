@@ -260,3 +260,45 @@ Cleanup (optional, safe): `git worktree remove .audit-worktrees/<name>` for each
 - P04's answer-line rewrite changes one existing expectation in `scripts/test-redownload.ts` (old `"উত্তর: H2O"` → new `"Ans: ক) H2O"`); the P04 prompt explicitly allows exactly this class of change.
 - `test:engines` is green on the integration branch, so P07's exporter font change and P03's fontless-run fixes do not conflict semantically.
 - Per-branch `test:all` results were re-confirmed with exit code 0; the only observed failures across the whole audit were the intentionally documented limitations above, none of which reproduces as a test failure.
+
+---
+
+## 12. Merge execution log (2026-11-14)
+
+The owner approved a phase-by-phase merge into `main`. This section records what was actually done; sections 1–11 are the pre-merge audit.
+
+### 12.1 Preconditions
+
+| Commit | Content |
+|---|---|
+| `401aa97` | The 19 pre-existing uncommitted files (unused imports / dead helpers cleanup, `.gitignore`, `README.md`) committed as one commit so the tree is clean. Verified before commit: `tsc` 0, `lint` 0 errors, `test:all` exit 0. |
+| `87f0f00` | This report added. |
+
+### 12.2 Merge commits (in order)
+
+| Merge commit | Branch | Conflicts and resolution |
+|---|---|---|
+| `dd3243b` | `feat/answer-line-format` (P04) | `scripts/test-redownload-splits.ts`: kept `main`'s fixtures 8–11 and P04's answer-line fixtures. `src/lib/mcq/redownload.ts`: kept P04's `buildAnswerLineParas` call sites (answered / tail / star) over the cleanup's `expandAnswerPara` calls; `expandAnswerPara` stays 4-arg for `expandAnswerBySerial` only. |
+| `826107d` | `feat/header-and-topic-toggles` (P05) | none (auto-merged). |
+| `4eb0a45` | `feat/removed-headers-card` (P06) | `src/app/page.tsx`: kept the cleanup's import list and added `RemovedHeadersCard`; P06's card JSX merged automatically. |
+| `20f850a` | `fix/exporter-single-segment-font` (P07) | none. |
+| `d814f3e` | `fix/text-parser-decimal-lines` (P08) | none. |
+| `dfd2969` | `fix/loading-state-reset` (P09) | none (the three `finally` moves applied cleanly on top of the cleanup's `forEach` edits). |
+| `693caa7` | `fix/staging-xml-cache` (P10) | `src/lib/mcq/file-pipeline.ts`: kept the cache shortcut with the cleanup's `_onProgress` name. `scripts/test-docx.ts`: kept P06's section `23`, renumbered P10's to `24` (including its `"23:` labels). |
+| `eed3869` | `chore/stale-comments-sw-waituntil` (P11) | none. |
+
+Every merge was verified before committing: `tsc --noEmit` exit 0, `lint` 0 errors, plus the affected suites (`test:redownload` 62 → 92 → 108 as P04/P05/P06 landed, `test:docx` 120 then 125, `test:export` 10, `test:mcq` 87, `test:splits` 85).
+
+### 12.3 Final gate on `main` (`eed3869`)
+
+| Check | Result |
+|---|---|
+| `tsc --noEmit` | exit 0 |
+| `eslint .` | exit 0 — 0 errors, 22 warnings (pre-existing / cleanup style) |
+| `node --check public/sw.js` | exit 0 |
+| `test:all` | exit 0 — mcq 87, docx 125, color 104, multi 70, font 144, labels 32, redownload 108, splits 85, weekly 9, reference 51, doc1 27, export 10, pdf 11, engines 104 (0 failures anywhere) |
+| Working tree | clean; local `main` is 9 commits ahead of `origin/main`, not pushed |
+
+### 12.4 Status after merge
+
+P04, P05 and P06 change from `READY AFTER FIX` to **READY (merged and verified)**. P07–P11 remain `READY (merged and verified)`. The open items from §7 are unchanged: I-10 is resolved by commit `401aa97`; I-05 and I-06 remain `NEEDS REVIEW` follow-ups.
