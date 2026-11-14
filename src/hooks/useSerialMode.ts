@@ -163,7 +163,7 @@ export function useSerialMode(deps: SerialDeps) {
         parse: (xml) => analyzeColorDocx(xml),
       });
       // সাইজ-গার্ড — পাইপলাইন রিপোর্ট করে, টোস্ট এখানেই (আগের হুবহু মেসেজ)
-      for (const f of run.tooBig) toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
+      run.tooBig.forEach(() => toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" }));
       // এক্সটেনশন-গার্ডে বাদ পড়া ফাইলের ফিডব্যাক — আগে নীরবে বাদ যেত
       if (run.notDocx.length) {
         toast({ title: `${run.notDocx.length} file(s) skipped — only .docx is supported`, variant: "destructive" });

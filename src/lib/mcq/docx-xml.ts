@@ -22,7 +22,6 @@ import {
 
 export const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 export const M_NS = "http://schemas.openxmlformats.org/officeDocument/2006/math";
-const XML_NS = "http://www.w3.org/XML/1998/namespace";
 
 // ---------- ডিজিট এনকোডিং (English / বাংলা Unicode / Bijoy ASCII) ----------
 

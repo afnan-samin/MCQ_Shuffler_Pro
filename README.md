@@ -1,8 +1,7 @@
 # MCQ Shuffler Pro — Free MCQ Shuffler & Exam Set Generator
 
-### 🔗 [**Try it live →**](https://afnan-samin.github.io/MCQ_Shuffler_Pro/)
+### 🔗 [**Try it live →**](https://mcq-shuffler-pro.pages.dev/)
 
-![Deploy](https://github.com/afnan-samin/MCQ_Shuffler_Pro/actions/workflows/deploy.yml/badge.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Client-side](https://img.shields.io/badge/100%25-client--side-brightgreen)
 ![Next.js](https://img.shields.io/badge/Next.js-16-black)
@@ -36,11 +35,26 @@ bun install
 bun run dev        # http://localhost:3000
 ```
 
+## Deployment
+
+The app is a pure static export, hosted on **Cloudflare Pages**:
+
+- Build command: `bun run build:static`
+- Output directory: `.next-static`
+- Env: `STATIC_EXPORT=1`, `NODE_VERSION=22`
+
+Every push to `main` is built and deployed automatically. Local preview of the
+production build:
+
+```bash
+bun run build:static
+```
+
 ## Tech stack
 
-Next.js 16 (App Router, Turbopack) + Tailwind CSS v4 + shadcn/ui + TypeScript. Fonts: Kalpurush and SutonnyMJ (embedded via `next/font/local`).
+Next.js 16 (App Router, Turbopack) + Tailwind CSS v4 + shadcn/ui + TypeScript. Fonts: Noto Serif Bengali / Noto Sans Bengali (Google Fonts, self-hosted at build time) + SutonnyMJ (legacy Bijoy, embedded via `next/font/local`).
 
 ## Notes for developers
 
 - The UI is English, but **functional Bengali stays**: the parser understands Bengali exam markers (`১.`, `ক)`, `উত্তর`, `উঃ`), Bengali digits (`০১২৩৪৫৬৭৮৯`), and output .docx files keep Bengali set-name styles (`সেট A/ক/১`) and `উত্তরমালা` headers — these are product decisions.
-- Unit tests live in `scripts/test-*.ts` (run with `bun run scripts/test-mcq.ts` etc.); browser E2E scripts are `scripts/e2e-*.ts` and expect the dev server on `localhost:3000`.
+- Regression tests live in `scripts/test-*.ts` (`bun run test:all`). They read tracked fixtures from `scripts/fixtures/` and, if present, the local `Format/` folder (git-ignored user files).

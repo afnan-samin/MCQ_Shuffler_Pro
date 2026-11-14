@@ -11,7 +11,7 @@
 // ============================================================
 
 import JSZip from "jszip";
-import { loadDocxXml, parseDocxXml, zipMetaToProgress, type DocxParseResult, type ZipProgress } from "./docx-xml";
+import { loadDocxXml, parseDocxXml, type DocxParseResult, type ZipProgress } from "./docx-xml";
 import {
   analyzeColorDocx,
   stripShadedParasXml,
@@ -57,7 +57,7 @@ async function loadDocxXmlCached(f: File, onProgress?: ZipProgress): Promise<str
  * to run at staging time, before files are accepted into the app).
  * A renamed .zip/.txt/.pdf with a .docx extension fails here.
  */
-export async function isValidDocxZip(file: Blob, onProgress?: ZipProgress): Promise<boolean> {
+export async function isValidDocxZip(file: Blob, _onProgress?: ZipProgress): Promise<boolean> {
   try {
     const zip = await JSZip.loadAsync(file);
     return !!zip.file("word/document.xml");

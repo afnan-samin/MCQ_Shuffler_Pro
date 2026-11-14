@@ -761,7 +761,7 @@ export function useShuffleMode(deps: ShuffleDeps) {
         parse: (xml) => prepareShuffleXml(xml),
       });
       // সাইজ-গার্ডের টোস্ট পাইপলাইন-রিপোর্ট থেকে — ডাবল-টোস্ট এড়াতে এরর-লিস্টে নেই
-      for (const f of run.tooBig) toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
+      run.tooBig.forEach(() => toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" }));
       // এক্সটেনশন-গার্ডে বাদ পড়া ফাইলের ফিডব্যাক — আগে নীরবে বাদ যেত
       if (run.notDocx.length) {
         toast({ title: `${run.notDocx.length} file(s) skipped — only .docx is supported`, variant: "destructive" });

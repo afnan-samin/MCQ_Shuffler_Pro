@@ -12,7 +12,7 @@ const dom = new JSDOM("<!doctype html><html><body></body></html>");
 (globalThis as unknown as Record<string, unknown>).XMLSerializer = dom.window.XMLSerializer;
 (globalThis as unknown as Record<string, unknown>).Node = dom.window.Node;
 
-const { findRefTokens, analyzeQRefs, analyzeRefReport } = await import(
+const { findRefTokens, analyzeRefReport } = await import(
   "../src/lib/mcq/reference"
 );
 const { parseDocxXml, extractParaText, W_NS } = await import("../src/lib/mcq/docx-xml");

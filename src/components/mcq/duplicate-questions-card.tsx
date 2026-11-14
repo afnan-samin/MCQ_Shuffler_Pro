@@ -83,7 +83,7 @@ export function DuplicateQuestionsCard({ groups }: { groups: DuplicateGroup[] })
                     </span>
                   </div>
                   <div className="mt-1 flex flex-wrap gap-1.5">
-                    {g.questions.map((h, hi) => (
+                    {g.questions.map((h) => (
                       <span
                         key={`${h.fileId}-${h.questionId}`}
                         className="inline-flex items-center gap-1 rounded-full border bg-card px-2 py-0.5 text-[11px] text-muted-foreground"

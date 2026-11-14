@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import JSZip from "jszip";
+import { useEffect, useRef, useState } from "react";
 import { DetectCard } from "@/components/mcq/detect-card";
 import { DocxDetectCard } from "@/components/mcq/docx-detect-card";
 import { ShuffleCard } from "@/components/mcq/shuffle-card";
@@ -10,51 +9,13 @@ import { DocxSetsResult } from "@/components/mcq/docx-sets-result";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MultiFileList } from "@/components/mcq/multi-file-list";
-import { MultiDownloadCard, type SerialStrategy } from "@/components/mcq/multi-download-card";
+import { MultiDownloadCard } from "@/components/mcq/multi-download-card";
 import { ShuffleMultiSetsCard } from "@/components/mcq/shuffle-multi-sets-card";
-import {
-  autoFixNumbering,
-  parseMcq,
-  type ParseOutput,
-  type McqQuestion,
-} from "@/lib/mcq/parser";
-import { buildSets, reshuffleDistinct, orderKey, shuffled, originalUniqueOrders, type Distribution } from "@/lib/mcq/set-engine";
-import { analyzeText, type Enc, type EncodingStats } from "@/lib/mcq/encoding";
-import {
-  allSetsClipboardText,
-  copyToClipboard,
-  downloadBlob,
-  buildSetsDocxBlob,
-  exportDocHtml,
-  printSets,
-  DEFAULT_EXPORT_OPTIONS,
-  type ExportOptions,
-} from "@/lib/mcq/exporter";
-import {
-  type DocxParseResult,
-} from "@/lib/mcq/docx-xml";
-import {
-  analyzeColorDocx,
-  applyColorSerialXml,
-  buildColorSerialDocxBlob,
-  planSerialByColor,
-  type BlockedLine,
-  type ColorAnalysis,
-  type SerialScheme,
-} from "@/lib/mcq/color-serial";
-import {
-  buildMergedDocxBlob,
-  buildZipBlob,
-  offsetSerialPlan,
-  replaceDocumentXml,
-} from "@/lib/mcq/multi-docx";
-import { remapDominantOf } from "@/lib/mcq/repack-docx";
-import type { RemapDominant } from "@/lib/mcq/font-remap";
 import { ColorSerialCard } from "@/components/mcq/color-serial-card";
 import { ModeTabs, type McqMode } from "@/components/mcq/mode-tabs";
 import { SerialInputCard } from "@/components/mcq/serial-input-card";
 import { NextModesCard } from "@/components/mcq/next-modes-card";
-import { StagedFilesCard, UploadFirstCard, type StagedFile, type StagedFileStats } from "@/components/mcq/upload-first-card";
+import { StagedFilesCard, UploadFirstCard } from "@/components/mcq/upload-first-card";
 import { ModeWorkBar } from "@/components/mcq/mode-work-bar";
 import {
   BlockedLinesCard,
@@ -62,53 +23,21 @@ import {
   MultiSerialSchemeCard,
   NoColorSerialCard,
 } from "@/components/mcq/serial-extra-cards";
-import {
-  buildShuffledDocxBlob,
-  buildShuffledXml,
-  englishSetName,
-} from "@/lib/mcq/docx-exporter";
-import { docxBlobToPdfParts, type DownloadFormat } from "@/lib/mcq/pdf-export";
-import { analyzeRefReport, type RefMode, type RefReport } from "@/lib/mcq/reference";
 import { RedownloadInputCard } from "@/components/mcq/redownload-input-card";
 import { RedownloadPartsCard } from "@/components/mcq/redownload-parts-card";
 import { RedownloadQuestionsCard } from "@/components/mcq/redownload-questions-card";
-import {
-  buildRedownloadXml,
-  DEFAULT_PART_SELECTION,
-  extractWatermark,
-  parseRedownloadXml,
-  type LabelTypo,
-  type PartKind,
-  type PartSel,
-  type RdParseResult,
-  type WatermarkInfo,
-} from "@/lib/mcq/redownload";
-import { renumberQuestionsByPosition } from "@/lib/mcq/serial-paste";
-import { DEFAULT_FONT_REMAP_SETTINGS, FONT_CHOICES, type FontSettings } from "@/lib/mcq/font-remap";
-import {
-  DEFAULT_OPTION_LABEL_SETTINGS,
-  sanitizeOptionLabelSettings,
-  type OptionLabelSettings,
-} from "@/lib/mcq/option-labels";
 import { FontSettingsCard } from "@/components/mcq/font-settings-card";
 import { OptionLabelsCard } from "@/components/mcq/option-labels-card";
-import { LabelTyposCard, type LabelTypoRow } from "@/components/mcq/label-typos-card";
-import { AnswerConflictsCard, answerConflictRowsOf, type AnswerConflictRow } from "@/components/mcq/answer-conflicts-card";
+import { LabelTyposCard } from "@/components/mcq/label-typos-card";
+import { AnswerConflictsCard } from "@/components/mcq/answer-conflicts-card";
 import { DuplicateQuestionsCard } from "@/components/mcq/duplicate-questions-card";
-import { findDuplicateQuestions, type DuplicateGroup } from "@/lib/mcq/duplicates";
 import {
   FILE_TOO_BIG_MSG,
-  prepareShuffleXml,
-  runFilePipeline,
-  isValidDocxZip,
-  type PipelineProgress,
 } from "@/lib/mcq/file-pipeline";
-import { MAX_FILE_BYTES, MIN_OPTIONS_PER_MCQ, SHUFFLE_MAX_FILES } from "@/lib/mcq/limits";
+import { MAX_FILE_BYTES, SHUFFLE_MAX_FILES } from "@/lib/mcq/limits";
 import { toast } from "@/hooks/use-toast";
-import { usePersistedJson, usePersistedString } from "@/hooks/use-persisted-state";
-import { Dices, Loader2, ShieldCheck, Upload, Zap } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { type DropzoneTrigger } from "@/components/mcq/file-dropzone";
+import { usePersistedString } from "@/hooks/use-persisted-state";
+import { Dices, Loader2, ShieldCheck, Zap } from "lucide-react";
 import { useSharedServices, type ProcState } from "@/hooks/useSharedServices";
 import { useStagedFiles } from "@/hooks/useStagedFiles";
 import { useShuffleMode } from "@/hooks/useShuffleMode";
@@ -116,10 +45,6 @@ import { useSerialMode } from "@/hooks/useSerialMode";
 import { useRedownloadMode } from "@/hooks/useRedownloadMode";
 
 const MODE_KEY = "mcq-shuffler-mode";
-/** রিডাউনলোডের অপশন-লেবেল কাস্টমাইজ সেটিংস (persisted) */
-const OPTION_LABELS_KEY = "mcq-option-labels";
-/** অপশন-লেবেল টাইপো অটো-ফিক্স (ডিফল্ট OFF — ডাউনলোড হুবহু) */
-const RD_FIX_LABELS_KEY = "mcq-rd-fix-labels";
 
 // ---------- প্রসেস-ওভারলে (বড় ফাইলের লোড/ডাউনলোডে "hang"-চেহারা আটকায়) ----------
 // ProcState — useSharedServices থেকে ইমপোর্ট (একক সোর্স, গুলিয়ে-যাওয়া বন্ধ)
@@ -448,7 +373,7 @@ export default function Home() {
                   if (rej.notAccepted.length) {
                     toast({ title: `${rej.notAccepted.length} file(s) skipped — only .docx is supported`, variant: "destructive" });
                   }
-                  for (const f of rej.tooBig) toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" });
+                  rej.tooBig.forEach(() => toast({ title: FILE_TOO_BIG_MSG, variant: "destructive" }));
                   void stageMoreFiles(fs);
                 }}
                 addFilesDisabled={shuffle.detecting}

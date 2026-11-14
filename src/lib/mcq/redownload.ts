@@ -1072,7 +1072,7 @@ export function buildRedownloadXml(
 
     // উত্তর-বিস্তার: অপশন বাদ + উত্তর আছে + অক্ষর-উত্তর ("উঃ ক")
     if (kind === "answer" && expandActive) {
-      expandAnswerPara(clone, q, kids, parse, opts.optionLabels ?? null);
+      expandAnswerPara(clone, q, kids, parse);
     }
 
     if (kind === "options" && opts.optionLabels?.enabled) {
@@ -1084,7 +1084,7 @@ export function buildRedownloadXml(
     // টেইল-অংশ (গ্লুড উত্তর / টেইল-রেফারেন্স) — নিজের অংশ-টিক অনুযায়ী
     if (tail && split && opts.partSel[split.kind]) {
       if (split.kind === "answer" && expandActive) {
-        expandAnswerPara(tail, q, kids, parse, opts.optionLabels ?? null);
+        expandAnswerPara(tail, q, kids, parse);
       }
       body.appendChild(tail);
     }
@@ -1094,7 +1094,7 @@ export function buildRedownloadXml(
     if (q.answerFromStar && opts.partSel.answer && !opts.partSel.options && lastOptPara.get(bid) === i) {
       const starPara = makeStarAnswerPara(doc, src, q.answer ?? "");
       if (expandActive) {
-        expandAnswerPara(starPara, q, kids, parse, opts.optionLabels ?? null);
+        expandAnswerPara(starPara, q, kids, parse);
       }
       body.appendChild(starPara);
     }
@@ -1125,7 +1125,7 @@ function expandAnswerBySerial(answerClone: Element, parse: RdParseResult, kids: 
   const q = parse.questions.find((qq) => qq.serial === si.num);
   if (!q || !q.answer) return;
   if (letterIndex(slM[1]) !== letterIndex(q.answer)) return;
-  expandAnswerPara(answerClone, q, kids, parse, null);
+  expandAnswerPara(answerClone, q, kids, parse);
 }
 
 /** প্রশ্ন-শুরু প্যারা থেকে সিরিয়াল (ডিজিট+সেপারেটর) সরানো */
@@ -1159,8 +1159,7 @@ function expandAnswerPara(
   answerClone: Element,
   q: RdQuestion,
   kids: Element[],
-  parse: RdParseResult,
-  labelSettings: OptionLabelSettings | null = null
+  parse: RdParseResult
 ): void {
   if (!q.answer) return;
   // উত্তর একাধিক অক্ষরও হতে পারে ("Dt L, N" / "উত্তর: ক, খ") — সব অক্ষর বিস্তার
@@ -1173,7 +1172,7 @@ function expandAnswerPara(
   const multi = letters.length > 1;
   const firstLabel = targets[0]!.label;
   const textBySlot = new Map<number, string>();
-  letters.forEach((ch, i) => textBySlot.set(slotIdxs[i], targets[i]!.text));
+  letters.forEach((_ch, i) => textBySlot.set(slotIdxs[i], targets[i]!.text));
 
   // মিলে-যাওয়া অপশন-প্যারা খোঁজা (শুধু একক-উত্তরে verbatim-এর জন্য)
   let optionEl: Element | null = null;

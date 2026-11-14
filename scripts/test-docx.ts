@@ -125,12 +125,6 @@ function countRunTabsIn(x: string): number {
   ok(physCount === 12, `PHYSICS হেডার প্রিজার্ভ: ফ্রন্ট-১×২সেট + গ্যাপ ৫×২সেট = ১২ [পেয়েছি ${physCount}]`);
   ok(out1Parse.separators.includes("A") && out1Parse.separators.includes("B"), "A/B সেপারেটর-প্যারাও আউটপুটে থাকে");
   // সেট-হেডার এখন ডকুমেন্টের নিজের ফন্ট-ফ্যামিলিতে
-  const srcDoc = new DOMParser().parseFromString(xmlText, "application/xml");
-  let srcAscii = "";
-  for (const rf of Array.from(srcDoc.getElementsByTagNameNS(W_NS, "rFonts"))) {
-    const a = rf.getAttribute("w:ascii") ?? "";
-    if (a) { srcAscii = a; break; }
-  }
   const outDoc = new DOMParser().parseFromString(out1, "application/xml");
   let headerFontAscii = "";
   for (const t of Array.from(outDoc.getElementsByTagNameNS(W_NS, "t"))) {
@@ -297,8 +291,7 @@ console.log("\n== ১৭) Shuffle: non-question paragraphs stay put (Phase 1.1 f
   const revParse = parseDocxXml(outRev);
   const physRe = /<w:t[^>]*>PHYSICS<\/w:t>/g;
   let physCount = 0;
-  let m: RegExpExecArray | null;
-  while ((m = physRe.exec(outRev))) {
+  while (physRe.exec(outRev)) {
     physCount++;
   }
   ok(

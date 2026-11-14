@@ -45,20 +45,6 @@ const BIJOY_WEAK = /[×÷±§¤¦¯°¡¿¬­®™‰]/;
 
 const ALPHA_RE = /[A-Za-z]/;
 
-/**
- * Chemistry-ফর্মুলা/এলিমেন্ট-সিম্বল (BeO, BaO, Al2O3, NO, CO):
- * Element-Case প্যাটার্ন — Bijoy-বাংলা শব্দে এই আকৃতি আসে না
- * (বাংলা-বিজয় শব্দ lower/mixed-case ASCII-art: "wKQz", "e¨vL¨v")।
- */
-const ELEMENT_LIKE_RE = /^[A-Z][a-z]?[0-9]*([A-Z][a-z]?[0-9]*)*$/;
-
-/** ট্রেলিং লেবেল-যতিচিহ্ন বাদে Element-প্যাটার্ন কিনা */
-function isElementLikeToken(w: string): boolean {
-  const core = w.replace(/^[*([{<"']+/, "").replace(/[.।):;,\]}>"']+$/g, "");
-  if (core.length < 2 || core.length > 12) return false;
-  return ELEMENT_LIKE_RE.test(core);
-}
-
 /** খাঁটি সংখ্যা/সিম্বল টোকেন (কোনো ভাষাই না) */
 const NUM_ONLY_RE = /^[0-9.,%:;\/\-–—+=°"'()]+$/;
 

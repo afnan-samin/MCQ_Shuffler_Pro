@@ -1,5 +1,3 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
 # dependencies
 node_modules
 /.pnp
@@ -13,122 +11,97 @@ node_modules
 # testing
 /coverage
 
-# next.js
+# next.js build output
 /.next/
 /.next-static/
 /out/
-
-# production
 /build
 
 # misc
 .DS_Store
 *.pem
+/tmp/
+.vscode/
+.claude
+.z-ai-config
 
-# debug
+# logs / debug
+*.log
+dev.log
+dev.out.log
+server.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+*.err
 
 # env files (can opt-in for committing if needed)
 .env*
-
-# vercel
 .vercel
-
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-local-*
-.claude
-.z-ai-config
-*.log
-dev.log
-dev.out.log
-test
-prompt
 
-server.log
-# Skills directory
-/skills/
-# tool/agent artifacts
-tool-results/
-scripts/*.png
-scripts/tmp-e2e/
+# ---- deployment / CI artifacts (GitHub Pages legacy + local deploys) ----
 .gh-pages-deploy/
 
-# ইউজারের নমুনা/টেস্ট ফাইল — লোকাল টেস্টে লাগে, রিপোতে যাবে না
+# ---- user data / privacy (never publish) ----
+# ইউজারের raw ফাইল (বড় + প্রাইভেসি)
+Format/
+# ইউজারের নমুনা/টেস্ট ফাইল
 upload/
-# ইউজারের আসল টেস্ট-ফাইল ফিক্সচার (প্রাইভেসি — রিপোতে যাবে না)
+# ইউজারের আসল প্রশ্ন-ব্যাংক ফিক্সচার (প্রাইভেসি/কপিরাইট)
 scripts/fixtures/bcs-english-bijoy-46.docx
+scripts/fixtures/user-physics-bank.txt
+# ইউজারের raw reply / reply দলিল
+reply/
+Reply/
+
 # verify-export রানটাইম আর্টিফ্যাক্ট
 scripts/document.xml
 scripts/test-export.docx
-/tmp/
 
-# local editor
-.vscode/
-
-# ইউজারের raw ফাইল (বড় + প্রাইভেসি — রিপোতে যাবে না)
-Format/
-reply/
-
-# dev-server artifacts (*.log আগেই ignored, .err বাকি ছিল)
-*.err
-
-# agent session log
+# ---- prompts / notes / plans — local only ----
+Prompt/
+prompts/
+Prompts/
+prompt-pack/
+prompt
+prompt.md
+*-prompt.md
+mcq-shuffler-pro-phasewise-plan.md
+worklog.md
 session-*.md
 
-# master prompt — local only, github e jabe na
-prompt.md
-
-# লোকাল জান্ক — লগ/নোট/টেম্প, রিপোতে যাবে না
+# ---- local junk / agent artifacts ----
 /*.txt
 /*.py
 /*.md.tmp
-*.tsbuildinfo
-
-# ডেলিভারেবল/আউটপুট ফোল্ডার
-download/
-
-# embedded repos
-freellmapi
-live-chunk.txt
-
-# dev/debug scripts — local only, public repo te jabe na
-.zscripts/
-
-# screenshots / error dumps — local only
-errors/
-
-# ইউজারের বাস্তব প্রশ্ন-ব্যাংক (প্রাইভেসি/কপিরাইট — Format/-এর মতোই local only)
-scripts/fixtures/user-physics-bank.txt
-
-# kaajer log - local only, GitHub-e jabe na
-worklog.md
-
-# bairear nirdeshona-file - local only
-*-prompt.md
-
-# phasewise planning file - local only
-mcq-shuffler-pro-phasewise-plan.md
-
-# agent backup files (*.bak-*) - local only, GitHub-e jabe na
 *.bak-*
-
-# golden test snapshots (verify/golden-test output) - local only
-golden/
-
-
-# এজেন্ট/QA লোকাল আর্টিফ্যাক্ট — রিপোতে যাবে না
+live-chunk.txt
+/skills/
+tool-results/
+.zscripts/
+errors/
+scripts/tmp-e2e/
+scripts/*.png
 /qa/
 /qa-kit/
 /.playwright-mcp/
 /opencode.json
-/reports/
 
-# QA matrix runner — লোকাল QA টুল, GitHub-e dorkar nai
+# ---- generated output ----
+download/
+golden/
+reports/
+
+# ---- QA matrix runner — লোকাল QA টুল, GitHub-e dorkar nai ----
 scripts/_qa-redownload-matrix.ts
-reply/
+
+# ---- embedded repos ----
+freellmapi
+
+# ---- local backup bundles (git bundle) ----
+*.bundle

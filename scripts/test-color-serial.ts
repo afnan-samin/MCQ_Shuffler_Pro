@@ -82,7 +82,6 @@ ok(paletteHexOf("A8") === null, "A8 অবৈধ");
 
 console.log("\n== ২) ইউজারের B1/A2/A5/A6 নেস্টিং উদাহরণ ==");
 // প্রতিটা হেডারের পরে কিছু প্রশ্ন; সহজ যাচাইয়ের জন্য প্রশ্নগুলো q1,q2... টেক্সটে
-type Node = ["H" | "Q", string, string]; // ধরন, রঙ(হেডার হলে), টেক্সট
 const userSeq: Array<[kind: "h" | "q", color: string | null, text: string]> = [
   ["h", "B1", "অধ্যায়-১"],
   ["h", "A2", "Type-১"],

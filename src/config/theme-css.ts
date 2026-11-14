@@ -15,10 +15,6 @@ import { siteTheme, type BrandScale, type ThemeColorSet } from "./theme";
 
 const BRAND_SHADES = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950] as const;
 
-function cssVarName(token: string): string {
-  return `--st-${token.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
-}
-
 /** font/radius/popup tokens (mode-independent — defined once on :root). */
 function structuralVars(): string[] {
   const t = siteTheme;

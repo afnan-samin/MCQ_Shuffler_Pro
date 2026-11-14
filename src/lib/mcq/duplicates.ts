@@ -3,8 +3,6 @@
 // কাছাকাছি প্রশ্ন flag করার জন্য (Phase 3 #9)।
 // ============================================================
 
-import type { DocxQuestion } from "./docx-xml";
-
 export interface DuplicateHit {
   fileId: string;
   fileName: string;

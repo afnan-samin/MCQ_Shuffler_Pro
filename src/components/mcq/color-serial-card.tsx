@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, ChevronDown, Download, PaintBucket, Shuffle, Info, ListTree } from "lucide-react";
-import type { ColorAnalysis, DetectedColor, SerialScheme, SectionOutlineItem } from "@/lib/mcq/color-serial";
+import type { ColorAnalysis, DetectedColor, SerialScheme } from "@/lib/mcq/color-serial";
 import { sectionOutlineOf } from "@/lib/mcq/color-serial";
 import type { DownloadFormat } from "@/lib/mcq/pdf-export";
 import { DownloadFormatToggle } from "@/components/mcq/download-format-toggle";

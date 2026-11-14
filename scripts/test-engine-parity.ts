@@ -40,16 +40,6 @@ function ok(cond: boolean, name: string) {
     console.error("  ✗ FAIL:", name);
   }
 }
-/** নরম-সতর্কতা নয় — রিডাউনলোডের ভিতরের সিরিয়াল-নম্বর অবশ্যই মিলতে হবে। */
-function warn(cond: boolean, name: string) {
-  if (cond) {
-    passed++;
-  } else {
-    warned++;
-    console.warn("  ⚠ WARN (সংখ্যা ঠিক, নম্বর আলাদা):", name);
-  }
-}
-
 /** কোথায় কী আছে: ট্র্যাকড ফিক্সচার (সবসময়) + ইউজারের Format/ ফোল্ডার (থাকলে) */
 const dirs = ["scripts/fixtures", "Format"];
 const files: string[] = [];
@@ -66,9 +56,6 @@ if (!files.length) {
 
 console.log("== ENGINE PARITY — এক ফাইলে তিন মোডের প্রশ্ন-সংখ্যা ==");
 console.log("serial | redownload | shuffle | file");
-
-/** প্রশ্ন-টেক্সটের নরমালাইজড কী (whitespace-fold) — সেট তুলনার জন্য */
-const norm = (t: string) => t.replace(/\s+/g, " ").trim();
 
 for (const file of files) {
   let xml: string;

@@ -16,7 +16,7 @@ const ok = (cond: boolean, name: string, extra = "") => {
 
 // ---- ভুয়া canvas: gapRows-এর সারি সাদা (255), বাকি সব কালো (0) ----
 type FakeCtx = { getImageData: (x: number, y: number, w: number, h: number) => { data: Uint8ClampedArray } };
-function fakeCanvas(w: number, h: number, gapRows: Set<number>, ctxImpl?: FakeCtx | null | "throw") {
+function fakeCanvas(w: number, h: number, _gapRows: Set<number>, ctxImpl?: FakeCtx | null | "throw") {
   return {
     width: w,
     height: h,
@@ -27,7 +27,7 @@ function fakeCanvas(w: number, h: number, gapRows: Set<number>, ctxImpl?: FakeCt
     },
   } as unknown as HTMLCanvasElement;
 }
-function ctxWithGaps(w: number, gapRows: Set<number>): FakeCtx {
+function ctxWithGaps(_w: number, gapRows: Set<number>): FakeCtx {
   return {
     getImageData: (_x: number, y: number, ww: number, _h: number) => {
       const data = new Uint8ClampedArray(ww * 4);
