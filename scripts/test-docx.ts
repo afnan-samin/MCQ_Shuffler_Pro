@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // DOCX pipeline unit tests — আসল আপলোড করা ফাইল দিয়ে যাচাই
 // রান: bun run scripts/test-docx.ts
 // ============================================================
@@ -18,6 +18,7 @@ const { parseDocxXml, renumberSerialPara, extractParaText, extractParaRuns, runs
 );
 const { YEAR_GUARD_MAX, YEAR_GUARD_MIN } = await import("../src/lib/mcq/limits");
 const { buildShuffledXml, englishSetName } = await import("../src/lib/mcq/docx-exporter");
+const { loadDocxXmlCached, isValidDocxZip } = await import("../src/lib/mcq/file-pipeline");
 
 let passed = 0;
 let failed = 0;
@@ -666,6 +667,52 @@ console.log("\n== 23) rich run extraction (removed-headers preview) ==");
   );
   ok(plainB.length === 3 && plainB[0].text === "one", "23: default mode run splitting unchanged");
 }
+
+console.log("\n== 24) Staging xml cache (loadDocxXmlCached + isValidDocxZip) ==");
+{
+  // Bun has no FileReader, which JSZip needs for File/Blob input; install the
+  // same minimal shim test-multi-docx.ts uses (lib code stays untouched).
+  class FileReaderShim {
+    result: ArrayBuffer | null = null;
+    error: unknown = null;
+    onload: ((e: { target: FileReaderShim }) => void) | null = null;
+    onerror: ((e: { target: FileReaderShim }) => void) | null = null;
+    readAsArrayBuffer(blob: Blob): void {
+      blob
+        .arrayBuffer()
+        .then((buf) => {
+          this.result = buf;
+          this.onload?.({ target: this });
+        })
+        .catch((err: unknown) => {
+          this.error = err;
+          this.onerror?.({ target: this });
+        });
+    }
+  }
+  (globalThis as unknown as Record<string, unknown>).FileReader = FileReaderShim;
+
+  const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  const docXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${W}"><w:body><w:p><w:r><w:t>cache probe</w:t></w:r></w:p></w:body></w:document>`;
+  // Minimal valid docx zip: word/document.xml at the right path
+  const z = new JSZip();
+  z.file("word/document.xml", docXml);
+  const f = new File([await z.generateAsync({ type: "arraybuffer" })], "cache-probe.docx");
+  const xml1 = await loadDocxXmlCached(f);
+  const xml2 = await loadDocxXmlCached(f);
+  ok(xml1 === xml2, "24: two loadDocxXmlCached calls for the same File return identical xml");
+  ok(xml1 === docXml, "24: cached xml is the word/document.xml content");
+  ok((await isValidDocxZip(f)) === true, "24: isValidDocxZip true for the cached File (no re-unzip)");
+  // Zip without word/document.xml must stay invalid
+  const zBad = new JSZip();
+  zBad.file("notes.txt", "not a docx");
+  const bad = new File([await zBad.generateAsync({ type: "arraybuffer" })], "bad.docx");
+  ok((await isValidDocxZip(bad)) === false, "24: zip without word/document.xml still reported invalid");
+  // Non-zip bytes with a .docx name must stay invalid too
+  const fake = new File([new TextEncoder().encode("plain text, not a zip")], "fake.docx");
+  ok((await isValidDocxZip(fake)) === false, "24: non-zip bytes still reported invalid");
+}
+
 console.log(`\n========================================`);
 console.log(`ফলাফল: ${passed} পাস, ${failed} ফেল`);
 console.log(`========================================\n`);

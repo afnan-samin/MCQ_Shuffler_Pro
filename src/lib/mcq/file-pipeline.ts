@@ -33,7 +33,7 @@ export const DOCX_EXT_RE = /\.docx$/i;
 const xmlCache = new Map<File, string>();
 const XML_CACHE_MAX = 8;
 
-async function loadDocxXmlCached(f: File, onProgress?: ZipProgress): Promise<string> {
+export async function loadDocxXmlCached(f: File, onProgress?: ZipProgress): Promise<string> {
   const hit = xmlCache.get(f);
   if (hit !== undefined) {
     // LRU রিফ্রেশ: সদ্য-ব্যবহৃত এন্ট্রি শেষে সরিয়ে দিই
@@ -58,6 +58,8 @@ async function loadDocxXmlCached(f: File, onProgress?: ZipProgress): Promise<str
  * A renamed .zip/.txt/.pdf with a .docx extension fails here.
  */
 export async function isValidDocxZip(file: Blob, _onProgress?: ZipProgress): Promise<boolean> {
+  // Cached xml proves the zip opened and word/document.xml exists — skip the re-unzip.
+  if (file instanceof File && xmlCache.has(file)) return true;
   try {
     const zip = await JSZip.loadAsync(file);
     return !!zip.file("word/document.xml");
