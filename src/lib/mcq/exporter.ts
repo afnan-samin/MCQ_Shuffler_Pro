@@ -83,7 +83,15 @@ export function runsForLine(line: string, opts: ExportOptions): LineRun[] {
   const base = fontForLine(line, opts);
   const segs = splitLineSegments(line);
   if (segs.length === 0) return [{ text: line, font: base, enc: "neutral" }];
-  if (segs.length === 1) return [{ text: line, font: base, enc: segs[0].enc }];
+  // single segment: font follows the segment encoding
+  if (segs.length === 1) {
+    const s = segs[0];
+    let font = base;
+    if (s.enc === "bijoy") font = opts.legacyFont;
+    else if (s.enc === "unicode") font = opts.unicodeFont;
+    else if (s.enc === "english") font = opts.englishFont;
+    return [{ text: line, font, enc: s.enc }];
+  }
   return segs.map((s) => {
     let font = base;
     if (s.enc === "bijoy") font = opts.legacyFont;
