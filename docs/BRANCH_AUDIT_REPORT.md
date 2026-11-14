@@ -19,12 +19,12 @@
 | Branches `READY AFTER FIX` (merge-order / conflict resolution needed) | 3 — P04, P05, P06 |
 | Branches `BLOCKED` | 0 |
 | Total fixes applied by this audit | 2 conflict resolutions (test files only), both verified |
-| Code-level defects found | 1 serious candidate (P05 Bijoy topic label) → `NEEDS REVIEW`; 3 documented limitations |
+| Code-level defects found | 1 serious candidate (P05 Bijoy topic label) → `NEEDS REVIEW`, later **FIXED** (§13); 3 documented limitations |
 | Full sequential integration (P04→P11) | **PASS** — `test:all` exit 0, `tsc --noEmit` exit 0, `lint` 0 errors, `node --check public/sw.js` exit 0 |
 | Real-file evidence | 24 `.docx` files, 9,300 questions, 9,155 answered questions, 9,279 generated answer lines |
 | `main` working tree | untouched (19 pre-existing modified files still present) |
 
-**Bottom line:** all 8 branches are functionally sound and can be merged, **in the order P04 → P05 → P06 → P07 → P08 → P09 → P10 → P11**, provided the two test-file conflicts documented in §6 are resolved as described. The P05 topic-label gap (§7, I-05) is a pre-existing shared-regex limitation rather than a regression, so it does **not** block the merge, but it should be tracked.
+**Bottom line:** all 8 branches are functionally sound and can be merged, **in the order P04 → P05 → P06 → P07 → P08 → P09 → P10 → P11**, provided the two test-file conflicts documented in §6 are resolved as described. The P05 topic-label gap (§7, I-05) was a pre-existing shared-regex limitation rather than a regression, so it did **not** block the merge; it has since been fixed as a follow-up (§13).
 
 ---
 
@@ -181,7 +181,7 @@ Status vocabulary: **READY** = no action needed; **READY AFTER FIX** = mergeable
 | I-02 | P05 `feat/header-and-topic-toggles` | `src/lib/mcq/redownload.ts`, `scripts/test-redownload-splits.ts` | Branch base `1e96bba`; merging alone conflicts with `main`'s P02/P03 edits in the same region. | Would require resolving core-engine hunks if merged out of order. | Merge after P04 → **auto-merges cleanly** (integration `dee7e71`); `test:redownload` 92/0. | **FIXED** (merge order) |
 | I-03 | P06 `feat/removed-headers-card` | `src/lib/mcq/redownload.ts`, `src/lib/mcq/docx-xml.ts`, `scripts/test-docx.ts`, `scripts/test-redownload.ts` | Same base problem, one phase deeper. | Same as I-02. | Merge after P05 → **auto-merges cleanly** (integration `27a689c`); `test:docx` 120/0, `test:redownload` 108/0. | **FIXED** (merge order) |
 | I-04 | P10 `fix/staging-xml-cache` | `scripts/test-docx.ts` | P06 and P10 independently add a test section numbered `23`. | Test-only conflict, no production impact. | Renumber P10's section (and its `"23:` labels) to `24` during merge; verified `test:docx` 125/0. | **FIXED** (integration `1700bb1`) |
-| I-05 | P05 (feature gap, shared with `reference.ts`) | `TOPIC_LABEL_RE` in `src/lib/mcq/redownload.ts`; `SOURCE_LABEL_LINE_RE` in `src/lib/mcq/reference.ts` | Topic keyword list includes Bijoy `UwcK`, but both regexes require an ASCII `:`; Bijoy files write the label as `UwcKt` (Bijoy colon = `t`). Those lines fall through to `kind = "options"`. | 44 in-block topic lines in 2 real files (`Chemistry 2nd Ch-05 SET-A.docx` 31, `Weekly test 2 SET A,B,C.docx` 13) cannot be removed by the Topic toggle; they are removed by Options OFF instead. No content loss; toggle semantics wrong for those lines. | **Not changed** (would alter shared regexes used by two engines — out of the 8 branches' file boundaries and a parity risk). Recommended follow-up: accept an optional Bijoy-colon form for `UwcK` in both regexes, with a parity test. | **NEEDS REVIEW** |
+| I-05 | P05 (feature gap, shared with `reference.ts`) | `TOPIC_LABEL_RE` in `src/lib/mcq/redownload.ts`; `SOURCE_LABEL_LINE_RE` in `src/lib/mcq/reference.ts` | Topic keyword list includes Bijoy `UwcK`, but both regexes require an ASCII `:`; Bijoy files write the label as `UwcKt` (Bijoy colon = `t`). Those lines fall through to `kind = "options"`. | 44 in-block topic lines in 2 real files (`Chemistry 2nd Ch-05 SET-A.docx` 30, `Weekly test 2 SET A,B,C.docx` 14) cannot be removed by the Topic toggle; they are removed by Options OFF instead. No content loss; toggle semantics wrong for those lines. | **Fixed after the merge** on `fix/topic-label-bijoy` (merge `1a3b82b`, §13): new shared `TOPIC_LABEL_BIJOY = "UwcKt\\b"` in `docx-xml.ts`, accepted by both regexes; new tests in `test:redownload` (114/0) and `test:reference` (53/0). Real-file re-probe: all 44 lines now `kind === "topic"`. | **FIXED** |
 | I-06 | P06 | `collectHeaderEntries` → `extractParaRuns(el, {rich: true})` in `src/lib/mcq/redownload.ts` | Bold/italic/size come only from direct run properties (`w:rPr`); formatting inherited from `styles.xml` (paragraph/character styles) is not resolved. | Removed-headers card preview may render a header that is bold only via its style as non-bold. **Preview cosmetics only** — the document output is unaffected and removal is correct. | Not changed (needs `styles.xml` access, outside P06's scope). Documented as a known limitation. | **NEEDS REVIEW** (low) |
 | I-07 | none of the 8 (pre-existing) | `OPTION_MARKER_RE` in `src/lib/mcq/docx-xml.ts` | Option labels are letter-based only (`K/L/M/N`, `ক-ঘ`, `a-d`); options numbered `1. 2. 3. 4.` are not recognised (a numeric label collides with the serial-number parser). | Files using numeric option labels are not parsed as MCQs. | Not a P04–P11 deliverable and not a regression (behaviour identical on `main`). No change. | **OUT OF SCOPE** |
 | I-08 | P04 | `buildAnswerLineParas` / `findOptionSpan` | The answer line clones only the paragraph that contains the answer option. If an option's text were split across two Word paragraphs, only the first would appear in `"Ans: …"`. | Cosmetic truncation of the answer line in that rare layout. Option text is NOT lost from the document (other parts still carry it). | Real-file probe found **0 confirmed** truncations in 24 files: all candidate "continuation" paragraphs turned out to be question-text continuations, group headings or explanation lines, not option text. The prompt explicitly asks for *one* paragraph per answer, so this is intended behaviour. | **NEEDS REVIEW** (accept as-is recommended) |
@@ -209,7 +209,7 @@ Initial probing flagged "header text still present" in 5 files; a second pass sh
 
 ### 8.2 P05 Topic toggle
 
-`topic: false` removed **all** `kind === "topic"` lines in every file (0 left in the output). The 44 Bijoy-label lines that are *not* classified as topic are I-05.
+`topic: false` removed **all** `kind === "topic"` lines in every file (0 left in the output). At audit time 44 Bijoy-label lines were *not* classified as topic (I-05); after the follow-up fix (§13) all 44 are classified and removed.
 
 ### 8.3 Card wiring (P06)
 
@@ -297,8 +297,23 @@ Every merge was verified before committing: `tsc --noEmit` exit 0, `lint` 0 erro
 | `eslint .` | exit 0 — 0 errors, 22 warnings (pre-existing / cleanup style) |
 | `node --check public/sw.js` | exit 0 |
 | `test:all` | exit 0 — mcq 87, docx 125, color 104, multi 70, font 144, labels 32, redownload 108, splits 85, weekly 9, reference 51, doc1 27, export 10, pdf 11, engines 104 (0 failures anywhere) |
-| Working tree | clean; local `main` is 9 commits ahead of `origin/main`, not pushed |
+| Working tree | clean; the 20 local commits were then pushed as `6ac98da..68dc82e main -> main` (owner-approved) |
 
 ### 12.4 Status after merge
 
-P04, P05 and P06 change from `READY AFTER FIX` to **READY (merged and verified)**. P07–P11 remain `READY (merged and verified)`. The open items from §7 are unchanged: I-10 is resolved by commit `401aa97`; I-05 and I-06 remain `NEEDS REVIEW` follow-ups.
+P04, P05 and P06 change from `READY AFTER FIX` to **READY (merged and verified)**. P07–P11 remain `READY (merged and verified)`. I-10 is resolved by commit `401aa97`; I-05 is resolved by the follow-up in §13; I-06 remains a `NEEDS REVIEW` (low, preview-only) follow-up.
+
+---
+
+## 13. I-05 follow-up fix — Bijoy colon topic label (2026-11-14)
+
+| Step | Detail |
+|---|---|
+| Branch | `fix/topic-label-bijoy`, created from `main` at `68dc82e` |
+| Root cause | In SutonnyMJ (Bijoy) the colon glyph is the letter `t`, so the corpus writes the topic label both as `UwcK:` (29 lines) and `UwcKt` (43 lines). Both regexes required an ASCII `:` after the keyword, so `UwcKt …` lines fell through to question/option classification. |
+| Change | `src/lib/mcq/docx-xml.ts`: new shared `export const TOPIC_LABEL_BIJOY = "UwcKt\\b"`. `redownload.ts` `TOPIC_LABEL_RE` and `reference.ts` `SOURCE_LABEL_LINE_RE` now accept `(?:(?:KEYWORDS|Ref|Reference)\s*:|UwcKt\b)` — one definition, no drift between the two engines. |
+| Tests added | `scripts/test-redownload.ts` §15: both `UwcKt …` and `UwcK: …` in-block lines are `kind === "topic"` and inside the block; Topic ON keeps both, OFF removes both, question/answer/explanation untouched (+6 tests → 114). `scripts/test-reference.ts`: two `UwcKt …` whole-line source-label positives (+2 tests → 53). |
+| Verification | `tsc --noEmit` 0; `eslint .` 0 errors (22 pre-existing warnings); `test:redownload` 114/0; `test:reference` 53/0; `test:splits` 85/0; `test:engines` 104/0. |
+| Real-file re-probe | 24 `Format/` docx: 44/44 `UwcK(t|:)` lines now `kind === "topic"` (`Chemistry 2nd Ch-05 SET-A.docx` 30/30, `Weekly test 2 SET A,B,C.docx` 14/14); 0 misses. |
+| Merge | `git merge --no-ff fix/topic-label-bijoy` → merge commit `1a3b82b` on `main`. |
+| Final gate on `main` | `test:all` exit 0 — mcq 87, docx 125, color 104, multi 70, font 144, labels 32, **redownload 114**, splits 85, weekly 9, **reference 53**, doc1 27, export 10, pdf 11, engines 104. |
