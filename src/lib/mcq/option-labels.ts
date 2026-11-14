@@ -221,6 +221,55 @@ export function relabelOptionPara(p: Element, s: OptionLabelSettings): number {
 }
 
 /**
+ * Additive helper: a paragraph's tab-visible text (w:t joined + run-level bare
+ * w:tab as \t — the same offset space relabelOptionPara scans) plus a mapper
+ * back to the w:t-joint offsets used by span edits. Null when no text at all.
+ */
+export function paraTabbedText(p: Element): {
+  tabbed: string;
+  toJoint: (x: number) => number;
+} | null {
+  const parts: string[] = [];
+  const tabs: number[] = [];
+  let tabbedPos = 0;
+  const walk = (node: Element): void => {
+    for (const child of Array.from(node.children)) {
+      if (child.localName === "t" && child.namespaceURI === W_NS) {
+        const text = child.textContent ?? "";
+        parts.push(text);
+        tabbedPos += text.length;
+      } else if (
+        child.localName === "tab" &&
+        child.namespaceURI === W_NS &&
+        node.localName === "r" &&
+        child.attributes.length === 0
+      ) {
+        // run-level bare tab (not a pPr tab-stop — those carry attributes)
+        tabs.push(tabbedPos);
+        parts.push("\t");
+        tabbedPos += 1;
+      } else if (child.localName === "oMath" || child.localName === "oMathPara") {
+        continue;
+      } else if (child.children.length) {
+        walk(child);
+      }
+    }
+  };
+  walk(p);
+  const tabbed = parts.join("");
+  if (!tabbed) return null;
+  const toJoint = (x: number): number => {
+    let c = 0;
+    for (const t of tabs) {
+      if (t < x) c++;
+      else break;
+    }
+    return x - c;
+  };
+  return { tabbed, toJoint };
+}
+
+/**
  * Persisted সেটিংস হাইড্রেশন-গার্ড — অজানা স্টাইল/সেপারেটর ড্রপ করে
  * ডিফল্টে ফেরায় (Radix Select খালি ভ্যালু রেন্ডার না করে)।
  */

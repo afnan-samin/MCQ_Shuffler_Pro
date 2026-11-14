@@ -25,7 +25,8 @@ import {
   YEAR_GUARD_WORD_RE,
 } from "./limits";
 import type { ZipProgress } from "./docx-xml";
-import { relabelOptionPara, type OptionLabelSettings } from "./option-labels";
+import { relabelOptionPara, paraTabbedText, type OptionLabelSettings } from "./option-labels";
+import { KNOWN_LATIN_FONT_VALUE_RE } from "./font-remap";
 import { findRefTokens } from "./reference";
 import {
   ANSWER_TAIL_RE,
@@ -935,6 +936,8 @@ export function buildRedownloadXml(
   selIds.forEach((qid, idx) => outPos.set(qid, idx + 1));
 
   const expandActive = opts.expandAnswer && !opts.partSel.options && opts.partSel.answer;
+  // Latin font for the generated "Ans: " run — surveyed once over the source paras
+  const ansLatinFont = expandActive ? dominantLatinFont(kids) : "Times New Roman";
   // "Topic & Header" — ডিফল্ট true (পুরোনো আউটপুট অপরিবর্তিত)
   const keepTopic = opts.topicHeader !== false;
   // B-টাইমার `*`-উত্তর-মার্কার — অপশন ও উত্তর দুটোই থাকলে সোর্সের `*` হুবহু
@@ -1070,9 +1073,11 @@ export function buildRedownloadXml(
       }
     }
 
-    // উত্তর-বিস্তার: অপশন বাদ + উত্তর আছে + অক্ষর-উত্তর ("উঃ ক")
+    // উত্তর-বিস্তার: অপশন বাদ + উত্তর আছে + অক্ষর-উত্তর ("উঃ ক") —
+    // নতুন ফরম্যাট: [tab][bold "Ans: "][label][verbatim অপশন-রান]
+    let ansExtras: Element[] = [];
     if (kind === "answer" && expandActive) {
-      expandAnswerPara(clone, q, kids, parse);
+      ansExtras = buildAnswerLineParas(clone, q, kids, parse, opts.optionLabels ?? null, ansLatinFont);
     }
 
     if (kind === "options" && opts.optionLabels?.enabled) {
@@ -1080,23 +1085,27 @@ export function buildRedownloadXml(
     }
 
     if (keep) body.appendChild(clone);
+    for (const ep of ansExtras) body.appendChild(ep);
 
     // টেইল-অংশ (গ্লুড উত্তর / টেইল-রেফারেন্স) — নিজের অংশ-টিক অনুযায়ী
     if (tail && split && opts.partSel[split.kind]) {
-      if (split.kind === "answer" && expandActive) {
-        expandAnswerPara(tail, q, kids, parse);
-      }
+      const tailExtras =
+        split.kind === "answer" && expandActive
+          ? buildAnswerLineParas(tail, q, kids, parse, opts.optionLabels ?? null, ansLatinFont)
+          : [];
       body.appendChild(tail);
+      for (const ep of tailExtras) body.appendChild(ep);
     }
 
     // `*`-উত্তর-লাইন জেনারেট — শেষ অপশন-প্যারার ঠিক পরে "Dt X" (+বিস্তার থাকলে "Dt 100")
     // (অপশন ON থাকলে জেনারেট নয় — সোর্সের `*`-ই উত্তর-চিহ্ন হিসেবে থাকে)
     if (q.answerFromStar && opts.partSel.answer && !opts.partSel.options && lastOptPara.get(bid) === i) {
       const starPara = makeStarAnswerPara(doc, src, q.answer ?? "");
-      if (expandActive) {
-        expandAnswerPara(starPara, q, kids, parse);
-      }
+      const starExtras = expandActive
+        ? buildAnswerLineParas(starPara, q, kids, parse, opts.optionLabels ?? null, ansLatinFont)
+        : [];
       body.appendChild(starPara);
+      for (const ep of starExtras) body.appendChild(ep);
     }
   }
 
@@ -1435,6 +1444,337 @@ function appendPlainTextRun(
   t.textContent = text;
   r.appendChild(t);
   answerClone.appendChild(r);
+}
+
+// ---------- উত্তর-লাইন ফরম্যাট (Options OFF + Answer ON) ----------
+
+/** উত্তর-লাইন প্রিফিক্স — সবসময় ইংরেজি শব্দ, ফাইল যা-ই ব্যবহার করুক */
+const ANS_PREFIX_TEXT = "Ans: ";
+
+/**
+ * ডকুমেন্টের explicit-Latin রানগুলোর সবচেয়ে বেশি ব্যবহৃত ফন্ট ("Ans: " রানের
+ * জন্য) — fallback "Times New Roman"। পরিচিত Latin-ফন্ট বহনকারী টেক্সট-রানই
+ * গণনায় আসে (Bijoy/অজানা ফন্টের রান নয়)।
+ */
+function dominantLatinFont(kids: Element[]): string {
+  const counts = new Map<string, number>();
+  for (const el of kids) {
+    for (const r of Array.from(el.getElementsByTagNameNS(W_NS, "r"))) {
+      const text = Array.from(r.getElementsByTagNameNS(W_NS, "t"))
+        .map((t) => t.textContent ?? "")
+        .join("");
+      if (!text) continue;
+      const rf = r.getElementsByTagNameNS(W_NS, "rFonts")[0];
+      if (!rf) continue;
+      const font =
+        rf.getAttributeNS(W_NS, "ascii") ||
+        rf.getAttributeNS(W_NS, "hAnsi") ||
+        rf.getAttribute("w:ascii") ||
+        "";
+      if (!font || !KNOWN_LATIN_FONT_VALUE_RE.test(font.trim())) continue;
+      counts.set(font, (counts.get(font) ?? 0) + 1);
+    }
+  }
+  let best: string | null = null;
+  let bestN = 0;
+  for (const [font, n] of counts) {
+    if (n > bestN) {
+      best = font;
+      bestN = n;
+    }
+  }
+  return best ?? "Times New Roman";
+}
+
+/** অপশন-লেবেল টোকেন যেমন লেখা আছে: "(ক)" / "[a]" / "C." / "ক)" / "M:" ইত্যাদি */
+function optionLabelTokenRe(label: string): RegExp {
+  const esc = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\(\\s*${esc}\\s*\\)|\\[\\s*${esc}\\s*\\]|${esc}\\s*[.।):]`, "g");
+}
+
+/** টোকেন-ম্যাচ অপশন-বাউন্ডারিতে বসেছে কি না (আগে লাইন-শুরু/স্পেস/ট্যাব/ব্র্যাকেট/`*`) */
+function tokenAtBoundary(tabbed: string, re: RegExp): RegExpExecArray | null {
+  for (const m of tabbed.matchAll(re)) {
+    const prev = m.index > 0 ? tabbed[m.index - 1] : "";
+    if (m.index === 0 || /[\s\(\[*]/.test(prev)) return m;
+  }
+  return null;
+}
+
+/**
+ * `rest`-এ পরের অপশন-মার্কারের কাট-পজিশন (scanOptions-এর বাউন্ডারি-নিয়মে:
+ * সেপারেটেড রূপে অক্ষরের পরে [.।):]; ডটলেস রূপ শুধু ট্যাব/`*`-এর পরে)।
+ * ব্র্যাকেট/`*` পরের অপশনের অংশ — কাট তার আগে বসে। না পেলে null।
+ */
+function nextOptionMarkerAt(rest: string): number | null {
+  for (let i = 0; i < rest.length; i++) {
+    if (!/[KLMNklmnকখগঘa-dA-D]/.test(rest[i]!)) continue;
+    const prev = i > 0 ? rest[i - 1]! : "";
+    if (!prev || !/[\s\(\[*]/.test(prev)) continue;
+    const next = i + 1 < rest.length ? rest[i + 1]! : "";
+    if (/[.।):]/.test(next)) return prev === "(" || prev === "[" || prev === "*" ? i - 1 : i;
+    if (/[\s\t]/.test(next) && (prev === "\t" || prev === "*")) return i;
+  }
+  return null;
+}
+
+/** অপশন-টেক্সটের শেষ (tab-দৃশ্য স্পেসে): পরের মার্কার বা গ্লুড উত্তর-টেইল */
+function optionSpanEnd(tabbed: string, from: number): number {
+  const rest = tabbed.slice(from);
+  let cut = rest.length;
+  const tailM = ANSWER_TAIL_RE.exec(rest);
+  if (tailM && isRealAnswerTail(tailM, rest)) cut = Math.min(cut, tailM.index);
+  const mkAt = nextOptionMarkerAt(rest);
+  if (mkAt !== null) cut = Math.min(cut, mkAt);
+  return from + cut;
+}
+
+/** options-কাইন্ড body-child-এর অপশন-ধারী প্যারা (টেবিল হলে সেল-প্যারাগুলো) */
+function optionParaCandidates(el: Element): Element[] {
+  if (el.localName === "tbl") return Array.from(el.getElementsByTagNameNS(W_NS, "p"));
+  return [el];
+}
+
+/**
+ * ব্লকে `label`-অপশনের প্যারা + w:t-জয়েন্ট স্প্যান খোঁজা: লেবেল-টোকেন (paren/
+ * bracket/bare — যেমন লেখা) থেকে অপশন-টেক্সটের শেষ পর্যন্ত। স্ক্যান tab-দৃশ্য
+ * স্পেসে (মাঝ-সারির লেবেল w:tab-এর পরে থাকে), কাট w:t-জয়েন্ট স্পেসে বসে।
+ */
+function findOptionSpan(
+  q: RdQuestion,
+  kids: Element[],
+  parse: RdParseResult,
+  label: string
+): { el: Element; start: number; end: number } | null {
+  const tokRe = optionLabelTokenRe(label);
+  for (let j = q.blockStart; j <= q.blockEnd; j++) {
+    if (parse.kinds[j] !== "options") continue;
+    for (const cand of optionParaCandidates(kids[j])) {
+      const tb = paraTabbedText(cand);
+      if (!tb) continue;
+      const m = tokenAtBoundary(tb.tabbed, tokRe);
+      if (!m) continue;
+      const from = m.index + m[0].length;
+      return {
+        el: cand,
+        start: tb.toJoint(m.index),
+        end: tb.toJoint(optionSpanEnd(tb.tabbed, from)),
+      };
+    }
+  }
+  return null;
+}
+
+/**
+ * রান স্প্যানের শেষ-প্রান্তে ফাঁকা রান (শুধু rPr/tab/br/সাদা-স্পেস w:t — কোনো
+ * drawing/সিম্বল/লেখা নেই) — স্প্যান-বাউন্ডারিতে পরের অপশনের আলাদা ট্যাব
+ * বা দুই-রানে ভাগ-হওয়া ট্রেলিং স্পেস এভাবে জমে; শেষে সত্যিকারের শেষ
+ * w:t-র ট্রেলিং স্পেস কাটা হয়।
+ */
+function trimSpanTrailing(span: Element): void {
+  const isTailJunkRun = (r: Element): boolean => {
+    for (const c of Array.from(r.children)) {
+      const ln = c.localName;
+      if (ln === "rPr" || ln === "tab" || ln === "br") continue;
+      if (ln === "t") {
+        if ((c.textContent ?? "").trim() !== "") return false;
+        continue;
+      }
+      return false; // drawing / sym / anything else — real content
+    }
+    return true;
+  };
+  for (;;) {
+    const runs = Array.from(span.childNodes).filter(
+      (c) => c.nodeType === 1 && (c as Element).localName === "r"
+    ) as Element[];
+    const last = runs[runs.length - 1];
+    if (!last || !isTailJunkRun(last)) break;
+    span.removeChild(last);
+  }
+  const ts = span.getElementsByTagNameNS(W_NS, "t");
+  const lastT = ts.length ? ts[ts.length - 1] : null;
+  if (lastT?.textContent) {
+    const v = lastT.textContent.replace(/\s+$/, "");
+    if (v !== lastT.textContent) {
+      lastT.textContent = v;
+      if (/^\s|\s$/.test(v)) lastT.setAttribute("xml:space", "preserve");
+    }
+  }
+}
+
+/**
+ * `el`-এর ক্লোনে w:t-জয়েন্ট টেক্সটের [start, end) অংশটুকু রাখা — কাট
+ * splitParaAtOffset-এর মেশিনারিতেই, তাই রান-বাউন্ডারি/মাঝ-রান ভাঙা নিরাপদ,
+ * সাব/সুপারস্ক্রিপ্ট-ইকুয়েশন-ছবি সব হুবহু বঁচে থাকে।
+ */
+function extractParaSpan(el: Element, start: number, end: number): Element | null {
+  if (start < 0 || end <= start) return null;
+  const clone = el.cloneNode(true) as Element;
+  const stream: Element[] = [];
+  collectTsLocal(clone, stream);
+  let total = 0;
+  for (const t of stream) total += (t.textContent ?? "").length;
+  if (end > total) return null;
+  if (end < total) splitParaAtOffset(clone, end);
+  if (start > 0) {
+    const span = splitParaAtOffset(clone, start);
+    if (span) return span;
+  }
+  return clone;
+}
+
+/** উত্তর-প্যারার নিজের রান (প্রিফিক্স/অক্ষর/ট্যাব) ফেলা — pPr + বুকমার্ক থাকে */
+function clearAnswerRuns(p: Element): void {
+  for (const child of Array.from(p.childNodes)) {
+    if (child.nodeType === 1) {
+      const ln = (child as Element).localName;
+      if (ln === "pPr" || ln === "bookmarkStart" || ln === "bookmarkEnd") continue;
+    }
+    p.removeChild(child);
+  }
+}
+
+/** রানের w:sz/w:szCs ভ্যালু (না থাকলে null) — "Ans: " রানে কপি হয় */
+function runSizeOf(r: Element | null): { sz: string | null; szCs: string | null } {
+  if (!r) return { sz: null, szCs: null };
+  const rPr = Array.from(r.children).find((c) => c.localName === "rPr") ?? null;
+  if (!rPr) return { sz: null, szCs: null };
+  const valOf = (name: string): string | null => {
+    const e = rPr.getElementsByTagNameNS(W_NS, name)[0];
+    if (!e) return null;
+    return e.getAttributeNS(W_NS, "val") || e.getAttribute("w:val") || null;
+  };
+  return { sz: valOf("sz"), szCs: valOf("szCs") };
+}
+
+/**
+ * উত্তর-লাইনের স্টাইল-রান: bold, ডকুমেন্টের Latin ফন্ট, সাইজ প্রথম ক্লোন করা
+ * অপশন-রান থেকে; `tab` হলে রানের শুরুতে [TAB], `text` দিলে তার পরে লেখা।
+ */
+function ansStyleRun(
+  doc: Document,
+  latinFont: string,
+  sz: { sz: string | null; szCs: string | null },
+  tab: boolean,
+  text: string | null
+): Element {
+  const r = doc.createElementNS(W_NS, "w:r");
+  const rPr = doc.createElementNS(W_NS, "w:rPr");
+  const rFonts = doc.createElementNS(W_NS, "w:rFonts");
+  rFonts.setAttributeNS(W_NS, "w:ascii", latinFont);
+  rFonts.setAttributeNS(W_NS, "w:hAnsi", latinFont);
+  rPr.appendChild(rFonts);
+  rPr.appendChild(doc.createElementNS(W_NS, "w:b"));
+  if (sz.sz) {
+    const e = doc.createElementNS(W_NS, "w:sz");
+    e.setAttributeNS(W_NS, "w:val", sz.sz);
+    rPr.appendChild(e);
+  }
+  if (sz.szCs) {
+    const e = doc.createElementNS(W_NS, "w:szCs");
+    e.setAttributeNS(W_NS, "w:val", sz.szCs);
+    rPr.appendChild(e);
+  }
+  r.appendChild(rPr);
+  if (tab) r.appendChild(doc.createElementNS(W_NS, "w:tab"));
+  if (text !== null) {
+    const t = doc.createElementNS(W_NS, "w:t");
+    t.setAttribute("xml:space", "preserve");
+    t.textContent = text;
+    r.appendChild(t);
+  }
+  return r;
+}
+
+/** উত্তর-লাইনে একটা উত্তরের কনটেন্ট বসানো: verbatim অপশন-রান, নয়তো লেবেল-রান */
+function appendAnswerContent(
+  target: Element,
+  seg: Element | string,
+  doc: Document,
+  latinFont: string,
+  sz: { sz: string | null; szCs: string | null }
+): void {
+  if (typeof seg === "string") {
+    target.appendChild(ansStyleRun(doc, latinFont, sz, false, seg));
+    return;
+  }
+  for (const child of Array.from(seg.childNodes)) {
+    if (child.nodeType !== 1) continue;
+    const el = child as Element;
+    const ln = el.localName;
+    if (ln === "pPr" || ln === "bookmarkStart" || ln === "bookmarkEnd") continue;
+    target.appendChild(el.cloneNode(true));
+  }
+}
+
+/**
+ * উত্তর-লাইন নতুন ফরম্যাটে লেখা (Options OFF + Answer ON):
+ * প্রথম উত্তর — [TAB][bold "Ans: "][label token][verbatim অপশন-রান];
+ * পরের প্রতিটা উত্তর নিজের প্যারায়, "Ans:" ছাড়া। অপশন-লেখা না পাওয়া গেলে
+ * শুধু লেবেল (fallback)। লেবেল-রিলেবেল ON হলে relabelOptionPara-ই টোকেন
+ * বদলায় — অপশন-লাইনের লেবেলের মতো আচরণ।
+ * রিটার্ন: পরের উত্তর-প্যারাগুলো (প্রথমটা answerClone-এ বসে)।
+ */
+function buildAnswerLineParas(
+  answerClone: Element,
+  q: RdQuestion,
+  kids: Element[],
+  parse: RdParseResult,
+  labelSettings: OptionLabelSettings | null,
+  latinFont: string
+): Element[] {
+  const doc = answerClone.ownerDocument;
+  if (!doc || !q.answer) return [];
+  const letters = q.answer.match(/[KLMNklmnকখগঘa-dA-D1-4]/g) ?? [];
+  if (!letters.length) return [];
+  const slotIdxs = letters.map((ch) => letterIndex(ch));
+  if (slotIdxs.some((v) => v < 0)) return [];
+  const targets = slotIdxs.map((si) => findOptionBySlot(q, si));
+  if (targets.some((t) => !t)) return [];
+
+  // প্রতি উত্তরের কনটেন্ট: verbatim অপশন-স্প্যান (লেবেলসহ) বা লেবেল-only fallback
+  const segs: Array<Element | string> = targets.map((t) => {
+    const span = findOptionSpan(q, kids, parse, t!.label);
+    const ext = span ? extractParaSpan(span.el, span.start, span.end) : null;
+    return ext ?? t!.label;
+  });
+  for (const s of segs) {
+    if (typeof s !== "string") {
+      stripStarMarkers(s);
+      trimParaLeading(s);
+      trimSpanTrailing(s);
+    }
+  }
+
+  // "Ans: " রানের সাইজ — প্রথম ক্লোন করা অপশন-রানেরটা
+  const sz = runSizeOf(
+    typeof segs[0] === "string" ? null : (segs[0] as Element).getElementsByTagNameNS(W_NS, "r")[0] ?? null
+  );
+
+  clearAnswerRuns(answerClone);
+  answerClone.appendChild(ansStyleRun(doc, latinFont, sz, true, ANS_PREFIX_TEXT));
+  appendAnswerContent(answerClone, segs[0]!, doc, latinFont, sz);
+
+  const srcPPr = Array.from(answerClone.children).find((c) => c.localName === "pPr") ?? null;
+  const extras: Element[] = [];
+  for (let i = 1; i < segs.length; i++) {
+    const p = doc.createElementNS(W_NS, "w:p");
+    if (srcPPr) {
+      const pPr = srcPPr.cloneNode(true) as Element;
+      const numPr = pPr.getElementsByTagNameNS(W_NS, "numPr")[0];
+      if (numPr?.parentNode) numPr.parentNode.removeChild(numPr);
+      p.appendChild(pPr);
+    }
+    p.appendChild(ansStyleRun(doc, latinFont, sz, true, null));
+    appendAnswerContent(p, segs[i]!, doc, latinFont, sz);
+    extras.push(p);
+  }
+  if (labelSettings?.enabled) {
+    relabelOptionPara(answerClone, labelSettings);
+    for (const p of extras) relabelOptionPara(p, labelSettings);
+  }
+  return extras;
 }
 
 // ---------- টেক্সট-স্ট্রিম হেল্পার (docx-xml-এর প্যাটার্ন অনুযায়ী) ----------
