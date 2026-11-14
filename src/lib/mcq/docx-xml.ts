@@ -592,6 +592,13 @@ export const REFERENCE_PREFIX_RE =
 export const TOPIC_LABEL_KEYWORDS = "Topic|UwcK|উৎস|উত্স|Source";
 
 /**
+ * Bijoy-encoded "টপিক:" (SutonnyMJ) — the colon glyph is the letter "t", so
+ * the corpus writes both "UwcK:" and "UwcKt". The topic/reference label
+ * regexes accept this form in addition to the ASCII-colon keywords.
+ */
+export const TOPIC_LABEL_BIJOY = "UwcKt\\b";
+
+/**
  * স্লট-ক্রমের DP (K→L→M→N / ক→খ→গ→ঘ / A→B→C→D) — অপশন-লেবেল টোকেনের
  * সেরা রান। প্রতিটা টোকেন নিজের লেবেল-স্লট অথবা টাইপো-রিপিটে ঠিক পরের
  * স্লট (K,L,L,M তে ২য় L=M, ৩য় M=N) পূরণ করে; dp[p] = p-তম স্লটে শেষ

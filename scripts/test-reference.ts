@@ -58,6 +58,9 @@ const positives: Array<[string, string]> = [
   // স্ট্যান্ডঅ্যালোন সোর্স-লেবেল লাইন
   ["Topic: B_vbj cÖ¯‘wZ (nvRvix)", "Topic: B_vbj cÖ¯‘wZ (nvRvix)"],
   ["UwcK : nvmvb m¨vi", "UwcK : nvmvb m¨vi"],
+  // Bijoy কোলন = অক্ষর "t" (SutonnyMJ) — করপাসে "UwcKt" রূপও আছে
+  ["UwcKt mvaviY MwYZ", "UwcKt mvaviY MwYZ"],
+  ["UwcKt †kÖwY Abyhvqx cÖkœ", "UwcKt †kÖwY Abyhvqx cÖkœ"],
 ];
 for (const [line, expected] of positives) {
   const toks = findRefTokens(line);

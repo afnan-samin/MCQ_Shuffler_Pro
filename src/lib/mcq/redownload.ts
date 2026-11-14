@@ -35,6 +35,7 @@ import {
   CASE_FOLD,
   LABEL_FAMS,
   REFERENCE_PREFIX_RE,
+  TOPIC_LABEL_BIJOY,
   TOPIC_LABEL_KEYWORDS,
   W_NS,
   M_NS,
@@ -161,10 +162,14 @@ const OPTION_LEAD_RE =
 // BEKKHA_PREFIX_RE — docx-xml BEKKHA_LINE_RE থেকে ইমপোর্ট (উপরে, alias) —
 // দুই ইঞ্জিন একই রেজেক্স পড়ে, ড্রিফ্টের সুযোগ নেই
 // REFERENCE_PREFIX_RE — docx-xml থেকে ইমপোর্ট (নিচে) — দুই ইঞ্জিন একই রেজেক্স পড়ে
-/** স্ট্যান্ডঅ্যালোন টপিক/উৎস-লেবেল লাইন — "Topic: …", "UwcK: …", "উৎস: …",
- * "Source: …"। কীওয়ার্ড-তালিকা docx-xml TOPIC_LABEL_KEYWORDS (শেয়ার্ড);
- * "Ref/Reference" বাদ (সেগুলো reference-অংশেই থাকে) — topic-অংশ আলাদা। */
-const TOPIC_LABEL_RE = new RegExp(`^\\s*(?:${TOPIC_LABEL_KEYWORDS})\\s*:`, "i");
+/** স্ট্যান্ডঅ্যালোন টপিক/উৎস-লেবেল লাইন — "Topic: …", "UwcK: …", "UwcKt …"
+ * (Bijoy কোলন), "উৎস: …", "Source: …"। কীওয়ার্ড-তালিকা docx-xml
+ * TOPIC_LABEL_KEYWORDS (শেয়ার্ড); "Ref/Reference" বাদ (সেগুলো
+ * reference-অংশেই থাকে) — topic-অংশ আলাদা। */
+const TOPIC_LABEL_RE = new RegExp(
+  `^\\s*(?:(?:${TOPIC_LABEL_KEYWORDS})\\s*:|${TOPIC_LABEL_BIJOY})`,
+  "i"
+);
 
 function countSerialLetterPairs(t: string): number {
   const m = t.match(SERIAL_LETTER_PAIR_RE);
