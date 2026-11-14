@@ -420,8 +420,6 @@ export default function Home() {
                   onChange={(k, v) => rd.setRdParts((p) => ({ ...p, [k]: v }))}
                   renumber={rd.rdRenumber}
                   onRenumberChange={rd.setRdRenumber}
-                  topicHeader={rd.rdTopicHeader}
-                  onTopicHeaderChange={rd.setRdTopicHeader}
                   filesCount={rd.rdDocs.length}
                   questionsCount={rd.rdTotalQuestions}
                   found={rd.rdFoundStats}

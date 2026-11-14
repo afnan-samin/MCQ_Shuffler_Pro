@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PART_LABELS, type PartKind, type PartSel } from "@/lib/mcq/redownload";
-import { FileCheck2, Hash, Heading, Save, Sparkles, X } from "lucide-react";
+import { FileCheck2, Hash, Save, Sparkles, X } from "lucide-react";
 
 export interface RedownloadFoundStats {
   withReference: number;
@@ -17,18 +17,19 @@ export interface RedownloadFoundStats {
   optionsTotal: number;
   withAnswer: number;
   withBekkha: number;
+  /** body-level elements outside any MCQ block (Header part) */
+  headerLines: number;
+  /** "Topic:"/"Source:" lines inside MCQ blocks (Topic part) */
+  topicLines: number;
 }
 
 export interface RedownloadPartsCardProps {
   /** সব ফাইল মিলিয়ে প্রতি অংশের প্যারা-সংখ্যা (legacy — ব্যাজে আর ব্যবহার হয় না) */
   counts: Record<PartKind, number>;
   sel: PartSel;
-  onChange: (kind: PartKind, v: boolean) => void;
+  onChange: (kind: keyof PartSel, v: boolean) => void;
   renumber: boolean;
   onRenumberChange: (v: boolean) => void;
-  /** "Topic & Header" টগল — OFF হলে "Topic:"/"UwcK:" লাইন ও রঙ-হেডার বাদ */
-  topicHeader: boolean;
-  onTopicHeaderChange: (v: boolean) => void;
   filesCount: number;
   questionsCount: number;
   /** কয়টা প্রশ্নে কোন অংশ পাওয়া গেছে — ব্যাজে এটাই দেখায় */
@@ -45,16 +46,37 @@ interface RdPreset {
   renumber: boolean;
 }
 const RD_PRESETS_KEY = "mcq-rd-presets";
+/** Legacy "Topic & Header" switch key — seeds missing header/topic in old presets */
+const LEGACY_TOPIC_HEADER_KEY = "mcq-rd-topic-header";
+/** Old "Topic & Header" value from localStorage — null when absent/corrupt */
+function legacyTopicHeader(): boolean | null {
+  try {
+    const raw =
+      typeof window === "undefined" ? null : window.localStorage.getItem(LEGACY_TOPIC_HEADER_KEY);
+    if (raw == null) return null;
+    const parsed: unknown = JSON.parse(raw);
+    return typeof parsed === "boolean" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 function loadRdPresets(): RdPreset[] {
   try {
     const raw = typeof window === "undefined" ? null : window.localStorage.getItem(RD_PRESETS_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed)
-      ? parsed.filter(
-          (p): p is RdPreset =>
-            p && typeof p.name === "string" && p.parts && typeof p.parts === "object" && typeof p.renumber === "boolean"
-        )
-      : [];
+    if (!Array.isArray(parsed)) return [];
+    // Old presets carry only the six part keys — header/topic default to the
+    // legacy "Topic & Header" value, else true (same rule as the engine).
+    const legacy = legacyTopicHeader();
+    return parsed
+      .filter(
+        (p): p is RdPreset =>
+          p && typeof p.name === "string" && p.parts && typeof p.parts === "object" && typeof p.renumber === "boolean"
+      )
+      .map((p) => ({
+        ...p,
+        parts: { ...p.parts, header: p.parts.header ?? legacy ?? true, topic: p.parts.topic ?? legacy ?? true },
+      }));
   } catch {
     return [];
   }
@@ -157,15 +179,20 @@ function RdPresetsBar({
   );
 }
 
-const KIND_ORDER: PartKind[] = ["serial", "question", "reference", "options", "answer", "bekkha"];
+const KIND_ORDER: Array<keyof PartSel> = ["header", "serial", "question", "reference", "options", "answer", "bekkha", "topic"];
 
-const KIND_HINTS: Record<Exclude<PartKind, "other" | "topic">, string> = {
+/** "header" is a PartSel key, not a PartKind — its label lives here */
+const partName = (k: keyof PartSel): string => (k === "header" ? "Header" : PART_LABELS[k]);
+
+const KIND_HINTS: Record<keyof PartSel, string> = {
+  header: "Everything outside the questions — titles, instructions, answer-key list, tables",
   serial: "Numbers kept / renumbered",
   question: "The question text itself",
   reference: "Stimulus / reference paragraph",
   options: "ক খ গ ঘ — the four options",
   answer: "Answer (উঃ ক / answer key)",
   bekkha: "Explanation / solution part",
+  topic: "The \"Topic:\"/\"Source:\" lines inside a question",
 };
 
 /** অংশ-বাছাই কার্ড — কোন অংশগুলো নতুন ফাইলে থাকবে (ডিফল্ট: সিরিয়াল + প্রশ্ন) */
@@ -175,8 +202,6 @@ export function RedownloadPartsCard({
   onChange,
   renumber,
   onRenumberChange,
-  topicHeader,
-  onTopicHeaderChange,
   filesCount,
   questionsCount,
   found,
@@ -185,7 +210,7 @@ export function RedownloadPartsCard({
   const expansionActive = !sel.options && sel.answer;
 
   /** প্রতি অংশের ব্যাজ-টেক্সট — কয়টায় পাওয়া গেছে (০ হলেও দেখায়) */
-  const badgeText = (k: PartKind): string => {
+  const badgeText = (k: keyof PartSel): string => {
     switch (k) {
       case "serial":
         return `${questionsCount} found`;
@@ -199,6 +224,10 @@ export function RedownloadPartsCard({
         return found ? `${found.withAnswer}/${questionsCount} qs` : `${counts[k]} lines`;
       case "bekkha":
         return found ? `${found.withBekkha}/${questionsCount} qs` : `${counts[k]} lines`;
+      case "header":
+        return `${found?.headerLines ?? 0} lines`;
+      case "topic":
+        return `${found?.topicLines ?? 0} lines`;
       default:
         return `${counts[k]} lines`;
     }
@@ -222,37 +251,39 @@ export function RedownloadPartsCard({
       <CardContent className="space-y-4">
         {/* Download presets — বারবার একই বাছাই নাম দিয়ে সেভ-রিইউজ (Phase 2 #6) */}
         {onApplyPreset && <RdPresetsBar sel={sel} renumber={renumber} onApply={onApplyPreset} />}
-        {/* ছয় অংশের চেকবক্স — পুরো রো-তেই ক্লিক করলে টগল হয় */}
+        {/* আট অংশের চেকবক্স — পুরো রো-তেই ক্লিক করলে টগল হয় */}
         <div className="grid gap-2 sm:grid-cols-2">
-          {KIND_ORDER.map((k) => (
+          {KIND_ORDER.map((k) => {
+            const on = sel[k] ?? true;
+            return (
             <div
               key={k}
               role="checkbox"
-              aria-checked={sel[k]}
-              aria-label={PART_LABELS[k]}
+              aria-checked={on}
+              aria-label={partName(k)}
               tabIndex={0}
-              onClick={() => onChange(k, !sel[k])}
+              onClick={() => onChange(k, !on)}
               onKeyDown={(e) => {
                 if (e.key === " " || e.key === "Enter") {
                   e.preventDefault();
-                  onChange(k, !sel[k]);
+                  onChange(k, !on);
                 }
               }}
               className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${
-                sel[k] ? "border-brand-400 bg-brand-50/60 dark:border-brand-700 dark:bg-brand-950/20" : "border-border hover:bg-muted/50"
+                on ? "border-brand-400 bg-brand-50/60 dark:border-brand-700 dark:bg-brand-950/20" : "border-border hover:bg-muted/50"
               }`}
             >
               <Checkbox
-                checked={sel[k]}
+                checked={on}
                 onCheckedChange={(v) => onChange(k, v === true)}
                 onClick={(e) => e.stopPropagation()}
                 className="mt-0.5"
-                aria-label={PART_LABELS[k]}
+                aria-label={partName(k)}
                 tabIndex={-1}
               />
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-2 text-sm font-semibold">
-                  {PART_LABELS[k]}
+                  {partName(k)}
                   <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
                     {badgeText(k)}
                   </Badge>
@@ -260,7 +291,8 @@ export function RedownloadPartsCard({
                 <span className="mt-0.5 block text-xs text-muted-foreground">{KIND_HINTS[k]}</span>
               </span>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* রিনাম্বার সুইচ */}
@@ -275,25 +307,6 @@ export function RedownloadPartsCard({
             </p>
           </div>
           <Switch checked={renumber} onCheckedChange={onRenumberChange} aria-label="Serial renumber toggle" />
-        </div>
-
-        {/* "Topic & Header" সুইচ */}
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/40 p-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-sm font-semibold">
-              <Heading className="h-4 w-4 text-brand-700 dark:text-brand-400" />
-              Topic &amp; Header
-            </div>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Keep &quot;Topic:&quot;/&quot;UwcK:&quot; lines and coloured section headers/titles. Off = those are removed (references stay).
-            </p>
-          </div>
-          <Switch
-            checked={topicHeader}
-            onCheckedChange={onTopicHeaderChange}
-            aria-label="Topic and header toggle"
-            data-testid="rd-topic-header"
-          />
         </div>
 
         {/* উত্তর-বিস্তার হিন্ট */}

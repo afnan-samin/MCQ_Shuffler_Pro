@@ -113,26 +113,38 @@ const outPractice = buildRedownloadXml(SYNTH, parse, [0, 1], {
 });
 ok(outPractice.includes("H2O"), "অপশন আছে");
 ok(!outPractice.includes("উত্তর:"), "উত্তর নেই");
-ok(!outPractice.includes(">১. ক<"), "উত্তরমালার লাইন নেই");
+ok(outPractice.includes("১. ক"), "answer-key list stays — Header defaults on, the answer part no longer drops it");
+ok(outPractice.includes("উত্তরমালা"), "answer-key section header stays (Header on)");
 const pracParas = parasOf(outPractice);
 ok(pracParas.some((t) => t.startsWith("১.") && t.includes("পানির")), "আসল নম্বরসহ (renumber off)");
 
 console.log("\n== ৪) উত্তর-বিস্তার: অপশন বাদ + উত্তর আছে → অক্ষরের জায়গায় অপশনের পুরো লেখা ==");
 const outExpand = buildRedownloadXml(SYNTH, parse, [0, 1], {
-  partSel: { serial: true, question: true, reference: false, options: false, answer: true, bekkha: false },
+  partSel: { serial: true, question: true, reference: false, options: false, answer: true, bekkha: false, header: false },
   renumber: true,
   expandAnswer: true,
 });
 const expParas = parasOf(outExpand);
 ok(expParas.some((t) => t === "Ans: ক) H2O"), `block answer rewritten as "Ans: ক) H2O" (file label + verbatim runs)`);
-ok(expParas.some((t) => t.includes("১.") && t.includes("H2O") && !t.includes("ক) H2O")), 'উত্তরমালার "১. ক" বিস্তৃত → "১. H2O"');
-ok(expParas.some((t) => t.includes("২.") && t.includes("ঢাকা") && !t.includes("খ) ঢাকা")), 'উত্তরমালার "২. খ" বিস্তৃত → "২. ঢাকা"');
+ok(!outExpand.includes("১. ক") && !outExpand.includes("২. খ"), "answer-key list gone (header off) — no longer expanded from");
+ok(!outExpand.includes("উত্তরমালা"), "answer-key section header gone (header off)");
 ok(!expParas.some((t) => t.trim() === "ক) H2O"), "মূল অপশন-প্যারা একা নেই");
-ok(!outExpand.includes("পরমাণুর সমন্বয়ে"), "ব্যাখ্যা নেই (bekkha off)");
+ok(!outExpand.includes("পরমাণুর সমন্বয়ে"), "ব্যাখ্যা নেই (header off — ব্লকের বাইরের লাইন)");
+// Header ON: the answer-key list is header now — kept verbatim, never expanded
+const outKeyKeep = buildRedownloadXml(SYNTH, parse, [0, 1], {
+  partSel: { serial: true, question: true, reference: false, options: false, answer: true, bekkha: false, header: true },
+  renumber: true,
+  expandAnswer: true,
+});
+const keyKeepParas = parasOf(outKeyKeep);
+ok(keyKeepParas.some((t) => t === "Ans: ক) H2O"), "header ON: block answer still rewritten \"Ans: ক) H2O\"");
+ok(keyKeepParas.some((t) => t === "১. ক") && keyKeepParas.some((t) => t === "২. খ"), "header ON: answer-key list kept verbatim (no expansion)");
+ok(!keyKeepParas.some((t) => t === "১. H2O"), 'key line not expanded into "১. H2O"');
+ok(!keyKeepParas.some((t) => t === "২. ঢাকা"), 'key line not expanded into "২. ঢাকা"');
 
 console.log("\n== ৫) সিরিয়াল বাদ (নম্বর ছাড়া প্রশ্ন) ==");
 const outNoSerial = buildRedownloadXml(SYNTH, parse, [0, 1], {
-  partSel: { serial: false, question: true, reference: false, options: false, answer: false, bekkha: false },
+  partSel: { serial: false, question: true, reference: false, options: false, answer: false, bekkha: false, header: false },
   renumber: true,
   expandAnswer: true,
 });
@@ -289,6 +301,99 @@ ok(starOpt.includes("গ. তিন"), "স্টার থাকলেও ফ�
 ok(!starOpt.includes("খ. তিন"), "ভুল লেবেল আর নেই (অফসেট-শিফট নেই)");
 ok(starOpt.includes("ঘ. চার"), "পরের অপশন অক্ষত");
 ok(parseRedownloadXml(outStarOn).labelTypos.length === 0, "স্টার-আউটপুট রিপার্স → টাইপো ০");
+
+// ---- Header/Topic switches: everything outside any MCQ block is Header;
+// "Topic:" lines inside a block are Topic ----
+const tbl = (a: string, b: string) =>
+  `<w:tbl><w:tr><w:tc><w:p><w:r><w:t xml:space="preserve">${a}</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t xml:space="preserve">${b}</w:t></w:r></w:p></w:tc></w:tr></w:tbl>`;
+const HD = [
+  W_DOC_OPEN,
+  p("Annual Examination 2024", "FFF2CC"), // shaded title
+  p("Model Test"), // plain title
+  p(""), // blank line
+  p("Sub: Botany  Topic: Chapter-1"), // stray plain line
+  p("1.প্রশ্নের লেখা যথেষ্ট লম্বা?"),
+  p("ক) এক"),
+  p("খ) দুই"),
+  p("গ) তিন"),
+  p("ঘ) চার"),
+  p("উত্তর: ক"),
+  p("Topic: Chapter-1"), // "Topic:" line inside the block
+  p("ব্যাখ্যা: এর ব্যাখ্যা এখানে"), // explanation inside the block
+  p("উত্তরমালা", "D9EAD3"), // shaded answer-key header (breaks the block)
+  p("১. ক"), // answer-key list
+  tbl("Cell one", "Cell two"), // table outside any MCQ
+  "<w:sectPr/>", // section properties — always kept
+  W_DOC_CLOSE,
+].join("");
+const hdParse = parseRedownloadXml(HD);
+const HD_ALL = { serial: true, question: true, reference: true, options: true, answer: true, bekkha: true, header: true, topic: true };
+
+/** body children as localName|text pairs — order and position checks */
+function bodyKids(xml: string): string[] {
+  const doc = new DOMParser().parseFromString(xml, "application/xml");
+  const body = doc.getElementsByTagNameNS("http://schemas.openxmlformats.org/wordprocessingml/2006/main", "body")[0];
+  return Array.from(body.children).map((el) => `${el.localName}|${(el.textContent ?? "").trim()}`);
+}
+
+console.log("\n== 11) Header switch: everything outside any MCQ block ==");
+ok(hdParse.questions.length === 1, `one MCQ parsed (got ${hdParse.questions.length})`);
+ok(hdParse.headerCount === 7, `header element count 7 (got ${hdParse.headerCount})`);
+const outHdOff = buildRedownloadXml(HD, hdParse, [0], { partSel: { ...HD_ALL, header: false }, renumber: false, expandAnswer: false });
+ok(!outHdOff.includes("Annual Examination 2024"), "header OFF: shaded title removed");
+ok(!outHdOff.includes("Model Test"), "header OFF: plain title removed");
+ok(!outHdOff.includes("Sub: Botany"), "header OFF: stray plain line removed");
+ok(!outHdOff.includes("<w:tbl"), "header OFF: table outside any MCQ removed");
+ok(!outHdOff.includes("উত্তরমালা"), "header OFF: answer-key section header removed");
+ok(!outHdOff.includes("১. ক"), "header OFF: answer-key list removed");
+ok(!parasOf(outHdOff).some((t) => t === ""), "header OFF: blank line removed");
+ok(outHdOff.includes("<w:sectPr"), "header OFF: sectPr still kept");
+ok(outHdOff.includes("প্রশ্নের লেখা") && outHdOff.includes("ক) এক"), "header OFF: question and options kept");
+ok(outHdOff.includes("উত্তর: ক"), "header OFF: in-block answer kept");
+ok(outHdOff.includes("এর ব্যাখ্যা"), "header OFF: in-block explanation kept");
+ok(outHdOff.includes("Topic: Chapter-1"), "header OFF: in-block topic line kept (topic part on)");
+const outHdOn = buildRedownloadXml(HD, hdParse, [0], { partSel: HD_ALL, renumber: false, expandAnswer: false });
+ok(
+  JSON.stringify(bodyKids(outHdOn)) === JSON.stringify(bodyKids(HD)),
+  "header ON: every body element kept in the original order and position"
+);
+
+console.log("\n== 12) Topic switch: \"Topic:\" lines inside a block ==");
+const outTopicOff = buildRedownloadXml(HD, hdParse, [0], { partSel: { ...HD_ALL, topic: false }, renumber: false, expandAnswer: false });
+ok(!parasOf(outTopicOff).some((t) => t === "Topic: Chapter-1"), "topic OFF: in-block topic line removed");
+ok(outTopicOff.includes("Annual Examination 2024"), "topic OFF: shaded heading outside blocks stays (header on)");
+ok(outTopicOff.includes("Sub: Botany"), "topic OFF: plain line with a Topic mention stays (header on)");
+ok(outTopicOff.includes("উত্তর: ক") && outTopicOff.includes("এর ব্যাখ্যা"), "topic OFF: answer and explanation unchanged");
+{
+  const onKids = bodyKids(outHdOn);
+  const offKids = bodyKids(outTopicOff);
+  const topicIdx = onKids.indexOf("p|Topic: Chapter-1");
+  ok(
+    topicIdx > 0 &&
+      offKids.length === onKids.length - 1 &&
+      offKids.every((t, i) => t === onKids[i < topicIdx ? i : i + 1]),
+    "topic OFF: only the topic line is missing, everything else in its original position"
+  );
+}
+
+console.log("\n== 13) preset part formats: old 6-key loads, new 8-key round-trips ==");
+// old preset shape: only the six part keys, exactly as saved by the previous version
+const oldPresetParts = { serial: true, question: true, reference: true, options: true, answer: true, bekkha: true };
+const outOldPreset = buildRedownloadXml(HD, hdParse, [0], { partSel: oldPresetParts, renumber: false, expandAnswer: false });
+ok(
+  outOldPreset.includes("Annual Examination 2024") && outOldPreset.includes("Topic: Chapter-1"),
+  "old 6-key preset: missing header/topic default to on"
+);
+ok(
+  JSON.stringify(bodyKids(outOldPreset)) === JSON.stringify(bodyKids(outHdOn)),
+  "old 6-key preset output equals the new all-on 8-key output"
+);
+// new preset shape: all eight keys — unticked header/topic survive a save+apply round-trip
+const savedPresetParts = { ...HD_ALL, header: false, topic: false };
+const outNewPreset = buildRedownloadXml(HD, hdParse, [0], { partSel: savedPresetParts, renumber: false, expandAnswer: false });
+ok(!outNewPreset.includes("Annual Examination 2024"), "new preset round-trip: header off is respected");
+ok(!outNewPreset.includes("Topic: Chapter-1"), "new preset round-trip: topic off is respected");
+ok(outNewPreset.includes("প্রশ্নের লেখা") && outNewPreset.includes("ক) এক"), "new preset round-trip: question parts still on");
 
 console.log(`\n=== ফলাফল: ${passed} পাস, ${failed} ফেল ===`);
 process.exit(failed ? 1 : 0);
