@@ -9,6 +9,7 @@
 // ============================================================
 
 import {
+  TOPIC_LABEL_BIJOY,
   TOPIC_LABEL_KEYWORDS,
   W_NS,
   collectParaTs,
@@ -223,13 +224,13 @@ function findBareRefToken(line: string): RefToken | null {
 }
 
 /**
- * স্ট্যান্ডঅ্যালোন সোর্স-লেবেল লাইন — "Topic: ...", "UwcK: ...", "উৎস: ...",
- * "Source: ..."। পুরো প্যারা লেবেল+কনটেন্ট (বছর লাগে না)। শুধু লাইন-শুরুতে
- * মেলে — মাঝ-লাইনের "e¨vL¨v : ... ; UwcK : ..." (ব্যাখ্যা) বা অপশন-টেক্সট
- * কখনোই ধরা পড়ে না।
+ * স্ট্যান্ডঅ্যালোন সোর্স-লেবেল লাইন — "Topic: ...", "UwcK: ...", "UwcKt ..."
+ * (Bijoy কোলন), "উৎস: ...", "Source: ...", "Ref/Reference: ..."। পুরো প্যারা
+ * লেবেল+কনটেন্ট (বছর লাগে না)। শুধু লাইন-শুরুতে মেলে — মাঝ-লাইনের
+ * "e¨vL¨v : ... ; UwcK : ..." (ব্যাখ্যা) বা অপশন-টেক্সট কখনোই ধরা পড়ে না।
  */
 const SOURCE_LABEL_LINE_RE = new RegExp(
-  `^\\s*(?:${TOPIC_LABEL_KEYWORDS}|Ref|Reference)\\s*:`,
+  `^\\s*(?:(?:${TOPIC_LABEL_KEYWORDS}|Ref|Reference)\\s*:|${TOPIC_LABEL_BIJOY})`,
   "i"
 );
 

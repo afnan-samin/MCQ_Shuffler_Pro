@@ -479,5 +479,53 @@ ok(
   "rich fixture: header OFF keeps the question block"
 );
 
+console.log("\n== 15) Bijoy topic label inside a block (\\\"UwcKt\\\"/\\\"UwcK:\\\") ==");
+// SutonnyMJ-তে কোলন গ্লিফ = অক্ষর "t" → করপাসে দুটো রূপই আছে: "UwcK:" ও "UwcKt"।
+// দুটোই in-block topic লাইন হিসেবে ডিটেক্ট হবে এবং Topic সুইচে একসাথে যাবে/থাকবে।
+const BJ = [
+  W_DOC_OPEN,
+  p("UwcKt †kÖwY-‡kÖwY Abyhvqx cÖkœ"),
+  p("1. cÖkœwU †h‡nZz †`L‡Z LyeB mnR,"),
+  p("K) GK"),
+  p("L) `yB"),
+  p("M) wZb"),
+  p("N) Pvi"),
+  p("DËi: K"),
+  p("UwcKt mvaviY MwYZ"), // Bijoy কোলন-রূপ (t)
+  p("UwcK: mvaviY MwYZ"), // ASCII কোলন-রূপ
+  p("e¨vL¨v: GB cÖkœwUi e¨vL¨v GKLv‡b"),
+  W_DOC_CLOSE,
+].join("");
+const bjParse = parseRedownloadXml(BJ);
+const bjParas = parasOf(BJ);
+const bijoyIdx = bjParas.indexOf("UwcKt mvaviY MwYZ");
+const asciiIdx = bjParas.indexOf("UwcK: mvaviY MwYZ");
+ok(
+  bijoyIdx > 0 && bjParse.kinds[bijoyIdx] === "topic",
+  `Bijoy colon form "UwcKt …" is a topic line (got ${JSON.stringify(bjParse.kinds[bijoyIdx])})`
+);
+ok(
+  asciiIdx > 0 && bjParse.kinds[asciiIdx] === "topic",
+  `ASCII colon form "UwcK: …" is a topic line (got ${JSON.stringify(bjParse.kinds[asciiIdx])})`
+);
+ok(
+  bjParse.blockIndex[bijoyIdx] >= 0 && bjParse.blockIndex[asciiIdx] >= 0,
+  "both topic lines sit inside the MCQ block (not header/outside elements)"
+);
+const bjOn = buildRedownloadXml(BJ, bjParse, [0], { partSel: HD_ALL, renumber: false, expandAnswer: false });
+ok(
+  bjOn.includes("UwcKt mvaviY MwYZ") && bjOn.includes("UwcK: mvaviY MwYZ"),
+  "topic ON: both topic spellings survive"
+);
+const bjOff = buildRedownloadXml(BJ, bjParse, [0], { partSel: { ...HD_ALL, topic: false }, renumber: false, expandAnswer: false });
+ok(
+  !bjOff.includes("UwcKt mvaviY MwYZ") && !bjOff.includes("UwcK: mvaviY MwYZ"),
+  "topic OFF: both topic spellings removed"
+);
+ok(
+  bjOff.includes("cÖkœwU") && bjOff.includes("DËi: K") && bjOff.includes("GB cÖkœwUi"),
+  "topic OFF: question, answer and explanation untouched"
+);
+
 console.log(`\n=== ফলাফল: ${passed} পাস, ${failed} ফেল ===`);
 process.exit(failed ? 1 : 0);
