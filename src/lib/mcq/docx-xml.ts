@@ -144,6 +144,20 @@ export interface ParaRun {
   sub?: 1;
   /** m:oMath — ইটালিক math-স্টাইলে */
   math?: 1;
+  /** rich mode only: run is bold (w:b / w:bCs) */
+  bold?: 1;
+  /** rich mode only: run is italic (w:i / w:iCs) */
+  italic?: 1;
+  /** rich mode only: run is underlined (w:u) */
+  underline?: 1;
+  /** rich mode only: run is struck through (w:strike / w:dstrike) */
+  strike?: 1;
+  /** rich mode only: w:color val (hex, "auto" skipped) */
+  color?: string;
+  /** rich mode only: w:highlight val (named colour, "none" skipped) */
+  highlight?: string;
+  /** rich mode only: w:sz / w:szCs val in half-points */
+  size?: number;
 }
 
 /**
@@ -151,22 +165,73 @@ export interface ParaRun {
  * vertAlign আর oMath আলাদা করে ধরে। রান-টেক্সট জোড়া দিলে extractParaText-এর
  * আউটপুটের সমান (tab=\t, br=" ") — অফসেট-স্লাইসিং এই সমীকরণের উপর দাঁড়িয়ে।
  */
-export function extractParaRuns(el: Element): ParaRun[] {
+export function extractParaRuns(el: Element, opts?: { rich?: boolean }): ParaRun[] {
+  const rich = opts?.rich === true;
   const runs: ParaRun[] = [];
   const push = (text: string, extra?: Partial<ParaRun>) => {
     if (!text) return;
     const last = runs[runs.length - 1];
-    if (last && extra && !!last.sup === !!extra.sup && !!last.sub === !!extra.sub && !!last.math === !!extra.math) {
+    if (
+      last &&
+      extra &&
+      !!last.sup === !!extra.sup &&
+      !!last.sub === !!extra.sub &&
+      !!last.math === !!extra.math &&
+      // rich fields are compared only in rich mode (never set otherwise)
+      (!rich ||
+        (!!last.bold === !!extra.bold &&
+          !!last.italic === !!extra.italic &&
+          !!last.underline === !!extra.underline &&
+          !!last.strike === !!extra.strike &&
+          last.color === extra.color &&
+          last.highlight === extra.highlight &&
+          last.size === extra.size))
+    ) {
       last.text += text;
     } else {
       runs.push({ text, ...extra });
     }
+  };
+  /** rich mode: run flags — val 0/false/off/noStrike means off */
+  const flagOn = (rPr: Element, names: string[]): boolean => {
+    for (const n of names) {
+      for (const c of Array.from(rPr.children)) {
+        if (c.localName !== n) continue;
+        const v = c.getAttribute("w:val") ?? c.getAttributeNS(W_NS, "val") ?? "";
+        return !(v === "0" || v === "false" || v === "off" || v === "noStrike");
+      }
+    }
+    return false;
+  };
+  /** rich mode: a run's rPr as run flags, colour, highlight, size, vertAlign */
+  const richFmt = (rPr: Element): Partial<ParaRun> => {
+    const f: Partial<ParaRun> = {};
+    for (const c of Array.from(rPr.children)) {
+      const v = c.getAttribute("w:val") ?? c.getAttributeNS(W_NS, "val") ?? "";
+      if (c.localName === "vertAlign") {
+        if (v === "superscript") f.sup = 1;
+        else if (v === "subscript") f.sub = 1;
+      } else if (c.localName === "color") {
+        if (v && v !== "auto") f.color = v;
+      } else if (c.localName === "highlight") {
+        if (v && v !== "none") f.highlight = v;
+      } else if (c.localName === "sz" || c.localName === "szCs") {
+        const n = parseInt(v, 10);
+        if (!isNaN(n) && f.size === undefined) f.size = n;
+      }
+    }
+    if (flagOn(rPr, ["b", "bCs"])) f.bold = 1;
+    if (flagOn(rPr, ["i", "iCs"])) f.italic = 1;
+    if (flagOn(rPr, ["u"])) f.underline = 1;
+    if (flagOn(rPr, ["strike", "dstrike"])) f.strike = 1;
+    return f;
   };
   const walk = (node: Element, fmt?: Partial<ParaRun>) => {
     for (const child of Array.from(node.children)) {
       const ln = child.localName;
       if (ln === "pPr" || ln === "tblPr" || ln === "trPr" || ln === "tcPr" || ln === "sectPr") continue;
       if (ln === "rPr") {
+        if (rich) continue; // rich: the owning w:r picks its own rPr up below
         // রান-প্রপার্টি — vertAlign পরের রানের ফরম্যাট
         const va = child.getElementsByTagNameNS(W_NS, "vertAlign")[0];
         const nf: Partial<ParaRun> = {};
@@ -176,6 +241,12 @@ export function extractParaRuns(el: Element): ParaRun[] {
           else if (v === "subscript") nf.sub = 1;
         }
         walk(child, nf); // rPr-এর ভেতরে টেক্সট নেই, কিন্তু সেফ
+        continue;
+      }
+      if (rich && ln === "r") {
+        // rich: the run's own rPr formats its text children
+        const rPr = Array.from(child.children).find((c) => c.localName === "rPr");
+        walk(child, rPr ? { ...fmt, ...richFmt(rPr as Element) } : fmt);
         continue;
       }
       if (ln === "t") {
@@ -821,6 +892,8 @@ function splitEmbeddedOptions(o: OptionPreview): OptionPreview[] {
 
 export interface DocxTableCell {
   text: string;
+  /** rich per-cell runs (paragraphs joined with "\n") — used by the removed-headers preview */
+  runs?: ParaRun[];
 }
 
 /** প্রশ্ন-ব্লকের টেবিল — সারি × সেল টেক্সট-গ্রিড (প্রিভিউ-রেন্ডারে) */
@@ -956,7 +1029,7 @@ export function parseDocxXml(xml: string): DocxParseResult {
     // অফসেট-স্লাইসিং নির্ভুল; না মিললে (বিরল এজ-কেস) runs বাদ, প্লেইন টেক্সটই
     const paraEls: Element[] = [];
     for (let i = c.start; i <= c.end; i++) if (kids[i].localName === "p") paraEls.push(kids[i]);
-    const parasRuns = paraEls.map(extractParaRuns);
+    const parasRuns = paraEls.map((el) => extractParaRuns(el));
     const flat = flattenParaRuns(parasRuns);
     const flatStr = runsText(flat);
     const richOk = flatStr === text;

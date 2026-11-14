@@ -13,9 +13,9 @@ const dom = new JSDOM("<!doctype html><html><body></body></html>");
 (globalThis as unknown as Record<string, unknown>).XMLSerializer = dom.window.XMLSerializer;
 (globalThis as unknown as Record<string, unknown>).Node = dom.window.Node;
 
-const { parseRedownloadXml, buildRedownloadXml, extractWatermark, DEFAULT_PART_SELECTION } =
+const { parseRedownloadXml, buildRedownloadXml, extractWatermark, DEFAULT_PART_SELECTION, collectHeaderEntries } =
   await import("../src/lib/mcq/redownload");
-const { parseDocxXml } = await import("../src/lib/mcq/docx-xml");
+const { parseDocxXml, runsText } = await import("../src/lib/mcq/docx-xml");
 
 let passed = 0;
 let failed = 0;
@@ -394,6 +394,90 @@ const outNewPreset = buildRedownloadXml(HD, hdParse, [0], { partSel: savedPreset
 ok(!outNewPreset.includes("Annual Examination 2024"), "new preset round-trip: header off is respected");
 ok(!outNewPreset.includes("Topic: Chapter-1"), "new preset round-trip: topic off is respected");
 ok(outNewPreset.includes("প্রশ্নের লেখা") && outNewPreset.includes("ক) এক"), "new preset round-trip: question parts still on");
+
+console.log("\n== 14) removed-headers helper: the card list equals what Header OFF removes ==");
+const hdEntries = collectHeaderEntries(HD, hdParse);
+ok(
+  hdEntries.length === hdParse.headerCount,
+  `helper lists every header element (${hdEntries.length} vs headerCount ${hdParse.headerCount})`
+);
+const helperKids = hdEntries.map((e) =>
+  e.kind === "table" ? `tbl|${e.rows.map((row) => row.map((c) => c.text).join("")).join("")}` : `p|${runsText(e.runs).trim()}`
+);
+ok(
+  helperKids.filter((k) => k.startsWith("tbl")).length === 1,
+  "helper marks the header table as one table entry"
+);
+ok(
+  helperKids.some((k) => k === "p|"),
+  "helper keeps blank paragraphs as entries (the card collapses them into a count)"
+);
+const hdKidsAll = bodyKids(HD);
+const hdOffKids = bodyKids(outHdOff);
+const removedKids = hdKidsAll.filter((k) => k !== "sectPr|" && !hdOffKids.includes(k));
+ok(
+  JSON.stringify(helperKids) === JSON.stringify(removedKids),
+  "helper list equals the removed body elements, in document order"
+);
+ok(
+  helperKids.every((k) => !hdOffKids.includes(k)),
+  "every listed element is absent from the header-OFF output"
+);
+
+// rich header fixture: formatting the card must mirror
+const rRun = (text: string, rPr = "") =>
+  `<w:r>${rPr ? `<w:rPr>${rPr}</w:rPr>` : ""}<w:t xml:space="preserve">${text}</w:t></w:r>`;
+const rTbl = (a: string, b: string) =>
+  `<w:tbl><w:tr><w:tc><w:tcPr><w:shd w:val="clear" w:fill="D9EAD3"/></w:tcPr><w:p>${rRun(a, "<w:b/>")}</w:p></w:tc><w:tc><w:p>${rRun(b)}</w:p></w:tc></w:tr></w:tbl>`;
+const RHD = [
+  W_DOC_OPEN,
+  p("Plain header line"),
+  `<w:p><w:pPr><w:jc w:val="center"/><w:shd w:val="clear" w:fill="FFF2CC"/></w:pPr>${rRun("Shaded title", "<w:b/><w:color w:val=\"FF0000\"/><w:sz w:val=\"40\"/>")}${rRun("2", "<w:vertAlign w:val=\"superscript\"/>")}</w:p>`,
+  `<w:p>${rRun("Inline image ahead")}<w:r><w:drawing/></w:r></w:p>`,
+  `<w:p xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath><m:r><m:t>x</m:t></m:r></m:oMath></w:p>`,
+  rTbl("Cell one", "Cell two"),
+  p("1. Question with enough text?"),
+  p("a) one"),
+  p("b) two"),
+  p("c) three"),
+  p("d) four"),
+  p("Ans: a"),
+  "<w:sectPr/>",
+  W_DOC_CLOSE,
+].join("");
+const rhdParse = parseRedownloadXml(RHD);
+const rEntries = collectHeaderEntries(RHD, rhdParse);
+ok(rEntries.length === 5 && rhdParse.headerCount === 5, `rich fixture: 5 header entries (${rEntries.length} vs headerCount ${rhdParse.headerCount})`);
+const [r0, r1, r2, r3, r4] = rEntries;
+ok(r0.kind === "para" && runsText(r0.runs) === "Plain header line", "rich fixture: plain para entry in document order");
+ok(
+  r1.kind === "para" && r1.align === "center" && r1.shading === "FFF2CC",
+  "rich fixture: alignment and paragraph shading extracted"
+);
+ok(
+  r1.kind === "para" && r1.runs[0].bold === 1 && r1.runs[0].color === "FF0000" && r1.runs[0].size === 40,
+  "rich fixture: header runs carry bold, colour and size"
+);
+ok(r1.kind === "para" && r1.runs[1].sup === 1, "rich fixture: header runs carry superscript");
+ok(r2.kind === "para" && r2.hasImage && !r2.hasEquation, "rich fixture: image badge flag detected");
+ok(r3.kind === "para" && r3.hasEquation && !r3.hasImage, "rich fixture: equation badge flag detected");
+ok(
+  r4.kind === "table" && r4.rows.length === 1 && r4.rows[0][0].text === "Cell one" && r4.rows[0][1].text === "Cell two",
+  "rich fixture: table entry with cell texts"
+);
+ok(
+  r4.kind === "table" && r4.rows[0][0].runs?.[0].bold === 1 && r4.rows[0][0].shading === "D9EAD3" && !r4.rows[0][1].runs?.[0].bold,
+  "rich fixture: cell runs and cell shading extracted"
+);
+const outRhdOff = buildRedownloadXml(RHD, rhdParse, [0], { partSel: { ...HD_ALL, header: false }, renumber: false, expandAnswer: false });
+ok(
+  !outRhdOff.includes("Plain header line") && !outRhdOff.includes("Cell one") && !outRhdOff.includes("Inline image ahead") && !outRhdOff.includes("oMath"),
+  "rich fixture: header OFF removes exactly the listed elements"
+);
+ok(
+  outRhdOff.includes("Question with enough text") && outRhdOff.includes("Ans: a"),
+  "rich fixture: header OFF keeps the question block"
+);
 
 console.log(`\n=== ফলাফল: ${passed} পাস, ${failed} ফেল ===`);
 process.exit(failed ? 1 : 0);

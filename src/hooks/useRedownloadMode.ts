@@ -16,6 +16,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   buildRedownloadXml,
+  collectHeaderEntries,
   DEFAULT_PART_SELECTION,
   parseRedownloadXml,
   extractWatermark,
@@ -47,6 +48,7 @@ import {
 } from "@/lib/mcq/option-labels";
 import { type LabelTypoRow } from "@/components/mcq/label-typos-card";
 import { answerConflictRowsOf, type AnswerConflictRow } from "@/components/mcq/answer-conflicts-card";
+import { type RemovedHeadersDoc } from "@/components/mcq/removed-headers-card";
 
 /** রিডাউনলোডের অপশন-লেবেল কাস্টমাইজ সেটিংস (persisted — REDOWNLOAD-ONLY, 3-F-এ page-এর কপি কাটবে) */
 const OPTION_LABELS_KEY = "mcq-option-labels";
@@ -187,6 +189,15 @@ export function useRedownloadMode(deps: RedownloadDeps) {
   const rdAnswerConflicts = useMemo<AnswerConflictRow[]>(
     () => rdDocs.flatMap((d) => answerConflictRowsOf(d.parse.questions, d.file.name)),
     [rdDocs]
+  );
+  // Removed-headers card: rich header entries per file, derived only while the
+  // Header tick is off (zero cost while Header is ticked)
+  const rdRemovedHeaders = useMemo<RemovedHeadersDoc[]>(
+    () =>
+      rdParts.header === false
+        ? rdDocs.map((d) => ({ fileName: d.file.name, entries: collectHeaderEntries(d.xml, d.parse) }))
+        : [],
+    [rdDocs, rdParts.header]
   );
 
   // ================== REDOWNLOAD MODE ==================
@@ -394,7 +405,7 @@ export function useRedownloadMode(deps: RedownloadDeps) {
     rdMergedBusy, rdZipBusy,
     // derived
     rdTotalCounts, rdTotalQuestions, rdSelTotal, rdFoundStats,
-    rdLabelTypos, rdAnswerConflicts,
+    rdLabelTypos, rdAnswerConflicts, rdRemovedHeaders,
     // handlers
     loadRedownloadFiles, reorderRdDocs, removeRdDoc,
     rdSelOf, toggleRdQuestion, selectAllRd, selectNoneRd, selectRangeRd,

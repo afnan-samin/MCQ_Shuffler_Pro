@@ -29,6 +29,7 @@ import { RedownloadQuestionsCard } from "@/components/mcq/redownload-questions-c
 import { FontSettingsCard } from "@/components/mcq/font-settings-card";
 import { OptionLabelsCard } from "@/components/mcq/option-labels-card";
 import { LabelTyposCard } from "@/components/mcq/label-typos-card";
+import { RemovedHeadersCard } from "@/components/mcq/removed-headers-card";
 import { AnswerConflictsCard } from "@/components/mcq/answer-conflicts-card";
 import { DuplicateQuestionsCard } from "@/components/mcq/duplicate-questions-card";
 import {
@@ -429,6 +430,9 @@ export default function Home() {
                     toast({ title: "Preset applied", description: "Part selection and renumber toggle restored." });
                   }}
                 />
+
+                {/* Removed headers — visible only while Header is unticked */}
+                <RemovedHeadersCard docs={rd.rdRemovedHeaders} />
 
                 <RedownloadQuestionsCard
                   files={rd.rdDocs.map((d) => ({
