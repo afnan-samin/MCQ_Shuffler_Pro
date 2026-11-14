@@ -4,7 +4,7 @@
  * Phase 3-I — COPY-ONLY extraction of shared services from src/app/page.tsx.
  *
  * - page.tsx থেকে COPY করা (কোনো line কাটা/মুছা হয়নি, page.tsx untouched — NEXT task-এ wire হবে)।
- * - এই hook এখনো page.tsx-এ wire করা হয়নি — compile+unused থাকে, runtime-এ কোনো প্রভাব নেই।
+ * - Used by page.tsx.
  * - NEXT task-এ page.tsx এই hook একবার call করে `shared.<field>` দিয়ে 3 mode hook-এর
  *   deps + JSX ভরবে; তখন page-এর কপি CUT হবে (single source)।
  * - page.tsx বা mode hook থেকে কিছু import করা হয়নি — শুধু lib/hooks থেকে।

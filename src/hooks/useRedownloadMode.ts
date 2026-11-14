@@ -4,7 +4,7 @@
  * Phase 3-E slice 3 — COPY-ONLY extraction of redownload-mode logic from src/app/page.tsx.
  *
  * - page.tsx থেকে COPY করা (কোনো line কাটা/মুছা হয়নি, page.tsx untouched — 3-F-তে wire হবে)।
- * - এই hook এখনো page.tsx-এ wire করা হয়নি — compile+unused থাকে, runtime-এ কোনো প্রভাব নেই।
+ * - Used by page.tsx.
  * - শেয়ার্ড helper (proc-overlay, finalizeDownload, fontSettings, nextMultiId, loader-guard)
  *   page.tsx থেকে PARAM-এ আসে (ShuffleDeps/SerialDeps pattern) — শুধু আসলে-ব্যবহৃতগুলোই।
  * - REDOWNLOAD-ONLY persisted কী (option-label settings, label-fix toggle) hook-এর ভেতরে
